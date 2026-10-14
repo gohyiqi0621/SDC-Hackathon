@@ -42,6 +42,22 @@ Open the app at http://localhost/REPO-NAME
 
 ## 2. Daily Git workflow (VS Code)
 
+### Quick routine
+1. Open the project path inside `htdocs` (for example `C:\xampp\htdocs\REPO-NAME`) in a terminal and run:
+   ```
+   code .
+   ```
+2. In VS Code, click the **refresh / sync icon at the bottom-left status bar** to pull the latest code.
+3. Edit the code.
+4. Open **Source Control** (`Ctrl+Shift+G`).
+5. **Stage** your files (click **+** next to each file).
+6. Write a message and **Commit**.
+7. Click **Sync Changes** to push.
+
+The detailed version of the same steps is below.
+
+### Detailed steps
+
 Click the **Source Control** icon in the left sidebar (the branch symbol), or press `Ctrl+Shift+G`.
 
 ### Step 1: Pull before you start
@@ -132,24 +148,36 @@ git merge --abort
 
 Each database is separate: your XAMPP database, each teammate's XAMPP database, and the Railway database do **not** sync automatically. Git only shares the SQL files, not the data.
 
-### Folder
+### Folder and file format
+Each teammate has their own folder, and each file is named with the date and time it was created:
+
+```
+migrations/teammembername/migration_datetime.sql
+```
+
+Example:
 ```
 database/
   migrations/
-    001_create_users.sql
-    002_add_phone_to_users.sql
+    jocelyn/
+      migration_20261015_143000.sql
+    yiqi/
+      migration_20261016_091500.sql
   seed.sql        (dummy data only)
 ```
 
+The date and time in the name (`YYYYMMDD_HHMMSS`) shows the order the files were made, and separate folders stop two people from creating the same file name.
+
 ### When you change a table
-1. Write the change as a **new numbered SQL file** in `database/migrations/` (for example `003_add_status_to_reports.sql`).
+1. Write the change as a **new SQL file** in your own folder, for example `database/migrations/jocelyn/migration_20261015_143000.sql`.
 2. Run it on your own XAMPP database (phpMyAdmin > Import or SQL tab).
 3. Commit and push the file.
-4. Tell the team: "run 003".
+4. Tell the team the file name.
 5. Teammates pull, then run the new file on their own database.
 6. The same file is also run on the **Railway database** (see section 5).
 
 ### Rules
+- Run files in date/time order, oldest first.
 - Never change a table only in phpMyAdmin. Always write the SQL file too.
 - Never edit a migration file that has already been run. Add a new one.
 - Avoid `DROP TABLE` / `DROP COLUMN` unless you really mean to delete data.
@@ -227,15 +255,7 @@ Only the database connection uses environment variables, and they are set in Rai
 
 ---
 
-## 7. Team
-
-| Name | Role |
-|---|---|
-| Teh Sze Yu Jocelyn | Team leader |
-| Goh Yi Qi | |
-| | |
-
-## 8. Declarations
+## 7. Declarations
 
 - **AI tools used in development:** (list them)
 - **External APIs / services:** (for example Gemini / GPT, Railway)
