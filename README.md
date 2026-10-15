@@ -106,11 +106,7 @@ In VS Code, conflicted files appear under **Merge Changes** in Source Control.
 ### Step 2: Open the conflicted file
 You will see markers like this:
 ```
-<<<<<<< HEAD
 your version of the code
-=======
-your teammate's version of the code
->>>>>>> origin/main
 ```
 
 ### Step 3: Fix it
