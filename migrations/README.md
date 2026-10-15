@@ -1,8 +1,10 @@
 # Migrations
 
-Every schema change is a **new SQL file** so all databases (yours, each
-teammate's, and Railway's) can be brought to the same shape. Git shares the SQL
-files, never the data.
+`database.sql` at the repo root is the **single source of truth** for the
+schema — it creates the database and every table. This folder holds only
+*changes made after* that file, so all databases (yours, each teammate's, and
+Railway's) can be brought to the same shape. Git shares the SQL files, never
+the data.
 
 ## Layout
 
@@ -16,9 +18,6 @@ migrations/
 
 The timestamp keeps files in creation order, and separate folders stop two
 people from creating the same filename.
-
-The two files sitting directly in `migrations/` predate that convention and are
-kept as-is (renaming an applied migration would make it look unapplied).
 
 ## Running a migration
 
@@ -36,8 +35,8 @@ kept as-is (renaming an applied migration would make it look unapplied).
 SELECT filename FROM schema_migrations;   -- what has already been applied
 ```
 
-A fresh import of `database.sql` pre-marks the two shipped migrations, because
-that file already contains their effect.
+It starts empty on a fresh import of `database.sql`, because that file already
+creates every table in its final shape — there is nothing left to apply.
 
 ## Rules
 

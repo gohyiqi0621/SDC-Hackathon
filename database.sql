@@ -165,17 +165,15 @@ CREATE TABLE `notification_reads` (
 
 -- ------------------------------------------------------ schema_migrations ---
 -- Records which migrations/*.sql files have been run against this database, so
--- no one re-runs one twice. Fresh installs (this file) already contain every
--- migration's effect, so the two shipped files are pre-marked as applied.
+-- no one re-runs one twice. This file is the single source of truth for the
+-- schema: it creates every table, and it already contains the effect of every
+-- migration shipped so far, so no migration file needs to run on a fresh
+-- import. It starts empty; add a row when you apply a new migration file.
 CREATE TABLE `schema_migrations` (
     `filename`   VARCHAR(190) NOT NULL,
     `applied_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`filename`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-INSERT INTO `schema_migrations` (`filename`) VALUES
-('migration_2026_10_14.sql'),
-('migration_2026_10_14_notifications.sql');
 
 -- ------------------------------------------------------------------ demo ---
 -- Passwords below are bcrypt hashes of "admin123" and "user123".

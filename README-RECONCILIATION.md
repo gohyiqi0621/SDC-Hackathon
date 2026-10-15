@@ -79,25 +79,25 @@ database/
 **This project has:**
 
 ```
-migrations/migration_2026_10_14.sql
-migrations/migration_2026_10_14_notifications.sql
-database.sql
+database.sql          <- single source of truth: creates DB + every table
+migrations/README.md  <- convention doc (no SQL files yet)
 ```
 
-Differences: there is no `database/` wrapper, no per-teammate subfolders, no
-`seed.sql`, and the installed files are named `YYYY_MM_DD` rather than the
-upstream `YYYYMMDD_HHMMSS`. Two teammates following upstream will create a
-*different tree* from the one that exists here.
+Differences: there is no `database/` wrapper, no per-teammate subfolders, and no
+`seed.sql` (demo data lives inside `database.sql`). The two migration files that
+previously sat here (`migration_2026_10_14.sql`,
+`migration_2026_10_14_notifications.sql`) have been **folded into
+`database.sql`** — every column, index and enum they added was already defined
+there, so a fresh import never needed them.
 
-I added `migrations/README.md` documenting the per-teammate convention. The two
-existing files were deliberately **not** renamed — they have already been applied
-to databases, and renaming would make them look unapplied.
+I added `migrations/README.md` documenting the per-teammate convention for
+*future* changes: `migrations/` now holds additions only, never a `CREATE TABLE`
+copy of something already in `database.sql`.
 
 ### A3. Local database name
 
 **Upstream (§1)** says create a database named `YOUR_LOCAL_DB` (a placeholder).
-**This project** hardcodes `sdc_app` (`config.php` default, `database.sql`,
-`USE \`sdc_app\`` in both migrations).
+**This project** hardcodes `sdc_app` (`config.php` default and `database.sql`).
 
 A teammate who creates `YOUR_LOCAL_DB` literally, or any other name, gets a
 connection failure — and the migrations' `USE \`sdc_app\`` line will fail or
@@ -151,13 +151,18 @@ switch to the wrong database. The README should state `sdc_app` explicitly.
 
 ## D. Rules the local README should adopt
 
+- `database.sql` is the single source of truth for the schema — it creates the
+  database and every table. A fresh import needs nothing else.
+- After the first import, ship each change as a new file in `migrations/`
+  (additions only, never a `CREATE TABLE` copy of an existing table).
 - Run migration files in timestamp order, oldest first.
-- Record each applied file in `schema_migrations` (added to `database.sql`).
+- Record each applied file in `schema_migrations`.
 - Never edit an applied migration — add a new one.
 - Never change a table in phpMyAdmin only — write the SQL file too.
-- **Do not use MariaDB-only syntax** in migrations. XAMPP runs MariaDB, Railway
-  runs MySQL 8. `ADD COLUMN IF NOT EXISTS` / `ADD KEY IF NOT EXISTS` are
-  MariaDB-only and error on MySQL 8 — this was fixed in both shipped migrations.
+- **Do not use MariaDB-only syntax.** XAMPP runs MariaDB, Railway runs MySQL 8.
+  `ADD COLUMN IF NOT EXISTS` / `ADD KEY IF NOT EXISTS` are MariaDB-only and error
+  on MySQL 8 — those clauses were removed from the migrations before they were
+  folded into `database.sql`.
 - Never commit a dump containing real user data or an API key.
 
 ---
