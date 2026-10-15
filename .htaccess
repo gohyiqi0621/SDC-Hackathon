@@ -1,0 +1,15 @@
+# sdc-project/.htaccess
+# XAMPP serves htdocs/ as the web root, so everything outside public/ is
+# reachable by URL unless we block it. These rules close that hole.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Application code and the Python service are never served directly.
+    RewriteRule ^(app|ai-service)/ - [F,L]
+
+    # Root PHP files and SQL dumps are includes, not endpoints.
+    RewriteRule ^(config\.php|db\.php|helpers\.php|database\.sql)$ - [F,L]
+
+    # .env, .env.example, .env.local ...
+    RewriteRule ^\.env - [F,L]
+</IfModule>

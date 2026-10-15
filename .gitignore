@@ -1,0 +1,32 @@
+# --- Secrets: never commit real credentials -------------------------------
+.env
+.env.*
+!.env.example
+
+# --- Logs and runtime output ----------------------------------------------
+*.log
+storage/logs/*
+!storage/logs/.gitkeep
+
+# --- Database dumps: may contain real user data or API keys ---------------
+*.sql.gz
+*dump*.sql
+storage/backups/
+
+# --- OS / editor junk ------------------------------------------------------
+.DS_Store
+Thumbs.db
+__MACOSX/
+._*
+*.swp
+
+# --- Tooling ---------------------------------------------------------------
+.workbuddy-ai/
+.vscode/
+.idea/
+
+# --- Python AI service -----------------------------------------------------
+ai-service/venv/
+ai-service/__pycache__/
+__pycache__/
+*.pyc

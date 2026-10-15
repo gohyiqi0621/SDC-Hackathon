@@ -1,0 +1,12 @@
+# public/uploads/.htaccess - never execute anything served from here.
+# Uploads are user-supplied; they must never run as code.
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+
+<FilesMatch "\.(php|phtml|php3|php4|php5|php7|php8|phps|pl|py|cgi|asp|aspx|sh|shtml)$">
+    Require all denied
+</FilesMatch>
+
+Options -Indexes -ExecCGI
+AddType text/plain .php .phtml .pl .py .cgi .sh
