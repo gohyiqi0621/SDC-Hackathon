@@ -13,14 +13,27 @@ require_once __DIR__ . '/app/onesignal.php';
 
 define('APP_ROOT', __DIR__);
 
-// --- .env loader (hand-rolled so XAMPP needs no Composer) -------------------
+// --- Environment loader (hand-rolled so XAMPP needs no Composer) ------------
+// 1) Real environment variables (Railway, Docker) are read first.
+// 2) A local .env file, if present, overrides them (XAMPP development).
 $envPath = APP_ROOT . '/.env';
-if (!is_file($envPath)) {
-    http_response_code(500);
-    exit('Missing .env file. Copy .env.example to .env and fill in your database details.');
+
+foreach ((getenv() ?: []) as $k => $v) {
+    if (is_string($v) && preg_match('/^[A-Z][A-Z0-9_]*$/', (string) $k)) {
+        $_ENV[$k] = $v;
+    }
 }
 
-foreach (file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+if (!is_file($envPath) && !isset($_ENV['DB_HOST'])) {
+    http_response_code(500);
+    exit('Missing .env file or DB_HOST variable. Copy .env.example to .env and fill in your database details.');
+}
+
+$__envLines = is_file($envPath)
+    ? (file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [])
+    : [];
+
+foreach ($__envLines as $line) {
     $line = trim($line);
     if ($line === '' || $line[0] === '#' || !str_contains($line, '=')) {
         continue;
@@ -34,6 +47,7 @@ foreach (file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line)
     }
     $_ENV[$key] = $value;
 }
+unset($__envLines);
 
 // --- App --------------------------------------------------------------------
 define('APP_NAME', (string) env('APP_NAME', 'SDC App'));
