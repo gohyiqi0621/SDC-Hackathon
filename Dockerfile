@@ -1,4 +1,3 @@
-```dockerfile
 FROM php:8.3-apache
 
 RUN docker-php-ext-install pdo pdo_mysql \
@@ -25,4 +24,3 @@ CMD rm -f /etc/apache2/mods-enabled/mpm_event.* \
  && sed -i "s/:80>/:${PORT}>/" \
            /etc/apache2/sites-available/000-default.conf \
  && apache2-foreground
-```
