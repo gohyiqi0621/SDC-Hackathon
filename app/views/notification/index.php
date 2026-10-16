@@ -53,30 +53,41 @@ $subscriberCount = count($recipients);
     </div>
 <?php endif; ?>
 
+<?php if (ONESIGNAL_APP_ID !== ''): ?>
+<section class="settings-group">
+    <h3 class="settings-group__title">Push on this device</h3>
+    <label class="settings-row">
+        <span>Turn notifications on or off<small>Loud pushes are sent to this browser only when this is on.</small></span>
+        <input class="switch" type="checkbox" role="switch" data-push-switch aria-label="Push notifications" data-push-page>
+    </label>
+    <p class="field__hint" data-push-hint>Turn this on to let your browser ask for permission.</p>
+</section>
+<?php endif; ?>
+
 <?php if ($isAdmin): ?>
     <section class="stat-grid" aria-label="Summary">
         <article class="stat">
             <span class="stat__icon"><?= icon('bell') ?></span>
             <p class="stat__label">Total</p>
-            <p class="stat__value" data-stat="total"><?= e($stats['total']) ?></p>
+            <p class="stat__value" data-stat="total" data-countup><?= e($stats['total']) ?></p>
             <p class="stat__hint">All time</p>
         </article>
         <article class="stat">
             <span class="stat__icon"><?= icon('check') ?></span>
             <p class="stat__label">Sent</p>
-            <p class="stat__value" data-stat="sent"><?= e($stats['sent']) ?></p>
+            <p class="stat__value" data-stat="sent" data-countup><?= e($stats['sent']) ?></p>
             <p class="stat__hint">Delivered to OneSignal</p>
         </article>
         <article class="stat">
             <span class="stat__icon"><?= icon('calendar') ?></span>
             <p class="stat__label">Scheduled</p>
-            <p class="stat__value" data-stat="scheduled"><?= e($stats['scheduled']) ?></p>
+            <p class="stat__value" data-stat="scheduled" data-countup><?= e($stats['scheduled']) ?></p>
             <p class="stat__hint">Waiting to fire</p>
         </article>
         <article class="stat">
             <span class="stat__icon"><?= icon('alert') ?></span>
             <p class="stat__label">Failed</p>
-            <p class="stat__value" data-stat="failed"><?= e($stats['failed']) ?></p>
+            <p class="stat__value" data-stat="failed" data-countup><?= e($stats['failed']) ?></p>
             <p class="stat__hint">Check the error column</p>
         </article>
     </section>

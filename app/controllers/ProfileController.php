@@ -7,8 +7,6 @@ declare(strict_types=1);
 
 class ProfileController
 {
-    private const MIN_PASSWORD = 8;
-
     /** GET ?page=profile */
     public function index(): void
     {
@@ -50,8 +48,8 @@ class ProfileController
         if ($hash === null || $current === '' || !password_verify($current, $hash)) {
             $errors['current_password'] = 'That is not your current password.';
         }
-        if (strlen($new) < self::MIN_PASSWORD) {
-            $errors['password'] = 'Use at least ' . self::MIN_PASSWORD . ' characters.';
+        if (validate_password($new) !== '') {
+            $errors['password'] = validate_password($new);
         }
         if ($new !== $confirm) {
             $errors['password_confirm'] = 'The two passwords do not match.';

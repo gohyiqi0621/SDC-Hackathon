@@ -97,6 +97,39 @@
 .tabbar__item:hover .icon, .tabbar__item[aria-current="page"] .icon { transform: translateY(-1px) scale(1.08); }
 .tabbar__item.is-pop .icon { animation: tab-pop 400ms var(--spring) both; }
 
+/* ------------------------------------------------ cross-page transitions --
+   Same-origin tab/page navigations cross-fade with a slight slide toward the
+   recorded direction (--push-dir, set inline in head + main.js, 1 = forward).
+   Browsers without cross-document view transitions just swap instantly. */
+@view-transition { navigation: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) { animation: page-out .22s var(--ease) both; }
+  ::view-transition-new(root) { animation: page-in .34s var(--ease-out) both; }
+}
+@keyframes page-out { to { opacity: 0; transform: translateX(calc(-16px * var(--push-dir, 1))); } }
+@keyframes page-in  { from { opacity: 0; transform: translateX(calc(28px * var(--push-dir, 1))); } }
+
+/* Theme switches (same document): the new theme expands from the toggle in a
+   circle, and switching back retracts along the same circle (old layer on top
+   shrinking to the toggle point). main.js arms it with data-theme-fx. The
+   non-animating layer is pinned via animation: none — the default UA
+   cross-fade would fight the clip reveal. */
+::view-transition-old(root), ::view-transition-new(root) { mix-blend-mode: normal; }
+:root[data-theme-fx="expand"]::view-transition-new(root)  { animation: vt-expand .5s var(--ease-out) both; }
+:root[data-theme-fx="expand"]::view-transition-old(root)  { animation: none; }
+:root[data-theme-fx="collapse"]::view-transition-old(root) { animation: vt-collapse .5s var(--ease-out) both; z-index: 2; }
+:root[data-theme-fx="collapse"]::view-transition-new(root) { animation: none; }
+@keyframes vt-expand   { from { clip-path: circle(0px at var(--fx-x, 50%) var(--fx-y, 50%)); } to { clip-path: circle(150vmax at var(--fx-x, 50%) var(--fx-y, 50%)); } }
+@keyframes vt-collapse { from { clip-path: circle(150vmax at var(--fx-x, 50%) var(--fx-y, 50%)); } to { clip-path: circle(0px at var(--fx-x, 50%) var(--fx-y, 50%)); } }
+
+/* ----------------------------------------------------- pull-to-refresh --- */
+/* The ring main.js shows below the top bar while the finger pulls down.
+   Rotation is driven per-move inline; opacity fades with the progress. */
+.ptr { position: fixed; z-index: 65; top: calc(var(--nav-h) + 10px + var(--safe-b, 0px)); left: 50%; margin-left: -17px; width: 34px; height: 34px; pointer-events: none; visibility: hidden; }
+.ptr.is-on { visibility: visible; }
+.ptr i { display: block; width: 28px; height: 28px; margin: 3px; border-radius: 50%; border: 3px solid color-mix(in srgb, var(--text) 12%, transparent); border-top-color: var(--text-3); }
+@media (prefers-reduced-motion: reduce) { .ptr { display: none; } }
+
 /* ------------------------------------------------------------- auth ---- */
 body[data-kind="auth"] {
   background:
@@ -113,6 +146,13 @@ body[data-kind="auth"] {
 .auth__divider { display: flex; align-items: center; gap: var(--sp-3); margin: var(--sp-5) 0; font-size: var(--fs-xs); color: var(--text-3); }
 .auth__divider::before, .auth__divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .auth__switch { margin-top: var(--sp-5); text-align: center; font-size: var(--fs-sm); color: var(--text-3); }
+/* Sits under the Google button: states the app's role in that flow. */
+.auth__oauth-note { margin-top: var(--sp-3); text-align: center; font-size: var(--fs-xs); color: var(--text-3); }
+/* Site identity, shown on the sign-in page only (see auth_footer.php). */
+.auth-footer { width: min(100%, 420px); text-align: center; font-size: var(--fs-xs); color: var(--text-3); }
+.auth-footer__brand { font-size: var(--fs-sm); color: var(--text-3); }
+.auth-footer__brand strong { font-weight: 600; }
+.auth-footer__note { margin-top: 4px; line-height: 1.5; }
 
 /* --------------------------------------------------------- ≥ 768px ----- */
 @media (min-width: 768px) {
@@ -131,5 +171,8 @@ body[data-kind="auth"] {
   .topbar__title { display: none; }
   .toast-region { bottom: var(--sp-6); left: auto; right: var(--sp-6); transform: none; }
 }
+/* Auth screens have no floating tab bar, so toasts sit right at the bottom
+   edge instead of reserving room for one. */
+body[data-kind="auth"] .toast-region { bottom: calc(var(--sp-4) + var(--safe-b)); }
 @media (max-width: 767px) { .topbar__brand .brand__name { display: none; } .topbar__title { font-size: 1.0625rem; } }
 @media (min-width: 1440px) { .content { max-width: 1180px; } }

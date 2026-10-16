@@ -15,6 +15,12 @@ $nav       = nav_links($user);
 $home      = url('dashboard');
 $profileUrl = url('profile');
 
+// Where the current page sits in the nav order; head.php arms the cross-page
+// transition direction from it (forward or back).
+$__navIndex = array_search($pageKey, array_column($nav, 'page'), true);
+$navIndex = $__navIndex === false ? 0 : $__navIndex;
+unset($__navIndex);
+
 require __DIR__ . '/head.php';
 
 // Side-nav group labels, shown when the group changes while walking $nav.

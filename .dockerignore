@@ -1,0 +1,45 @@
+# .dockerignore - keep non-application content out of the deployed image.
+#
+# Dockerfile does `COPY . /var/www/html`, so without this file a local build
+# ships the developer's .env (APP_KEY, client secret, DB password), the whole
+# .git history, database backups and logs into the image. On Railway the build
+# context is the git checkout so most of these are absent already, but a local
+# `docker build` would bake them in. Excluding them is free and removes a
+# credential-leak path.
+
+# --- Secrets ---------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# --- VCS / tooling ---------------------------------------------------------
+.git
+.gitignore
+.workbuddy-ai/
+.vscode/
+.idea/
+
+# --- Runtime data (may contain user data or credentials) -------------------
+storage/backups/
+storage/logs/*
+!storage/logs/.gitkeep
+*.log
+*.sql.gz
+*dump*.sql
+
+# --- Python AI service build artefacts -------------------------------------
+ai-service/venv/
+ai-service/__pycache__/
+__pycache__/
+*.pyc
+
+# --- OS / editor junk ------------------------------------------------------
+.DS_Store
+Thumbs.db
+__MACOSX/
+._*
+
+# --- Docs (not needed at runtime) ------------------------------------------
+README.md
+README-RECONCILIATION.md
+sdc-frame-prompt.md

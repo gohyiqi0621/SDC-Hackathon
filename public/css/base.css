@@ -169,16 +169,47 @@ textarea.input, .field textarea { min-height: 96px; resize: vertical; line-heigh
 .input:disabled, .field input:disabled { background: var(--surface-2); color: var(--text-3); cursor: not-allowed; }
 .input[aria-invalid="true"], .is-invalid { border-color: var(--danger) !important; }
 .is-invalid:focus { box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 30%, transparent) !important; }
-.field__error { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: var(--fs-sm); font-weight: 500; color: var(--danger-ink); animation: nudge 360ms var(--ease-out); }
+/* error appears as a whole: red border + one horizontal shake. ui.js adds
+   .is-error to the .field (re-adding replays the shake after a collapse). */
+.field.is-error input:not([type=checkbox]):not([type=radio]):not([type=file]),
+.field.is-error select, .field.is-error textarea {
+  border-color: var(--danger) !important;
+  animation: shake .45s var(--ease);
+}
+.field.is-error input:focus, .field.is-error select:focus, .field.is-error textarea:focus {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 30%, transparent) !important;
+}
+/* whole-card variant for form-level auth errors (ui.js adds/removes it) */
+.is-shaking { animation: shake .5s var(--ease); }
+/* Error line lives on its own collapsible row: it slides in below the input
+   when an error appears and eases back up the moment it is fixed. */
+.field__error {
+  display: flex; align-items: center; gap: 6px;
+  max-height: 0; margin-top: 0; opacity: 0; transform: translateY(-4px); overflow: hidden;
+  font-size: var(--fs-sm); font-weight: 500; color: var(--danger-ink);
+  transition: max-height .3s var(--ease-out), opacity .3s var(--ease-out), transform .3s var(--ease-out), margin-top .3s var(--ease-out);
+}
 .field__error:empty { display: none; }
+.field__error:not(:empty) {
+  max-height: 48px; margin-top: 6px; opacity: 1; transform: none;
+  animation: error-in .32s var(--spring) both;
+}
 .field__error:not(:empty)::before { content: "!"; display: inline-grid; place-items: center; flex: none; width: 16px; height: 16px; border-radius: 50%; background: var(--danger); color: var(--surface); font-size: 11px; font-weight: 700; }
 .field__hint { margin-top: 6px; font-size: var(--fs-xs); color: var(--text-3); }
 .input-wrap { position: relative; }
 .input-wrap .input, .input-wrap input { padding-right: 50px; }
 .input-btn { position: absolute; right: 4px; top: 4px; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; background: none; border: 0; border-radius: var(--r-sm); color: var(--text-3); cursor: pointer; }
 .input-btn:hover { color: var(--text); background: var(--surface-3); }
+.input-btn:active { transform: scale(.9); }
+/* password reveal (ui.js): the button ships one eye; the off-eye is injected
+   and swapped in while the password shows, so the state is always visible. */
+.input-btn .icon--eye-off { display: none; }
+.input-btn.is-on .icon:first-child { display: none; }
+.input-btn.is-on .icon--eye-off { display: inline-block; }
 .check { display: flex; gap: 10px; align-items: flex-start; font-size: var(--fs-sm); color: var(--text-2); cursor: pointer; margin-bottom: var(--sp-4); }
 .check input { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--btn); flex: none; }
+.check span { display: block; }
+.check span small { display: block; margin-top: 3px; font-size: var(--fs-xs); font-weight: 400; color: var(--text-3); line-height: 1.45; }
 .field-row { display: grid; gap: var(--sp-4); }
 @media (min-width: 600px) { .field-row { grid-template-columns: 1fr 1fr; } }
 .form-actions { display: flex; flex-wrap: wrap; gap: var(--sp-3); justify-content: flex-end; margin-top: var(--sp-5); }
@@ -195,11 +226,18 @@ textarea.input, .field textarea { min-height: 96px; resize: vertical; line-heigh
 .chip:hover { background: var(--surface-3); color: var(--text); }
 .chip.is-active { background: var(--btn); color: #fff; animation: pop 320ms var(--spring); }
 
-.seg { display: inline-flex; gap: 2px; padding: 3px; background: var(--surface-3); border-radius: var(--r-md); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.seg { position: relative; display: inline-flex; gap: 2px; padding: 3px; background: var(--surface-3); border-radius: var(--r-md); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
 .seg::-webkit-scrollbar { display: none; }
-.seg__btn { flex: 1 1 auto; min-height: 34px; padding: 6px 14px; border: 0; border-radius: 11px; background: transparent; color: var(--text-2); font-size: .875rem; font-weight: 500; white-space: nowrap; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; transition: background-color var(--t), color var(--t-fast), box-shadow var(--t); }
+.seg__btn { position: relative; z-index: 1; flex: 1 1 auto; min-height: 34px; padding: 6px 14px; border: 0; border-radius: 11px; background: transparent; color: var(--text-2); font-size: .875rem; font-weight: 500; white-space: nowrap; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; transition: background-color var(--t), color var(--t-fast), box-shadow var(--t); }
 .seg__btn:hover { color: var(--text); }
-.seg__btn.is-active { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.12), 0 3px 8px -2px rgba(0,0,0,.12); }
+.seg__btn:active { transform: scale(.96); }
+.seg__btn.is-active { background: transparent; color: var(--text); box-shadow: none; }
+/* The active segment rides on a sliding thumb (main.js positions it), so
+   switching range/tab glides instead of blinking. No-JS fallback: the active
+   button keeps its own opaque background. */
+.seg__thumb { position: absolute; z-index: 0; top: 3px; bottom: 3px; left: 0; width: 0; border-radius: 11px; background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.12), 0 3px 8px -2px rgba(0,0,0,.12); transition: transform .3s var(--spring), width .3s var(--spring); }
+html:not(.js) .seg__btn.is-active { background: var(--surface); }
+@media (prefers-reduced-motion: reduce) { .seg__thumb { transition: none; } }
 
 .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--r-pill); font-size: .75rem; font-weight: 600; white-space: nowrap; color: var(--text-2); background: var(--surface-3); }
 .badge--ok     { color: var(--ok-ink);     background: color-mix(in srgb, var(--ok) 16%, transparent); }
@@ -211,7 +249,7 @@ textarea.input, .field textarea { min-height: 96px; resize: vertical; line-heigh
 .badge--live::before { animation: live 2s ease-in-out infinite; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--text-3); }
 
-.notice { display: flex; gap: 12px; align-items: flex-start; padding: var(--sp-4) var(--sp-5); border-radius: var(--r-lg); background: var(--accent-soft); }
+.notice { display: flex; gap: 12px; align-items: flex-start; padding: var(--sp-4) var(--sp-5); margin-bottom: var(--sp-4); border-radius: var(--r-lg); background: var(--accent-soft); }
 .notice .icon { color: var(--accent); margin-top: 2px; }
 .notice strong { display: block; font-size: var(--fs-sm); font-weight: 600; margin-bottom: 2px; }
 .notice p { font-size: var(--fs-sm); color: var(--text-2); }
@@ -222,13 +260,25 @@ textarea.input, .field textarea { min-height: 96px; resize: vertical; line-heigh
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes pop { 0% { transform: scale(.94); } 100% { transform: scale(1); } }
-@keyframes nudge { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+@keyframes error-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-5px); }
+  40%, 60% { transform: translateX(5px); }
+}
 @keyframes live { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.8); } }
 @keyframes dot { 0%,80%,100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
 @keyframes bubble { from { opacity: 0; transform: translateY(10px) scale(.96); } to { opacity: 1; transform: none; } }
 @keyframes toast-in { from { opacity: 0; transform: translateY(24px) scale(.92); } to { opacity: 1; transform: none; } }
 @keyframes toast-out { to { opacity: 0; transform: translateY(12px) scale(.96); } }
-@keyframes pill-settle { 0% { transform: translateY(1px) scaleY(.94); } 55% { transform: translateY(-1px) scaleY(1.04); } 100% { transform: none; } }
+/* The pill squashes as it travels between tabs, then settles — jelly. */
+@keyframes pill-settle {
+  0% { transform: translateY(1px) scaleX(1.04) scaleY(.94); }
+  45% { transform: scaleX(1.14) scaleY(.84); }
+  75% { transform: scaleX(.97) scaleY(1.08); }
+  100% { transform: none; }
+}
 @keyframes tab-pop { 0% { transform: translateY(-1px) scale(1.08); } 32% { transform: scale(.86); } 68% { transform: translateY(-2px) scale(1.1); } 100% { transform: translateY(-1px) scale(1.08); } }
 @keyframes breathe { 0%,100% { opacity: .85; transform: scale(1); } 50% { opacity: 1; transform: scale(1.06); } }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -251,4 +301,7 @@ textarea.input, .field textarea { min-height: 96px; resize: vertical; line-heigh
 @media (pointer: coarse) {
   .btn, .chip, .seg__btn, .icon-btn, .input-btn { min-height: 44px; }
   .icon-btn--flat { width: 44px; height: 44px; }
+  /* On touch devices the app owns pull-to-refresh (main.js), so the browser's
+     own site-refresh gesture is disabled here to avoid triggering both. */
+  body { overscroll-behavior-y: contain; }
 }

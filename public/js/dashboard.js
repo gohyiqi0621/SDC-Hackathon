@@ -16,9 +16,19 @@
     var fallback = document.querySelector('.chart-fallback');
 
     // The CDN can be unreachable; the rest of the dashboard still works.
+    // Show a short shimmer first so the moment reads as "loading", then the
+    // text fallback - not a dead grey box.
     if (typeof window.Chart === 'undefined') {
-        if (wrap) { wrap.hidden = true; }
-        if (fallback) { fallback.hidden = false; }
+        if (wrap) {
+            wrap.classList.add('is-loading');
+            setTimeout(function () {
+                wrap.classList.remove('is-loading');
+                wrap.hidden = true;
+                if (fallback) { fallback.hidden = false; }
+            }, 900);
+        } else if (fallback) {
+            fallback.hidden = false;
+        }
         return;
     }
 

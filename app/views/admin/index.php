@@ -4,6 +4,8 @@
  * the controller calls require_admin() before this view is ever reached.
  */
 view('layouts/header', ['title' => 'Admin']);
+
+$policy = password_policy();
 ?>
 <div class="page-head">
     <div>
@@ -25,25 +27,25 @@ view('layouts/header', ['title' => 'Admin']);
     <article class="stat">
         <span class="stat__icon"><?= icon('users') ?></span>
         <p class="stat__label">Accounts</p>
-        <p class="stat__value"><?= e($stats['users']) ?></p>
+        <p class="stat__value" data-countup><?= e($stats['users']) ?></p>
         <p class="stat__hint"><?= e($stats['admins']) ?> administrator<?= $stats['admins'] === 1 ? '' : 's' ?></p>
     </article>
     <article class="stat">
         <span class="stat__icon"><?= icon('alert') ?></span>
         <p class="stat__label">Disabled</p>
-        <p class="stat__value"><?= e($stats['disabled']) ?></p>
+        <p class="stat__value" data-countup><?= e($stats['disabled']) ?></p>
         <p class="stat__hint">Cannot sign in</p>
     </article>
     <article class="stat">
         <span class="stat__icon"><?= icon('items') ?></span>
         <p class="stat__label">Items</p>
-        <p class="stat__value"><?= e($stats['items']) ?></p>
+        <p class="stat__value" data-countup><?= e($stats['items']) ?></p>
         <p class="stat__hint">Across all accounts</p>
     </article>
     <article class="stat">
         <span class="stat__icon"><?= icon('sparkle') ?></span>
         <p class="stat__label">AI calls</p>
-        <p class="stat__value"><?= e($stats['ai']) ?></p>
+        <p class="stat__value" data-countup><?= e($stats['ai']) ?></p>
         <p class="stat__hint">Across all accounts</p>
     </article>
 </section>
@@ -155,6 +157,41 @@ view('layouts/header', ['title' => 'Admin']);
     ]); ?>
 </section>
 
+<section class="card" aria-labelledby="policy-title">
+    <div class="card__head">
+        <div>
+            <h3 id="policy-title">Password policy</h3>
+            <p>Applies wherever a password is created: sign-up, invited first sign-in and password changes.</p>
+        </div>
+    </div>
+
+    <form method="post" action="<?= e(url('admin', ['action' => 'policy'])) ?>" data-ajax>
+        <?= csrf_field() ?>
+
+        <div class="field">
+            <label for="password_min_chars">Minimum characters</label>
+            <input id="password_min_chars" name="password_min_chars" type="number" inputmode="numeric"
+                   min="4" max="64" value="<?= (int) $policy['min'] ?>" required>
+            <p class="field__hint">Between 4 and 64.</p>
+            <p class="field__error" data-error-for="password_min_chars"></p>
+        </div>
+
+        <label class="check">
+            <input type="checkbox" name="password_require_special" value="1"<?= $policy['special'] ? ' checked' : '' ?>>
+            <span>Require a special symbol<small>At least one character that is not a letter or digit.</small></span>
+        </label>
+
+        <label class="check">
+            <input type="checkbox" name="password_require_case" value="1"<?= $policy['case'] ? ' checked' : '' ?>>
+            <span>Require upper and lower case<small>At least one lowercase and one uppercase letter.</small></span>
+        </label>
+
+        <div class="form-actions">
+            <button class="btn btn--primary" type="submit">Save policy</button>
+        </div>
+    </form>
+</section>
+
 <dialog class="modal" id="user-dialog" aria-labelledby="user-dialog-title">
     <form class="modal__panel" method="post" action="<?= e(url('admin', ['action' => 'create'])) ?>" data-ajax>
         <?= csrf_field() ?>
@@ -175,8 +212,9 @@ view('layouts/header', ['title' => 'Admin']);
         <div class="field-row">
             <div class="field">
                 <label for="u-pass">Password</label>
-                <input id="u-pass" name="password" type="password" autocomplete="new-password" required>
-                <p class="field__hint">At least 8 characters.</p>
+                <input id="u-pass" name="password" type="password" autocomplete="new-password" required
+                       minlength="<?= (int) $policy['min'] ?>">
+                <p class="field__hint"><?= e(password_hint()) ?></p>
                 <p class="field__error" data-error-for="password"></p>
             </div>
             <div class="field">

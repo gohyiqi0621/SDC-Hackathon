@@ -6,8 +6,10 @@
  * back out; only a mask is ever queried. A non-secret (OneSignal App ID) is
  * stored in the clear because the browser needs it.
  *
- * setting() in helpers.php reads through this; .env stays the fallback so the
- * app still boots before an admin has saved anything.
+ * setting() in helpers.php reads through this. The database is the ONLY source:
+ * there is deliberately no .env fallback, so a credential can be rotated from
+ * the Key page without a redeploy and no integration secret sits in the
+ * environment. An unset key means "not configured yet".
  */
 declare(strict_types=1);
 
@@ -26,7 +28,7 @@ class Setting
     public function all(): array
     {
         $rows = [];
-        foreach (db()->query('SELECT s.key, s.value_plain, s.value_encrypted, s.last4, s.is_secret, s.updated_at, u.name AS updater
+        foreach (db()->query('SELECT s.key, s.value_plain, s.value_encrypted, s.first4, s.last4, s.is_secret, s.updated_at, u.name AS updater
                                 FROM settings s LEFT JOIN users u ON u.id = s.updated_by') as $r) {
             $rows[$r['key']] = $r;
         }
@@ -41,7 +43,7 @@ class Setting
                 'hint'   => $meta['hint'],
                 'set'    => $row !== null && ($row['value_encrypted'] !== null || $row['value_plain'] !== null),
                 'mask'   => $meta['secret'] && $row !== null && $row['last4'] !== null
-                    ? mask_secret((string) $row['last4'])
+                    ? mask_secret((string) ($row['first4'] ?? ''), (string) $row['last4'])
                     : ($row['value_plain'] ?? ''),
                 'updated_at' => $row['updated_at'] ?? null,
                 'updater'    => $row['updater'] ?? null,
@@ -117,12 +119,12 @@ class Setting
                 return 'The value could not be encrypted.';
             }
             $stmt = db()->prepare(
-                'INSERT INTO settings (`key`, value_encrypted, value_plain, is_secret, last4, updated_by)
-                 VALUES (?, ?, NULL, 1, ?, ?)
+                'INSERT INTO settings (`key`, value_encrypted, value_plain, is_secret, first4, last4, updated_by)
+                 VALUES (?, ?, NULL, 1, ?, ?, ?)
                  ON DUPLICATE KEY UPDATE value_encrypted = VALUES(value_encrypted),
-                     value_plain = NULL, is_secret = 1, last4 = VALUES(last4), updated_by = VALUES(updated_by)'
+                     value_plain = NULL, is_secret = 1, first4 = VALUES(first4), last4 = VALUES(last4), updated_by = VALUES(updated_by)'
             );
-            $stmt->execute([$key, $sealed, substr($value, -4), $by]);
+            $stmt->execute([$key, $sealed, mb_substr($value, 0, 4), mb_substr($value, -4), $by]);
             return '';
         }
 

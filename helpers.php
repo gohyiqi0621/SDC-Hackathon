@@ -42,6 +42,77 @@ function e(mixed $value): string
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+/**
+ * The password policy admins configure on the Admin page, stored as plain
+ * values in the settings table. Defaults keep the old behaviour (min 8, no
+ * special symbol, no case rules) until an admin changes them.
+ *
+ * @return array{min: int, special: bool, case: bool}
+ */
+function password_policy(): array
+{
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    $policy = ['min' => 8, 'special' => false, 'case' => false];
+    try {
+        // config.php can run before db.php is loaded, so pull it in on demand.
+        require_once APP_ROOT . '/db.php';
+        $rows = db()->query(
+            "SELECT `key`, value_plain FROM settings
+             WHERE `key` IN ('password_min_chars', 'password_require_special', 'password_require_case')"
+        )->fetchAll();
+        foreach ($rows as $row) {
+            if ($row['key'] === 'password_min_chars') {
+                $min = (int) $row['value_plain'];
+                $policy['min'] = max(4, min(64, $min > 0 ? $min : 8));
+            } elseif ($row['key'] === 'password_require_special') {
+                $policy['special'] = $row['value_plain'] === '1';
+            } elseif ($row['key'] === 'password_require_case') {
+                $policy['case'] = $row['value_plain'] === '1';
+            }
+        }
+    } catch (Throwable $e) {
+        // no table yet: fall through to the defaults
+    }
+    return $cached = $policy;
+}
+
+/** Human hint for form labels: "At least 8 characters, upper/lower case…". */
+function password_hint(): string
+{
+    $policy = password_policy();
+    $parts  = ['at least ' . $policy['min'] . ' characters'];
+    if ($policy['case']) {
+        $parts[] = 'upper and lower case letters';
+    }
+    if ($policy['special']) {
+        $parts[] = 'one special character';
+    }
+    if (count($parts) === 1) {
+        return 'At least ' . $policy['min'] . ' characters.';
+    }
+    return 'Use ' . implode(', ', array_slice($parts, 0, -1)) . ' and ' . $parts[count($parts) - 1] . '.';
+}
+
+/** '' when the password satisfies the policy, otherwise the error message. */
+function validate_password(string $password): string
+{
+    $policy = password_policy();
+    if (mb_strlen($password) < $policy['min']) {
+        return 'Use at least ' . $policy['min'] . ' characters.';
+    }
+    if ($policy['case'] && (!preg_match('/[a-z]/', $password) || !preg_match('/[A-Z]/', $password))) {
+        return 'Mix uppercase and lowercase letters.';
+    }
+    if ($policy['special'] && !preg_match('/[^A-Za-z0-9]/', $password)) {
+        return 'Add at least one special character.';
+    }
+    return '';
+}
+
 /** Build an internal URL: url('items', ['action' => 'edit', 'id' => 5]). */
 function url(string $page = '', array $params = []): string
 {

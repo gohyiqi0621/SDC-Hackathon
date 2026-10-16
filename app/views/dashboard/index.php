@@ -94,7 +94,7 @@ $statusBadge = static function (string $status): string {
 <section class="overview liquid-glass" aria-label="Overview">
     <div>
         <p class="overview__label"><?= $isAdmin ? 'All items' : 'Your items' ?></p>
-        <p class="overview__value"><?= e($stats['items_total']) ?></p>
+        <p class="overview__value" data-countup><?= e($stats['items_total']) ?></p>
         <p class="overview__sub">
             <?php if ($isAdmin): ?>
                 <?= e($stats['items_active']) ?> are active right now, across every account.
@@ -117,7 +117,7 @@ $statusBadge = static function (string $status): string {
         <article class="stat">
             <span class="stat__icon"><?= icon($card['icon']) ?></span>
             <p class="stat__label"><?= e($card['label']) ?></p>
-            <p class="stat__value"><?= e($card['value']) ?></p>
+            <p class="stat__value" data-countup><?= e($card['value']) ?></p>
             <p class="stat__hint"><?= e($card['hint']) ?></p>
         </article>
     <?php endforeach; ?>

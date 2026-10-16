@@ -160,6 +160,11 @@
         var initOptions = {
             appId: appId,
             allowLocalhostAsSecureOrigin: true,
+            // The app owns all notification UI (our top-bar bell and the
+            // on/off switch on Profile and Notification). Make sure OneSignal
+            // never injects its own bell button, whatever the dashboard says.
+            notifyButton: { enable: false },
+            autoPrompt: false,
         };
         if (workerPath) {
             initOptions.path = workerPath;
@@ -263,7 +268,14 @@
         }).join('');
     }
 
+    /* Shape-matched placeholder rows while the feed is in flight. */
+    function sketch() {
+        var bones = '<div class="skel-row skeleton"><i></i><i></i></div>';
+        list.innerHTML = bones + bones + bones;
+    }
+
     function load() {
+        sketch();
         API.request(feedUrl).then(function (res) {
             if (!res.success) return;
             render(res.data.items || []);
