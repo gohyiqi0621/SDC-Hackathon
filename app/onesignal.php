@@ -47,6 +47,23 @@ function onesignal_configured(): bool
 }
 
 /**
+ * Non-secret diagnostics: which pieces are present. Safe to log - it never
+ * contains the App ID or the REST key, only whether each is set and how long
+ * the key is.
+ *
+ * @return array<string,mixed>
+ */
+function onesignal_config_state(): array
+{
+    return [
+        'source'        => 'database',
+        'app_id_set'    => ONESIGNAL_APP_ID !== '',
+        'api_key_set'   => ONESIGNAL_API_KEY !== '',
+        'key_shape'     => secret_shape(ONESIGNAL_API_KEY),
+    ];
+}
+
+/**
  * The external id we hand to OneSignal for one of our users.
  *
  * Namespaced on purpose. OneSignal BLOCKS an external_id that a deleted user

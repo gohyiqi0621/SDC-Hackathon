@@ -19,6 +19,7 @@ class Setting
         'onesignal_api_key' => ['label' => 'OneSignal REST API Key',  'secret' => true,  'hint' => 'Secret. Never leaves the server.'],
         'google_client_id'  => ['label' => 'Google Client ID',        'secret' => false, 'hint' => 'Public OAuth client id.'],
         'google_secret'     => ['label' => 'Google Client Secret',    'secret' => true,  'hint' => 'Secret. Used only in the token exchange.'],
+        'agnes_api_key'     => ['label' => 'Agnes AI API Key',        'secret' => true,  'hint' => 'Secret. Used only for AI Chat replies.'],
     ];
 
     /** Rows the admin can see: label, mask/dates. Never a secret's plaintext. */
@@ -49,6 +50,21 @@ class Setting
         return $out;
     }
 
+    /** Is there a stored value for this key (secret or plain)? */
+    public function isSet(string $key): bool
+    {
+        $stmt = db()->prepare(
+            'SELECT value_plain, value_encrypted FROM settings WHERE `key` = ? LIMIT 1'
+        );
+        $stmt->execute([$key]);
+        $row = $stmt->fetch();
+        if ($row === false) {
+            return false;
+        }
+        return ($row['value_encrypted'] ?? null) !== null
+            || (($row['value_plain'] ?? null) ?? '') !== '';
+    }
+
     /** Non-secret value, for handing to the browser (e.g. the App ID). */
     public function plain(string $key): ?string
     {
@@ -69,7 +85,12 @@ class Setting
 
     /**
      * Save (or clear) one key. A secret is sealed here; a plain value is stored
-     * as-is. Passing '' deletes the row, so a key can be unset from the UI.
+     * as-is.
+     *
+     * Empty-value contract: '' deletes the row. Callers that want "leave the
+     * saved value alone when the field is left blank" must check isSet() first -
+     * KeyController::saveSetting() does exactly that, so only an explicit
+     * name="clear" reaches this method with ''.
      *
      * @return string '' on success, otherwise an error message.
      */

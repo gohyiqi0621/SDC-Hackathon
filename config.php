@@ -125,13 +125,23 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
-// --- Admin-managed keys (after the autoloader: setting() loads Setting) ------
-// Keys saved on the Key page win; .env is the fallback before anything is saved.
-define('GOOGLE_CLIENT_ID', setting('google_client_id', (string) env('GOOGLE_CLIENT_ID', '')));
-define('GOOGLE_CLIENT_SECRET', setting('google_secret', (string) env('GOOGLE_CLIENT_SECRET', '')));
-// App ID is public (goes to the page); the REST key is a server-only secret.
-define('ONESIGNAL_APP_ID', setting('onesignal_app_id', (string) env('ONESIGNAL_APP_ID', '')));
-define('ONESIGNAL_API_KEY', setting('onesignal_api_key', (string) env('ONESIGNAL_API_KEY', '')));
+// --- Integration credentials (database only) ---------------------------------
+// Google and OneSignal are configured by an admin on the Key page and stored in
+// the `settings` table. They are deliberately NOT read from .env: the database
+// is the single source of truth, so a key can be rotated from the UI without a
+// redeploy, and no integration secret is left lying around in environment
+// variables. An empty value means "not configured yet".
+//
+// Public identifiers (ODIC client id, OneSignal App ID) are handed to the
+// browser; the secrets (client secret, REST key) stay server-side.
+define('GOOGLE_CLIENT_ID', setting('google_client_id'));
+define('GOOGLE_CLIENT_SECRET', setting('google_secret'));
+define('ONESIGNAL_APP_ID', setting('onesignal_app_id'));
+define('ONESIGNAL_API_KEY', setting('onesignal_api_key'));
+
+// Agnes AI powers the chat replies. The Python service receives this per
+// request and holds it for that call only.
+define('AGNES_API_KEY', setting('agnes_api_key'));
 
 if (APP_DEBUG) {
     ini_set('display_errors', '1');

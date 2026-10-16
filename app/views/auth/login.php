@@ -55,10 +55,10 @@ view('layouts/header', ['title' => 'Sign in', 'bare' => true]);
         </a>
     <?php else: ?>
         <button class="btn btn--google btn--block" type="button" disabled
-                title="Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env to enable this">
+                title="This service is not configured yet. Please contact your administrator.">
             <?= $googleSvg ?>Continue with Google
         </button>
-        <p class="field__hint" style="text-align:center">Google sign-in is off until credentials are added to <code>.env</code>.</p>
+        <p class="field__hint" style="text-align:center">Google sign-in is not set up yet. Please contact your administrator.</p>
     <?php endif; ?>
 
     <p class="auth__switch">No account yet? <a href="<?= e(url('auth', ['action' => 'register'])) ?>">Create one</a></p>

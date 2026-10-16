@@ -18,6 +18,24 @@ function google_configured(): bool
 }
 
 /**
+ * Non-secret diagnostics: which pieces are present. Safe to log - it never
+ * contains the client id or the secret itself, only whether each is set.
+ *
+ * @return array<string,mixed>
+ */
+function google_config_state(): array
+{
+    return [
+        'source'            => 'database',
+        'client_id_set'     => GOOGLE_CLIENT_ID !== '',
+        'client_secret_set' => GOOGLE_CLIENT_SECRET !== '',
+        'secret_shape'      => secret_shape(GOOGLE_CLIENT_SECRET),
+        'redirect_uri'      => GOOGLE_REDIRECT_URI,
+    ];
+}
+
+
+/**
  * Append a line to storage/logs/google.log. Never throws, never blocks the flow.
  * Diagnostics only - it must never log the full client secret or access token.
  */
@@ -100,8 +118,16 @@ function google_request(string $url, array $fields = [], array $headers = []): a
     return [$status, is_array($decoded) ? $decoded : null];
 }
 
-/** Swap the authorization code for an access token. Returns the token, or null. */
-function google_exchange_code(string $code): ?string
+/**
+ * Swap the authorization code for an access token.
+ *
+ * Returns the token plus Google's own failure reason, so the caller can tell a
+ * wrong client secret (`invalid_client`, unfixable by retrying) apart from a
+ * spent code (`invalid_grant`, worth another attempt).
+ *
+ * @return array{token:?string,status:int,error:?string,description:?string}
+ */
+function google_exchange_code(string $code): array
 {
     [$status, $data] = google_request('https://oauth2.googleapis.com/token', [
         'code'          => $code,
@@ -111,12 +137,21 @@ function google_exchange_code(string $code): ?string
         'grant_type'    => 'authorization_code',
     ]);
 
-    if ($status < 200 || $status >= 300 || $data === null) {
-        return null;
+    $error = is_array($data) ? ($data['error'] ?? null) : null;
+    $desc  = is_array($data) ? ($data['error_description'] ?? null) : null;
+    $token = is_array($data) ? ($data['access_token'] ?? null) : null;
+
+    if ($status < 200 || $status >= 300 || !is_string($token) || $token === '') {
+        // Log Google's reason - never the code, never the secret.
+        google_log('token exchange failed', [
+            'status'      => $status,
+            'error'       => $error,
+            'description' => $desc,
+        ]);
+        return ['token' => null, 'status' => $status, 'error' => $error, 'description' => $desc];
     }
 
-    $token = $data['access_token'] ?? null;
-    return is_string($token) && $token !== '' ? $token : null;
+    return ['token' => $token, 'status' => $status, 'error' => null, 'description' => null];
 }
 
 /**

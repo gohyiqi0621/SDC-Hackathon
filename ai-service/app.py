@@ -1,8 +1,11 @@
 """
-SDC App - dummy AI service.
+SDC App - AI service.
 
 Flask app that the PHP side calls over HTTP. It is deliberately generic and
 stateless: PHP owns the database, this service only does the "thinking".
+
+`/chat` is backed by Agnes AI (see agnes.py). `/predict` still runs the local
+keyword classifier - it is a separate feature and is untouched.
 
 Run it (from the project root):
     cd ai-service
@@ -11,9 +14,6 @@ Run it (from the project root):
 
 It listens on http://127.0.0.1:5000 and is only ever called by PHP, so CORS is
 deliberately NOT enabled.
-
-Swap the dummy logic in `predict()` for the real model when the problem
-statement is revealed - the request/response contract should not change.
 """
 
 import re
@@ -21,7 +21,19 @@ import time
 
 from flask import Flask, jsonify, request
 
+import agnes
+
 app = Flask(__name__)
+
+# How many prior turns are replayed to the model, so a long thread cannot
+# overflow the context window.
+HISTORY_LIMIT = 20
+
+SYSTEM_PROMPT = (
+    "You are the SDC assistant, a helpful and concise assistant inside a small "
+    "web app. Answer in plain language. Use short paragraphs, and use Markdown "
+    "only for lists, bold text and code. If you do not know something, say so."
+)
 
 # --- Dummy model configuration --------------------------------------------
 # A tiny keyword table so the placeholder returns something that looks like a
@@ -39,12 +51,10 @@ MAX_TEXT_CHARS = 20000
 
 def classify(text: str) -> dict:
     """
-    >>> REAL MODEL GOES HERE <<<
+    Local keyword classifier behind POST /predict.
 
-    Everything below is placeholder logic: lowercase the text, count how many
-    keywords from each category appear, and return the best match. It exists so
-    the whole PHP -> Flask -> PHP round trip can be built and tested before the
-    real model is ready.
+    This is NOT the chat model - /chat calls Agnes AI. This stays as the
+    offline demo path for /predict and needs no API key.
     """
     lowered = text.lower()
     words = re.findall(r"[a-z]+", lowered)
@@ -114,39 +124,38 @@ def predict():
     return jsonify(outcome)
 
 
-def chat_reply(text: str) -> str:
+def _history_messages(raw) -> list[dict]:
     """
-    >>> REAL MODEL GOES HERE <<<
-
-    Placeholder chat reply. It reuses `classify()` so the reply reflects the
-    detected category, which makes the whole chat feel alive without a model.
-    Swap this for a real completion call when the model is ready.
+    Keep only well-formed prior turns. Anything else is dropped rather than
+    forwarded, so a malformed payload cannot poison the model request.
     """
-    outcome = classify(text)
-    category = outcome["category"]
+    if not isinstance(raw, list):
+        return []
 
-    if category == "unknown":
-        return (
-            "I'm a prototype assistant, so I can't answer that in depth yet. "
-            f"You said: \"{text[:160]}\". Once a real model is connected here, "
-            "this is exactly where its reply will appear."
-        )
-
-    return (
-        f"That reads like a {category} topic. Here's a prototype reply: "
-        f"{outcome['result']} (Connect a real model in ai-service/app.py to get a "
-        "genuine answer.)"
-    )
+    turns = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role")
+        content = item.get("content")
+        if role in ("user", "assistant") and isinstance(content, str) and content.strip():
+            turns.append({"role": role, "content": content[:MAX_TEXT_CHARS]})
+    return turns[-HISTORY_LIMIT:]
 
 
 @app.post("/chat")
 def chat():
     """
-    Request:  { "text": "..." }
-    Response: { "reply": "...", "duration_ms": 0 }
+    Request:  { "text": "...", "api_key": "...", "history": [{"role","content"}, ...] }
+    Response: { "reply": "...", "model": "...", "duration_ms": 0 }
+
+    `api_key` is handed over by PHP, which read and decrypted it from the
+    database. It is used for this call only and never stored here.
     """
     payload = request.get_json(silent=True) or {}
     text = payload.get("text")
+    api_key = payload.get("api_key")
+    api_key = api_key if isinstance(api_key, str) else ""
 
     if not isinstance(text, str) or not text.strip():
         return jsonify({"error": "Field 'text' is required and must be a non-empty string."}), 400
@@ -154,11 +163,21 @@ def chat():
     if len(text) > MAX_TEXT_CHARS:
         return jsonify({"error": f"Field 'text' must be under {MAX_TEXT_CHARS} characters."}), 400
 
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages.extend(_history_messages(payload.get("history")))
+    messages.append({"role": "user", "content": text.strip()})
+
     started = time.perf_counter()
-    reply = chat_reply(text.strip())
+    try:
+        reply = agnes.complete(api_key, messages)
+    except agnes.AgnesError as exc:
+        # Never fabricate a reply and never fall back to another provider: the
+        # real reason goes back so the UI can show it honestly.
+        return jsonify({"error": exc.message}), exc.status
 
     return jsonify({
         "reply": reply,
+        "model": agnes.MODEL,
         "duration_ms": int((time.perf_counter() - started) * 1000),
     })
 

@@ -99,10 +99,23 @@
 .chat-empty { margin: auto; display: grid; justify-items: center; gap: var(--sp-3); max-width: 340px; text-align: center; color: var(--text-3); font-size: var(--fs-sm); }
 .chat-empty .empty__icon { width: 56px; height: 56px; }
 .chat-suggest { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: var(--sp-2); }
-.msg { max-width: min(84%, 540px); padding: 10px 16px; border-radius: 20px; font-size: var(--fs-sm); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; animation: bubble .55s var(--spring) both; }
-.msg--user { align-self: flex-end; background: var(--btn); color: #fff; border-bottom-right-radius: 6px; }
+.msg { max-width: min(84%, 540px); padding: 10px 16px; border-radius: 20px; font-size: var(--fs-sm); line-height: 1.55; text-align: left; overflow-wrap: anywhere; animation: bubble .55s var(--spring) both; }
+.msg--user { align-self: flex-end; background: var(--btn); color: #fff; border-bottom-right-radius: 6px; white-space: pre-wrap; }
 .msg--bot { align-self: flex-start; background: var(--surface); box-shadow: var(--shadow-card); border-bottom-left-radius: 6px; }
 .msg--error { align-self: stretch; max-width: none; background: color-mix(in srgb, var(--danger) 10%, var(--surface)); color: var(--danger-ink); }
+
+/* Markdown-lite rendering for assistant replies (see chat.js). */
+.msg__text > :first-child { margin-top: 0; }
+.msg__text > :last-child { margin-bottom: 0; }
+.msg__text p { margin: 0 0 8px; }
+.msg__text .md-h { font-weight: 650; margin: 10px 0 6px; }
+.msg__text .md-list { margin: 6px 0 8px; padding-left: 20px; }
+.msg__text .md-list li { margin: 2px 0; }
+.msg__text .md-inline { font-family: var(--mono); font-size: .92em; padding: 1px 5px; border-radius: 6px; background: var(--surface-3, rgba(0, 0, 0, .07)); }
+.msg--user .md-inline { background: rgba(255, 255, 255, .22); }
+.msg__text .md-code { margin: 8px 0; padding: 10px 12px; border-radius: 12px; background: var(--surface-3, rgba(0, 0, 0, .06)); overflow-x: auto; }
+.msg__text .md-code code { font-family: var(--mono); font-size: var(--fs-xs); white-space: pre; }
+.msg__text a { color: var(--accent); }
 .typing { display: inline-flex; gap: 4px; padding: 5px 2px; }
 .typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); animation: dot 1.2s ease-in-out infinite; }
 .typing i:nth-child(2) { animation-delay: .15s; } .typing i:nth-child(3) { animation-delay: .3s; }
@@ -243,4 +256,158 @@
     0%   { transform: scale(1); color: var(--accent); }
     45%  { transform: scale(1.14); color: var(--accent); }
     100% { transform: scale(1); color: inherit; }
+}
+
+/* =====================================================================
+   Integration panel (admin Key page)
+   Two circular brand icons by default; clicking one slides its card down
+   beneath the icons. One panel open at a time.
+   ===================================================================== */
+
+.int-icons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-5);
+    padding: var(--sp-4) var(--sp-1) var(--sp-2);
+}
+
+.int-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 104px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--text-2);
+    cursor: pointer;
+    border-radius: var(--r-lg);
+}
+
+.int-icon__logo {
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--surface, #fff);
+    box-shadow: inset 0 0 0 1px var(--border, rgba(0, 0, 0, .1)),
+                0 1px 2px rgba(0, 0, 0, .06);
+    transition: transform var(--t-fast), box-shadow var(--t-fast), background-color var(--t-fast);
+}
+
+.int-icon__logo svg {
+    width: 30px;
+    height: 30px;
+    display: block;
+}
+
+.int-icon__name {
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-1, inherit);
+    line-height: 1.2;
+}
+
+.int-icon__state {
+    font-size: var(--fs-xs);
+    color: var(--text-3);
+    line-height: 1.2;
+}
+
+/* A configured integration gets a quiet brand tick of approval. */
+.int-icon.is-configured .int-icon__logo {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent),
+                0 1px 2px rgba(0, 0, 0, .06);
+}
+.int-icon.is-configured .int-icon__state { color: var(--ok); }
+
+/* Hover / active / focus are all visible, and the icon reacts. */
+.int-icon:hover .int-icon__logo {
+    transform: translateY(-2px);
+    box-shadow: inset 0 0 0 1px var(--border, rgba(0, 0, 0, .14)),
+                0 6px 16px rgba(0, 0, 0, .1);
+}
+.int-icon:active .int-icon__logo { transform: translateY(0) scale(.97); }
+.int-icon:focus-visible { outline: none; }
+.int-icon:focus-visible .int-icon__logo {
+    box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px var(--focus);
+}
+.int-icon.is-active .int-icon__logo {
+    box-shadow: inset 0 0 0 2px var(--accent), 0 0 0 3px var(--focus);
+}
+
+/* ---- the sliding card ------------------------------------------------- */
+
+.int-panel {
+    overflow: hidden;
+    height: 0;
+    opacity: 0;
+    transition: height var(--t), opacity var(--t-fast) ease;
+}
+
+.int-panel.is-open {
+    height: auto;
+    opacity: 1;
+}
+
+.int-panel__inner {
+    margin-top: var(--sp-3);
+    padding: var(--sp-5);
+    border-radius: var(--r-xl);
+    background: var(--surface-2, rgba(0, 0, 0, .02));
+    box-shadow: inset 0 0 0 1px var(--border, rgba(0, 0, 0, .08));
+}
+
+.int-panel__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-4);
+}
+
+.int-panel__head h4 {
+    margin: 0 0 2px;
+    font-size: var(--fs-body);
+    font-weight: 600;
+}
+
+.int-panel__head p {
+    margin: 0;
+    font-size: var(--fs-sm);
+    color: var(--text-3);
+}
+
+.int-panel .settings-form + .settings-form {
+    margin-top: var(--sp-4);
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--border, rgba(0, 0, 0, .07));
+}
+
+.int-panel__meta {
+    margin-top: var(--sp-4);
+    padding-top: var(--sp-3);
+    border-top: 1px dashed var(--border, rgba(0, 0, 0, .1));
+}
+
+.int-panel__meta code {
+    font-family: var(--mono);
+    font-size: var(--fs-xs);
+    word-break: break-all;
+}
+
+@media (max-width: 560px) {
+    .int-icons { gap: var(--sp-4); }
+    .int-icon { width: 88px; }
+    .int-icon__logo { width: 56px; height: 56px; }
+    .int-icon__logo svg { width: 26px; height: 26px; }
+    .int-panel__inner { padding: var(--sp-4); }
+}
+
+/* Respect reduced motion: no slide, just show/hide. */
+@media (prefers-reduced-motion: reduce) {
+    .int-panel { transition: none; }
 }

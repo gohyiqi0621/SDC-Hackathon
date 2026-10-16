@@ -36,12 +36,19 @@ class KeyController
      *
      * One endpoint for every key in Setting::SCHEMA, so the panel adapts to a
      * new key by adding a row there - no new route or method per key.
+     *
+     * Empty-vs-clear: an empty value is treated as "no change" for a key that
+     * already has a value, because a secret renders as an empty password input
+     * (only the mask shows as the placeholder). Wiping a saved credential must
+     * be explicit, via name="clear". That is what stops a well-meaning "Save"
+     * on an untouched field from destroying a working integration.
      */
     public function saveSetting(): void
     {
         $admin = require_admin();
         $key   = (string) ($_POST['key'] ?? '');
         $value = trim((string) ($_POST['value'] ?? ''));
+        $clear = isset($_POST['clear']);
 
         if (!isset(Setting::SCHEMA[$key])) {
             if (wants_json()) {
@@ -51,7 +58,28 @@ class KeyController
             redirect(url('key'));
         }
 
-        $error = (new Setting())->put($key, $value, (int) $admin['id']);
+        $label    = Setting::SCHEMA[$key]['label'];
+        $settings = new Setting();
+
+        // Explicit clear: drop the row and say so.
+        if ($clear) {
+            $error = $settings->put($key, '', (int) $admin['id']);
+            if ($error !== '') {
+                if (wants_json()) {
+                    json_response(false, ['errors' => ['value' => $error]], $error, 422);
+                }
+                flash('error', $error);
+                redirect(url('key'));
+            }
+            respond_ok($label . ' cleared.', url('key'));
+        }
+
+        // Nothing typed and something is already saved: leave it alone.
+        if ($value === '' && $settings->isSet($key)) {
+            respond_ok($label . ' unchanged.', url('key'));
+        }
+
+        $error = $settings->put($key, $value, (int) $admin['id']);
         if ($error !== '') {
             if (wants_json()) {
                 json_response(false, ['errors' => ['value' => $error]], $error, 422);
@@ -60,9 +88,9 @@ class KeyController
             redirect(url('key'));
         }
 
-        $label  = Setting::SCHEMA[$key]['label'];
-        $verb   = $value === '' ? 'cleared' : 'saved';
-        respond_ok($label . ' ' . $verb . '.', url('key'));
+        // An empty value with nothing saved is a no-op, not a "clear".
+        $verb = $value === '' ? 'has no value to save.' : 'saved.';
+        respond_ok($label . ' ' . $verb, url('key'));
     }
 
     /** POST ?page=key&action=store - add a key (label + secret). */

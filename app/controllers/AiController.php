@@ -30,6 +30,7 @@ class AiController
             'title'    => 'AI Chat',
             'user'     => $user,
             'online'   => $this->serviceOnline(),
+            'configured' => AGNES_API_KEY !== '',
             'session'  => $session,
             'messages' => (new ChatMessage())->forSession((int) $session['id']),
             'maxText'  => self::MAX_TEXT,
@@ -71,6 +72,16 @@ class AiController
 
         $messages = new ChatMessage();
 
+        // The thread so far, read BEFORE the new message is appended, so the
+        // model sees the real conversation instead of a lone question.
+        $history = array_map(
+            static fn (array $m): array => [
+                'role'    => (string) $m['role'],
+                'content' => (string) $m['body'],
+            ],
+            $messages->forSession((int) $session['id'])
+        );
+
         // The stored body carries a note when a photo was attached (prototype:
         // the image itself is previewed in the browser but not persisted).
         $storedBody = $body !== '' ? $body : 'Sent a photo.';
@@ -81,10 +92,22 @@ class AiController
             $sessions->rename((int) $session['id'], mb_strimwidth($body, 0, 60, '…'));
         }
 
-        $result = callAiService('chat', ['text' => $body !== '' ? $body : 'photo']);
-        $reply  = $result['ok']
-            ? (string) ($result['data']['reply'] ?? '')
-            : 'Sorry - the AI service is unavailable right now. Please try again.';
+        $result = callAiService('chat', [
+            'text'    => $body !== '' ? $body : 'photo',
+            'api_key' => AGNES_API_KEY,
+            'history' => $history,
+        ]);
+
+        // No fabricated reply and no silent provider switch: if Agnes failed,
+        // say what actually went wrong and store nothing.
+        if (!$result['ok']) {
+            json_response(false, [], $result['error'], 502);
+        }
+
+        $reply = trim((string) ($result['data']['reply'] ?? ''));
+        if ($reply === '') {
+            json_response(false, [], 'The AI service returned an empty reply.', 502);
+        }
 
         $messageId = $messages->create((int) $session['id'], 'assistant', $reply);
         $sessions->touch((int) $session['id']);
@@ -93,8 +116,8 @@ class AiController
             'session_id' => (int) $session['id'],
             'message_id' => $messageId,
             'reply'      => $reply,
-            'ok'         => $result['ok'],
-        ], $result['ok'] ? 'Replied.' : 'The service was offline; a placeholder was saved.');
+            'ok'         => true,
+        ], 'Replied.');
     }
 
     /** GET ?page=ai&action=health - lets the chat re-check without a reload. */

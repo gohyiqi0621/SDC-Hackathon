@@ -25,6 +25,61 @@
     var stream = null;
     var hasImage = false;
 
+    /* ------------------------------------------------------- markdown ---- */
+    /* Agnes replies are Markdown. Escaping happens FIRST, so anything the
+       model echoes back is inert before any tag is added - the renderer can
+       only ever emit the handful of tags listed below. */
+
+    function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    function inline(text) {
+        return text
+            .replace(/`([^`\n]+)`/g, '<code class="md-inline">$1</code>')
+            .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+            .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,
+                '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    }
+
+    function renderMarkdown(source) {
+        var blocks = [];
+        var text = escapeHtml(source).replace(/```[a-z]*\n?([\s\S]*?)```/g, function (_m, code) {
+            blocks.push('<pre class="md-code"><code>' + code.replace(/\n+$/, '') + '</code></pre>');
+            return '\u0000' + (blocks.length - 1) + '\u0000';
+        });
+
+        var out = [];
+        var list = null;
+        function closeList() { if (list) { out.push('</' + list + '>'); list = null; } }
+
+        text.split('\n').forEach(function (line) {
+            var bullet = line.match(/^\s*[-*]\s+(.*)$/);
+            var numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
+            var heading = line.match(/^#{1,6}\s+(.+)$/);
+
+            if (bullet || numbered) {
+                var tag = bullet ? 'ul' : 'ol';
+                if (list !== tag) { closeList(); out.push('<' + tag + ' class="md-list">'); list = tag; }
+                out.push('<li>' + inline((bullet || numbered)[1]) + '</li>');
+            } else if (heading) {
+                closeList();
+                out.push('<p class="md-h">' + inline(heading[1]) + '</p>');
+            } else if (line.trim() === '') {
+                closeList();
+            } else {
+                closeList();
+                out.push('<p>' + inline(line) + '</p>');
+            }
+        });
+        closeList();
+
+        return out.join('').replace(/\u0000(\d+)\u0000/g, function (_m, i) { return blocks[+i]; });
+    }
+
     function scrollDown() { body.scrollTop = body.scrollHeight; }
     function hideEmpty() { if (empty) { empty.hidden = true; } }
 
@@ -32,11 +87,26 @@
         hideEmpty();
         var el = document.createElement('div');
         el.className = 'msg msg--' + role;
-        el.textContent = text;
+
+        var inner = document.createElement('div');
+        inner.className = 'msg__text';
+        if (role === 'bot') {
+            inner.innerHTML = renderMarkdown(text);
+        } else {
+            // User text is never parsed - it stays literal.
+            inner.textContent = text;
+        }
+        el.appendChild(inner);
+
         body.appendChild(el);
         scrollDown();
         return el;
     }
+
+    // Server-rendered assistant messages arrive as escaped text; upgrade them.
+    Array.prototype.forEach.call(document.querySelectorAll('[data-markdown]'), function (el) {
+        el.innerHTML = renderMarkdown(el.textContent);
+    });
 
     function typingBubble() {
         hideEmpty();
@@ -164,24 +234,25 @@
             if (window.UI) { UI.setLoading(sendBtn, false); }
             pending.remove();
 
-            var reply = (env.data && env.data.reply) || env.message || 'No reply.';
-            var el = bubble('bot', reply);
             if (!env.success) {
-                el.classList.add('msg--error');
+                // Agnes failed - missing key, rejected key, rate limit, timeout or
+                // an upstream error. Show the real reason; never invent a reply.
+                hideEmpty();
+                var errEl = document.createElement('div');
+                errEl.className = 'msg msg--bot msg--error';
+                errEl.textContent = env.message || 'The AI call failed.';
+                body.appendChild(errEl);
+                scrollDown();
                 if (window.UI) { UI.toast(env.message || 'The AI call failed.', 'error'); }
-            } else if (env.data && env.data.ok === false) {
-                // The message was stored but the AI service was unreachable, so
-                // a placeholder reply was saved. Say so out loud instead of
-                // letting the user think the bot actually answered.
-                el.classList.add('msg--error');
-                if (window.UI) {
-                    UI.toast('The AI service is offline — your message was saved, but no reply was generated.', 'error');
-                }
+                return;
             }
+
+            bubble('bot', (env.data && env.data.reply) || env.message || 'No reply.');
+
             if (statusEl) {
-                var ok = !!(env.data && env.data.ok);
-                statusEl.className = 'badge badge--dot ' + (ok ? 'badge--ok badge--live' : 'badge--danger');
-                statusEl.textContent = ok ? 'Service online' : 'Service offline';
+                // The service answered, so it is reachable by definition.
+                statusEl.className = 'badge badge--dot badge--ok badge--live';
+                statusEl.textContent = 'Service online';
             }
         }).catch(function () {
             if (window.UI) { UI.setLoading(sendBtn, false); }

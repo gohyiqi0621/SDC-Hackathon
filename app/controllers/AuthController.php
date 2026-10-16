@@ -131,7 +131,10 @@ class AuthController
     public function google(): void
     {
         if (!google_configured()) {
-            flash('error', 'Google sign-in is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env.');
+            google_log('flow start refused: not configured', google_config_state());
+            flash('error',
+                'Google sign-in is not available yet. This service is not configured. Please contact your administrator.',
+                'Sign-in unavailable');
             redirect(url('auth', ['action' => 'login']));
         }
 
@@ -205,12 +208,16 @@ class AuthController
             redirect(url('auth', ['action' => 'login']));
         }
 
-        $token = google_exchange_code($code);
-        if ($token === null) {
-            google_log('token exchange failed', ['code_prefix' => substr($code, 0, 12), 'redirect_uri' => GOOGLE_REDIRECT_URI]);
-            flash('error', 'Google rejected the sign-in. Please try again.');
+        $exchange = google_exchange_code($code);
+        if ($exchange['token'] === null) {
+            // `invalid_client` means the stored client secret is wrong, which
+            // retrying can never fix - point at the configuration instead.
+            flash('error', $exchange['error'] === 'invalid_client'
+                ? 'Google sign-in is not configured correctly. Please contact your administrator.'
+                : 'Google rejected the sign-in. Please try again.');
             redirect(url('auth', ['action' => 'login']));
         }
+        $token = $exchange['token'];
         google_log('token exchange ok', ['token_len' => strlen($token)]);
 
         $profile = google_userinfo($token);

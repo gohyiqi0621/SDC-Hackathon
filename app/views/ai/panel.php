@@ -5,7 +5,15 @@
  */
 view('layouts/header', ['title' => 'AI Chat']);
 ?>
-<?php if (!$online): ?>
+<?php if (!$configured): ?>
+    <div class="notice notice--warn" role="status">
+        <?= icon('alert') ?>
+        <div>
+            <strong>AI Chat is not available yet</strong>
+            <p>Agnes AI is not configured yet. Please contact your administrator.</p>
+        </div>
+    </div>
+<?php elseif (!$online): ?>
     <div class="notice notice--warn" role="status">
         <?= icon('alert') ?>
         <div>
@@ -13,10 +21,10 @@ view('layouts/header', ['title' => 'AI Chat']);
             <?php if (AI_SERVICE_URL === ''): ?>
                 <p>It is not configured yet — <code>AI_SERVICE_URL</code> is empty. Set it in your
                    environment (and start the service with <code>cd ai-service &amp;&amp; python app.py</code>)
-                   so the assistant can answer. Until then replies will be placeholders.</p>
+                   so the assistant can answer.</p>
             <?php else: ?>
                 <p>It is not answering at <code><?= e(AI_SERVICE_URL) ?></code>. Start it with
-                   <code>cd ai-service &amp;&amp; python app.py</code>. Replies will be placeholders until then.</p>
+                   <code>cd ai-service &amp;&amp; python app.py</code>.</p>
             <?php endif; ?>
         </div>
     </div>
@@ -36,7 +44,7 @@ view('layouts/header', ['title' => 'AI Chat']);
 
     <div class="chat-body" id="chat-body" aria-live="polite">
         <?php if ($messages === []): ?>
-            <div class="chat-empty" id="chat-empty" hidden>
+            <div class="chat-empty" id="chat-empty">
                 <span class="empty__icon"><?= icon('sparkle') ?></span>
                 <strong>How can I help?</strong>
                 <p>Try one of these, or write your own.</p>
@@ -49,10 +57,14 @@ view('layouts/header', ['title' => 'AI Chat']);
             <?php foreach ($messages as $m): ?>
                 <?php $isUser = $m['role'] === 'user'; ?>
                 <div class="msg msg--<?= $isUser ? 'user' : 'bot' ?>">
-                    <?php if (!empty($m['image_name'])): ?>
-<small class="muted"><?= e((string) $m['image_name']) ?></small>
+                    <?php if ($isUser): ?>
+                        <div class="msg__text"><?= e((string) $m['body']) ?></div>
+                    <?php else: ?>
+                        <?php if (!empty($m['image_name'])): ?>
+                            <small class="muted"><?= e((string) $m['image_name']) ?></small>
+                        <?php endif; ?>
+                        <div class="msg__text" data-markdown><?= e((string) $m['body']) ?></div>
                     <?php endif; ?>
-                    <?= e((string) $m['body']) ?>
                 </div>
             <?php endforeach; ?>
         <?php endif; ?>

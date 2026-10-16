@@ -180,10 +180,17 @@ function csrf_valid(): bool
 
 /* --------------------------------------------------------------- flash ---- */
 
-/** Queue a one-shot message for the next page load. */
-function flash(string $type, string $message): void
+/**
+ * Queue a one-shot message for the next page load.
+ *
+ * $title is optional and overrides the generic heading picked from $type. Use
+ * it when the message is not actually a failure - e.g. a sign-in redirect is
+ * type 'error' (so it is announced assertively) but must NOT be headed
+ * "Something went wrong".
+ */
+function flash(string $type, string $message, string $title = ''): void
 {
-    $_SESSION['flash'][] = ['type' => $type, 'message' => $message];
+    $_SESSION['flash'][] = ['type' => $type, 'message' => $message, 'title' => $title];
 }
 
 /** Pull and clear queued flash messages. */
@@ -340,7 +347,9 @@ function require_login(): array
 {
     $user = current_user();
     if ($user === null) {
-        flash('error', 'Please sign in to continue.');
+        // Type stays 'error' so the notice is announced assertively, but the
+        // heading is a sign-in prompt - not "Something went wrong".
+        flash('error', 'Please sign in to continue.', 'Sign in to continue');
         redirect(url('auth', ['action' => 'login']));
     }
     return $user;

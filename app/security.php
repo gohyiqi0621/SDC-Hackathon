@@ -81,3 +81,18 @@ function mask_secret(string $last4): string
 {
     return 'sk-' . str_repeat('.', 18) . $last4;
 }
+
+/**
+ * Describe a secret for the server log without revealing it.
+ *
+ * Returns length only (and, for a value whose prefix is itself non-secret, that
+ * prefix). Never return any part of the secret body - a log line must not be
+ * enough to reconstruct or partially guess a credential.
+ */
+function secret_shape(string $secret): string
+{
+    if ($secret === '') {
+        return 'empty';
+    }
+    return 'len:' . strlen($secret);
+}

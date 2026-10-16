@@ -37,12 +37,18 @@ $subscriberCount = count($recipients);
     <?php endif; ?>
 </div>
 
-<?php if ($isAdmin && !$configured): ?>
+<?php if (!$configured): ?>
     <div class="notice notice--warn" role="status">
         <?= icon('alert') ?>
         <div>
-            <strong>OneSignal is not configured</strong>
-            <p>Add the <strong>App ID</strong> and <strong>REST API Key</strong> on the <a href="<?= e(url('key')) ?>">Key</a> page to start sending.</p>
+            <strong>Push notifications are not available yet</strong>
+            <p>
+                This service is not configured yet. Please contact your administrator.
+                <?php if ($isAdmin): ?>
+                    Add the <strong>OneSignal App ID</strong> and <strong>REST API Key</strong> on the
+                    <a href="<?= e(url('key')) ?>">Key</a> page to start sending.
+                <?php endif; ?>
+            </p>
         </div>
     </div>
 <?php endif; ?>
