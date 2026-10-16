@@ -62,11 +62,5 @@ view('layouts/header', ['title' => 'Sign in', 'bare' => true]);
     <?php endif; ?>
 
     <p class="auth__switch">No account yet? <a href="<?= e(url('auth', ['action' => 'register'])) ?>">Create one</a></p>
-
-    <div class="auth__demo">
-        <span>Demo logins</span>
-        <code>admin@sdc.local &middot; admin123</code>
-        <code>user@sdc.local &middot; user123</code>
-    </div>
 </div>
 <?php view('layouts/footer', ['bare' => true]); ?>
