@@ -175,39 +175,11 @@ CREATE TABLE `schema_migrations` (
     PRIMARY KEY (`filename`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ------------------------------------------------------------------ demo ---
--- Passwords below are bcrypt hashes of "admin123" and "user123".
--- Change them before any real deployment.
-INSERT INTO `users` (`id`, `name`, `email`, `password_hash`, `role`, `status`) VALUES
-(1, 'Admin User', 'admin@sdc.local', '$2y$10$uWZ.lwqJwbpElDncu1GjW.eZw1bbbW8bJtI.yoB8wfLZ7FyJbWMjG', 'admin', 'active'),
-(2, 'Demo User',  'user@sdc.local',  '$2y$10$iy4MhC09jt9829zgCxwJjeVUpDRQ01gqpICHpKXuhtF3fVBjhMyke', 'user',  'active');
+-- ------------------------------------------------------------------ seed ---
+-- No demo accounts and no sample rows are seeded: a fresh import starts empty.
+-- Register the first account through the UI, then promote it once with:
+--   UPDATE users SET role = 'admin' WHERE email = 'you@example.com';
 
--- Items for both users on purpose: a fresh import should show the role scoping
--- straight away (admin sees 11 rows, the demo user sees only their own 6).
-INSERT INTO `items` (`user_id`, `title`, `description`, `status`, `created_at`, `updated_at`) VALUES
-(1, 'Sample item one',   'First placeholder record for the demo table.',   'active',   DATE_SUB(NOW(), INTERVAL 6 DAY), DATE_SUB(NOW(), INTERVAL 6 DAY)),
-(1, 'Sample item two',   'Second placeholder record for the demo table.',  'active',   DATE_SUB(NOW(), INTERVAL 4 DAY), DATE_SUB(NOW(), INTERVAL 4 DAY)),
-(1, 'Sample item three', 'Third placeholder record for the demo table.',   'draft',    DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_SUB(NOW(), INTERVAL 3 DAY)),
-(1, 'Sample item four',  'Fourth placeholder record for the demo table.',  'draft',    DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY)),
-(1, 'Sample item five',  'Fifth placeholder record for the demo table.',   'archived', NOW(),                           NOW()),
-(2, 'My draft idea',     'Owned by the demo user, still a draft.',         'draft',    DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY)),
-(2, 'My active task',    'Owned by the demo user and in progress.',        'active',   DATE_SUB(NOW(), INTERVAL 4 DAY), DATE_SUB(NOW(), INTERVAL 4 DAY)),
-(2, 'My second task',    'Another item the demo user can edit and delete.','active',   DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_SUB(NOW(), INTERVAL 3 DAY)),
-(2, 'Old experiment',    'Archived item owned by the demo user.',          'archived', DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY)),
-(2, 'Notes to self',     'Draft notes owned by the demo user.',            'draft',    DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY)),
-(2, 'Something fresh',   'Created today by the demo user.',                'active',   NOW(),                           NOW());
-
--- Spread over the last week so the dashboard chart has a real shape on a
--- fresh import. Replace these with genuine logs once the AI panel is wired up.
-INSERT INTO `ai_logs` (`user_id`, `input_text`, `output_text`, `status`, `created_at`) VALUES
-(1, 'Summarise the project brief.',        'Sample output from the dummy service.', 'success', DATE_SUB(NOW(), INTERVAL 6 DAY)),
-(1, 'List three risks for the prototype.', 'Sample output from the dummy service.', 'success', DATE_SUB(NOW(), INTERVAL 5 DAY)),
-(1, 'Draft a one-line pitch.',             'Sample output from the dummy service.', 'success', DATE_SUB(NOW(), INTERVAL 4 DAY)),
-(2, 'Suggest a colour palette.',           'Sample output from the dummy service.', 'success', DATE_SUB(NOW(), INTERVAL 4 DAY)),
-(2, 'Turn this paragraph into bullet points.', '',                                   'error',   DATE_SUB(NOW(), INTERVAL 3 DAY)),
-(1, 'Explain the SDG we picked.',          'Sample output from the dummy service.', 'success', DATE_SUB(NOW(), INTERVAL 2 DAY)),
-(2, 'Rewrite the abstract shorter.',       'Sample output from the dummy service.', 'success', DATE_SUB(NOW(), INTERVAL 1 DAY)),
-(1, 'Generate five demo questions.',       'Sample output from the dummy service.', 'success', NOW());
 
 -- Seed the public OneSignal App ID so the bell and push switch render on a
 -- fresh import. The REST API key is a SECRET and is NOT seeded on purpose:
