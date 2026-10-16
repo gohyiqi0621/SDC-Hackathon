@@ -152,11 +152,6 @@ if (APP_DEBUG) {
 }
 
 if (session_status() === PHP_SESSION_NONE) {
-    // secure=on whenever the request is HTTPS (directly or behind a proxy),
-    // so the session cookie is never sent over plain http in production.
-    $__secure = (($_SERVER['HTTPS'] ?? '') !== '' && ($_SERVER['HTTPS'] ?? '') !== 'off')
-        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
-    session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax', 'secure' => $__secure]);
+    session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax']);
     session_start();
-    unset($__secure);
 }

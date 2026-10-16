@@ -32,18 +32,6 @@
         if (!region) { return null; }
 
         var kind = TYPES.indexOf(type) === -1 ? 'info' : type;
-        var text = String(message);
-
-        // Repeated submits used to stack identical prompts; replace in place.
-        for (var i = 0; i < region.children.length; i++) {
-            var seen = region.children[i];
-            if (!seen.classList.contains('is-leaving')
-                && seen.querySelector('span') && seen.querySelector('span').textContent === text
-                && seen.classList.contains('toast--' + kind)) {
-                return seen;
-            }
-        }
-
         var el = document.createElement('div');
         el.className = 'toast liquid-glass-strong toast--' + kind;
         el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
@@ -72,34 +60,15 @@
         if (typeof el.showModal === 'function' && !el.open) { el.showModal(); } else { el.setAttribute('open', ''); }
         return el;
     }
-
-    /** Close with the exit animation, then really close (or on a safety timeout). */
     function closeModal(target) {
         var el = resolveEl(target);
-        if (!el || !el.open || el.classList.contains('is-closing')) { return; }
-
-        function finish() {
-            el.classList.remove('is-closing');
-            el.removeEventListener('animationend', once);
-            if (el.open) { el.close(); }
-        }
-        var once = function (e) { if (e.target === el) { finish(); } };
-        el.classList.add('is-closing');
-        el.addEventListener('animationend', once);
-        setTimeout(finish, 300); // animationend may never fire (no animation, hidden tab)
+        if (el && el.open) { el.close(); }
     }
-    // Route every close path (Esc, backdrop click) through the exit animation.
-    document.addEventListener('cancel', function (e) {
-        if (e.target instanceof HTMLDialogElement && e.target.classList.contains('modal')) {
-            e.preventDefault();
-            closeModal(e.target);
-        }
-    }, true);
 
     // Light-dismiss: clicking the backdrop closes any .modal
     document.addEventListener('click', function (e) {
         var d = e.target;
-        if (d instanceof HTMLDialogElement && d.classList.contains('modal') && d.open) { closeModal(d); }
+        if (d instanceof HTMLDialogElement && d.classList.contains('modal') && d.open) { d.close('cancel'); }
     });
     // [data-open-modal="#id"] / [data-close-modal] triggers
     document.addEventListener('click', function (e) {
@@ -166,107 +135,6 @@
             if (ok) { form.dataset.confirmed = '1'; form.submit(); }
         });
     });
-
-    /* --------------------------------------------- field error feel ------- */
-    /* Source of truth is the .field__error text (server-rendered or written by
-       api.js): non-empty slides in below the input, empty collapses. The input
-       shakes and turns red whenever the field flips into error, and the error
-       eases away as soon as the user types a valid value. */
-    (function fieldErrors() {
-        function inputOf(field) { return field.querySelector('input, select, textarea'); }
-
-        function sync() {
-            Array.prototype.forEach.call(document.querySelectorAll('.field'), function (field) {
-                var error = field.querySelector('.field__error');
-                if (!error) { return; }
-                var open = error.textContent.trim() !== '';
-                if (open && !field.classList.contains('is-error')) {
-                    field.classList.add('is-error'); // triggers the CSS shake
-                    if (navigator.vibrate) { navigator.vibrate(10); }
-                } else if (!open && field.classList.contains('is-error')) {
-                    field.classList.remove('is-error');
-                    var input = inputOf(field);
-                    if (input) { input.classList.remove('is-invalid'); input.removeAttribute('aria-invalid'); }
-                }
-            });
-        }
-
-        function wire() {
-            Array.prototype.forEach.call(document.querySelectorAll('.field'), function (field) {
-                if (field.dataset.fxError) { return; }
-                var error = field.querySelector('.field__error');
-                var input = field.querySelector('input, select, textarea');
-                if (!error || !input) { return; }
-                field.dataset.fxError = '1';
-                input.addEventListener('input', function () {
-                    // Fixing it: collapse the message as soon as the value validates.
-                    if (error.textContent.trim() !== '' && input.checkValidity()) {
-                        error.textContent = '';
-                    }
-                });
-            });
-        }
-
-        var mo = new MutationObserver(function () { sync(); wire(); });
-        mo.observe(document.body, { childList: true, characterData: true, subtree: true });
-        sync();
-        wire();
-    })();
-
-    /* --------------------------------------- password reveal (eye) -------- */
-    /* Server markup ships one eye icon per button; the crossed-out eye is
-       injected here so "show" state is visible on every password field. */
-    (function passwordEyes() {
-        var OFF = '<svg class="icon icon--sm icon--eye-off" aria-hidden="true" focusable="false"><use href="#i-eye-off"/></svg>';
-
-        Array.prototype.forEach.call(document.querySelectorAll('[data-toggle-password]'), function (btn) {
-            var input = document.getElementById(btn.getAttribute('data-toggle-password'));
-            if (!input || btn.dataset.eyeWired || input.type !== 'password') { return; }
-            btn.dataset.eyeWired = '1';
-            btn.insertAdjacentHTML('beforeend', OFF);
-            btn.setAttribute('aria-pressed', 'false');
-
-            btn.addEventListener('click', function () {
-                var show = input.type === 'password';
-                input.type = show ? 'text' : 'password';
-                btn.classList.toggle('is-on', show);
-                btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
-                btn.setAttribute('aria-pressed', String(show));
-                if (show) { input.focus(); } // keep typing where they left off
-            });
-        });
-    })();
-
-    /* Wrong-password shake: a form-level warning inside an auth card nudges
-       the whole card once, matching the field-level shake. */
-    Array.prototype.forEach.call(document.querySelectorAll('.notice--warn[role="alert"]'), function (notice) {
-        var card = notice.closest('.auth__card') || notice.closest('.card');
-        if (!card || card.classList.contains('is-shaking')) { return; }
-        card.classList.add('is-shaking');
-        card.addEventListener('animationend', function () { card.classList.remove('is-shaking'); });
-    });
-
-    /* ------------------------------------------------------- count-up ----- */
-    /* Numbers marked [data-countup] roll up from zero on load (non-numeric
-       values like "Admin" or dates are skipped). */
-    (function countUp() {
-        var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        Array.prototype.forEach.call(document.querySelectorAll('[data-countup]'), function (el) {
-            if (el.dataset.counted) { return; }
-            el.dataset.counted = '1';
-            var raw = el.textContent.trim().replace(/[,\s]/g, '');
-            if (reduce || !/^\d+(\.\d+)?$/.test(raw)) { return; }
-            var target = parseFloat(raw);
-            var decimals = raw.indexOf('.') > -1 ? raw.split('.')[1].length : 0;
-            var start = performance.now(), DURATION = 700;
-            (function frame(now) {
-                var p = Math.min(((now || performance.now()) - start) / DURATION, 1);
-                var eased = 1 - Math.pow(1 - p, 3);
-                el.textContent = decimals ? (target * eased).toFixed(decimals) : String(Math.round(target * eased));
-                if (p < 1) { requestAnimationFrame(frame); }
-            })();
-        });
-    })();
 
     window.UI = { toast: toast, openModal: openModal, closeModal: closeModal, confirm: confirmDialog, setLoading: setLoading, escapeHtml: escapeHtml };
 })();

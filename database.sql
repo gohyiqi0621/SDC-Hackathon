@@ -116,8 +116,7 @@ CREATE TABLE `settings` (
     `value_encrypted` TEXT         NULL,          -- base64(iv || tag || ciphertext), or NULL
     `value_plain`     TEXT         NULL,          -- non-secret values only
     `is_secret`       TINYINT(1)   NOT NULL DEFAULT 0,
-    `first4`          CHAR(4)      NULL,          -- mask: first four characters
-    `last4`           CHAR(4)      NULL,          -- mask: last four characters
+    `last4`           CHAR(4)      NULL,
     `updated_by`      INT UNSIGNED NULL,
     `updated_at`      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`key`),

@@ -7,20 +7,9 @@
     # Application code and the Python service are never served directly.
     RewriteRule ^(app|ai-service)/ - [F,L]
 
-    # Runtime data (logs, backups), migrations and local tooling are not web
-    # content either - logs in particular can include request metadata.
-    RewriteRule ^(storage|migrations|\.workbuddy-ai)/ - [F,L]
-
     # Root PHP files and SQL dumps are includes, not endpoints.
     RewriteRule ^(config\.php|db\.php|helpers\.php|database\.sql)$ - [F,L]
 
     # .env, .env.example, .env.local ...
     RewriteRule ^\.env - [F,L]
-</IfModule>
-
-# Baseline hardening for anything Apache serves from this tree.
-<IfModule mod_headers.c>
-    Header always set X-Content-Type-Options "nosniff"
-    Header always set X-Frame-Options "SAMEORIGIN"
-    Header always set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>

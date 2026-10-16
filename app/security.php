@@ -75,13 +75,11 @@ function decrypt_secret(string $sealed): ?string
 
 /**
  * The only representation of a secret the UI ever sees:
- * the first four characters, a fixed run of dots, and the last four.
- * (first4 comes from the `settings.first4` column; older rows that predate it
- * show a placeholder run instead of a prefix.)
+ * "sk-" + 18 dots + the last four characters.
  */
-function mask_secret(string $first4, string $last4): string
+function mask_secret(string $last4): string
 {
-    return ($first4 !== '' ? $first4 : '····') . str_repeat('·', 12) . $last4;
+    return 'sk-' . str_repeat('.', 18) . $last4;
 }
 
 /**

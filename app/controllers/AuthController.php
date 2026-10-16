@@ -91,8 +91,8 @@ class AuthController
             } elseif ($this->users->emailExists($email)) {
                 $errors['email'] = 'That email is already registered.';
             }
-            if (validate_password($password) !== '') {
-                $errors['password'] = validate_password($password);
+            if (strlen($password) < 8) {
+                $errors['password'] = 'Use at least 8 characters.';
             }
             if ($confirm !== $password) {
                 $errors['password_confirm'] = 'The two passwords do not match.';
@@ -333,8 +333,8 @@ class AuthController
             $password = (string) ($_POST['password'] ?? '');
             $confirm  = (string) ($_POST['password_confirm'] ?? '');
 
-            if (validate_password($password) !== '') {
-                $errors['password'] = validate_password($password);
+            if (strlen($password) < 8) {
+                $errors['password'] = 'Use at least 8 characters.';
             }
             if ($confirm !== $password) {
                 $errors['password_confirm'] = 'The two passwords do not match.';

@@ -79,8 +79,8 @@ class AdminController
         } elseif ((new User())->emailExists($email)) {
             $errors['email'] = 'That email is already registered.';
         }
-        if (validate_password($password) !== '') {
-            $errors['password'] = validate_password($password);
+        if (strlen($password) < 8) {
+            $errors['password'] = 'Use at least 8 characters.';
         }
         if (!in_array($role, User::ROLES, true)) {
             $errors['role'] = 'Pick a valid role.';
@@ -103,34 +103,6 @@ class AdminController
     }
 
     /* ---------------------------------------------------------- private ---- */
-
-    /**
-     * POST ?page=admin&action=policy - save the sign-up password policy:
-     * minimum length plus optional special-symbol and mixed-case rules.
-     * Values are plain settings rows the whole app reads via password_policy().
-     */
-    public function policy(): void
-    {
-        $admin   = require_admin();
-
-        $min     = (int) ($_POST['password_min_chars'] ?? 8);
-        $special = isset($_POST['password_require_special']) ? '1' : '0';
-        $case    = isset($_POST['password_require_case']) ? '1' : '0';
-        $min     = max(4, min(64, $min > 0 ? $min : 8));
-
-        $stmt = db()->prepare(
-            'INSERT INTO settings (`key`, value_plain, is_secret, updated_by)
-             VALUES (?, ?, 0, ?)
-             ON DUPLICATE KEY UPDATE value_plain = VALUES(value_plain), updated_by = VALUES(updated_by)'
-        );
-        foreach (['password_min_chars' => (string) $min, 'password_require_special' => $special, 'password_require_case' => $case] as $key => $value) {
-            // Touch updated_at so the Key-page style "Saved by X" contract holds
-            // for anything that later reads these rows.
-            $stmt->execute([$key, $value, (int) $admin['id']]);
-        }
-
-        respond_ok('Password policy updated.', url('admin'));
-    }
 
     private function findOrFail(int $id): array
     {

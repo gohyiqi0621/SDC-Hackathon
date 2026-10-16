@@ -19,20 +19,15 @@
 .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); margin-bottom: var(--sp-4); }
 .stat { display: flex; flex-direction: column; gap: 3px; padding: var(--sp-5); border-radius: var(--r-xl); background: var(--surface); box-shadow: var(--shadow-card); transition: transform var(--t), box-shadow var(--t); }
 .stat:hover { transform: translateY(-2px); box-shadow: var(--shadow-pop); }
-.stat:active { transform: scale(.97); transition-duration: 80ms; }
-.stat:active { transform: scale(.97); transition-duration: 80ms; }
 .stat__icon { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: var(--sp-3); border-radius: 12px; background: var(--accent-soft); color: var(--accent); }
 .stat__label { font-size: var(--fs-xs); font-weight: 500; color: var(--text-3); }
 .stat__value { font-size: 1.875rem; font-weight: 600; letter-spacing: -.045em; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .stat__hint { font-size: var(--fs-xs); color: var(--text-3); }
 @media (min-width: 768px) { .stat-grid { grid-template-columns: repeat(4, 1fr); } }
-/* Phones breathe: the 2-across stat cards read as one slab at a 12px gutter. */
-@media (max-width: 399px) { .stat-grid, .quick, .dash-grid, .notif-list { gap: var(--sp-4); } }
 
 .quick { display: grid; gap: var(--sp-3); margin-bottom: var(--sp-4); }
 .quick__item { display: grid; grid-template-columns: auto 1fr; gap: 2px var(--sp-3); align-items: center; padding: var(--sp-4); border-radius: var(--r-xl); background: var(--surface); box-shadow: var(--shadow-card); color: var(--text); text-decoration: none; transition: transform var(--t), box-shadow var(--t); }
 .quick__item:hover { transform: translateY(-2px); box-shadow: var(--shadow-pop); }
-.quick__item:active { transform: scale(.97); transition-duration: 80ms; }
 .quick__item .stat__icon { grid-row: span 2; margin: 0; }
 .quick__item strong { font-size: var(--fs-sm); } .quick__item span:last-child { font-size: var(--fs-xs); color: var(--text-3); }
 @media (min-width: 600px) { .quick { grid-template-columns: repeat(3, 1fr); } }
@@ -43,18 +38,6 @@
 /* ------------------------------------------------------------ charts --- */
 .chart-wrap { position: relative; height: 260px; }
 .chart-fallback { padding: var(--sp-6); text-align: center; border: 1.5px dashed var(--line-strong); border-radius: var(--r-lg); }
-/* When the chart library fails to load: a brief shimmer instead of a dead
-   area, then the text fallback (dashboard.js drops is-loading after ~1s). */
-.chart-wrap.is-loading canvas { visibility: hidden; }
-.chart-wrap.is-loading::after {
-  content: ""; position: absolute; inset: 0; border-radius: var(--r-lg);
-  background: var(--surface-3); overflow: hidden;
-}
-.chart-wrap.is-loading::before {
-  content: ""; position: absolute; inset: 0; border-radius: var(--r-lg); z-index: 1;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface) 70%, transparent), transparent);
-  animation: shimmer 1.2s infinite;
-}
 
 /* ------------------------------------------------------------ tables --- */
 .toolbar { display: flex; flex-direction: column; gap: var(--sp-3); margin-bottom: var(--sp-4); }
@@ -70,7 +53,6 @@
 .table td { padding: 14px var(--sp-5); border-bottom: 1px solid var(--line); vertical-align: middle; }
 .table tbody tr { transition: background-color var(--t-fast); }
 .table tbody tr:hover { background: var(--surface-2); }
-.table tbody tr:active { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .table tbody tr:last-child td { border-bottom: 0; }
 .table td:last-child, .table th:last-child { text-align: right; }
 .table__title { display: flex; align-items: center; gap: var(--sp-3); font-weight: 600; }
@@ -91,26 +73,7 @@
 .modal { width: min(92vw, 480px); max-height: 90dvh; padding: 0; border: 0; border-radius: var(--r-2xl); background: var(--glass-strong); color: var(--text); box-shadow: var(--shadow-pop); -webkit-backdrop-filter: saturate(180%) blur(24px); backdrop-filter: saturate(180%) blur(24px); overflow: auto; }
 .modal[open] { animation: toast-in .45s var(--spring); }
 .modal::backdrop { background: rgba(0,0,0,.36); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: fade-in .3s var(--ease); }
-.modal.is-closing { animation: toast-out .25s var(--ease) both; }
 .modal__panel { margin: 0; padding: var(--sp-6); }
-/* Phones get a bottom action sheet: slides up from the bottom edge with a
-   grabber, mirrors the drop on close (ui.js holds .is-closing until it ends). */
-@keyframes sheet-in { from { opacity: 0; transform: translateY(48px); } }
-@keyframes sheet-out { to { opacity: 0; transform: translateY(64px); } }
-@media (max-width: 767px) {
-  dialog.modal {
-    inset: auto 0 var(--safe-b) 0; margin: 0; max-width: none; width: 100%;
-    max-height: min(88dvh - var(--safe-b), 700px);
-    border-radius: var(--r-xl) var(--r-xl) 0 0;
-  }
-  dialog.modal[open] { animation: sheet-in .45s var(--spring) both; } /* beats .modal[open] toast-in */
-  dialog.modal.is-closing { animation: sheet-out .25s var(--ease) both; }
-  dialog.modal::before {
-    content: ""; position: absolute; top: 9px; left: 50%; transform: translateX(-50%);
-    width: 38px; height: 5px; border-radius: 3px; background: var(--line-strong);
-  }
-  .modal__panel { padding-bottom: calc(var(--sp-6) + var(--safe-b)); }
-}
 .modal__head { margin-bottom: var(--sp-4); } .modal__head h3 { font-size: 1.375rem; }
 .modal__head p { margin-top: 4px; font-size: var(--fs-sm); color: var(--text-3); }
 .modal__foot { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-5); }
@@ -188,7 +151,7 @@
 .activity li { display: flex; gap: var(--sp-3); align-items: center; padding: 12px 0; border-top: 1px solid var(--line); font-size: var(--fs-sm); }
 .activity li:first-child { border-top: 0; } .activity time { margin-left: auto; font-size: var(--fs-xs); color: var(--text-3); white-space: nowrap; }
 .activity .dot { background: var(--accent); }
-.split { display: grid; gap: var(--sp-4); margin-bottom: var(--sp-4); }
+.split { display: grid; gap: var(--sp-4); }
 .split .card, .split .settings-group { margin-bottom: 0; }
 @media (min-width: 900px) { .split { grid-template-columns: 1fr 1fr; align-items: start; } }
 
@@ -202,9 +165,8 @@
 .key-mask { font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: .04em; color: var(--text-2); padding: 6px 12px; border-radius: var(--r-pill); background: var(--surface-3); }
 
 /* -------------------------------------------------- notifications ----- */
-.set-row { position: relative; display: flex; gap: var(--sp-2); align-items: center; }
+.set-row { display: flex; gap: var(--sp-2); align-items: center; }
 .set-row input { flex: 1; }
-.set-row .input-btn { position: absolute; right: 4px; top: 50%; margin-top: -20px; }
 .settings-form { padding: var(--sp-4) 0; border-top: 1px solid var(--line); }
 .settings-form:first-of-type { padding-top: 0; border-top: 0; }
 
@@ -232,20 +194,6 @@
 .notif-item__meta { font-size: var(--fs-xs); color: var(--text-3); margin-top: 6px; }
 .badge--warn { background: var(--warn-soft, #fff4d6); color: var(--warn, #8a6100); }
 .badge--danger { background: var(--danger-soft, #ffe2e0); color: var(--danger, #b3261e); }
-
-/* --------------------------------------------------------- skeleton --- */
-/* Shape-matched placeholders while JS fetches (notifications feed, etc.). */
-.skeleton { position: relative; overflow: hidden; background: var(--surface-3); }
-.skeleton::after {
-  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface) 70%, transparent), transparent);
-  animation: shimmer 1.4s infinite;
-}
-@keyframes shimmer { to { transform: translateX(100%); } }
-.skel-row { display: flex; flex-direction: column; gap: 7px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
-.skel-row:last-child { border-bottom: 0; }
-.skel-row i { display: block; width: 88%; height: 12px; border-radius: 6px; }
-.skel-row i:last-child { width: 55%; height: 10px; }
 
 /* ------------------------------------------------- notif composer --- */
 /* The modal body scrolls, not the whole dialog, so the footer buttons and the

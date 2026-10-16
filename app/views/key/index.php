@@ -3,13 +3,13 @@
  * key/index.php - the admin Key page.
  *
  * Integration configuration is two circular brand icons; clicking one slides
- * its card down beneath them (one open at a time). Every field across all
- * integrations lives in ONE form with a single Save button
- * (?page=key&action=save_all); a blank field keeps the saved value, typing a
- * new one overwrites it.
+ * its card down beneath them (one open at a time). Everything is stored in the
+ * `settings` table via the existing ?page=key&action=save_setting endpoint, so
+ * there is no per-integration route.
  *
  * Secrets are rendered as password inputs with the stored value never echoed
- * back - only a first4/last4 mask appears as the placeholder.
+ * back - only a mask appears as the placeholder. Leaving a secret field blank
+ * keeps the saved value; clearing it is an explicit action via the Clear button.
  *
  * Below the integrations: stored keys (encrypted) and a read-only chat review.
  * Admins only (controller guard).
@@ -80,15 +80,9 @@ $isSet = static function (array $entry) use ($byKey): bool {
     <div class="card__head">
         <div>
             <h3 id="integrations-title">Integrations</h3>
-            <p>Select an integration to configure it. One Save button stores everything at once.</p>
+            <p>Select an integration to configure it.</p>
         </div>
     </div>
-
-    <!-- One form for every integration: a blank field keeps the saved value,
-         typing a new one overwrites it. -->
-    <form method="post" action="<?= e(url('key', ['action' => 'save_all'])) ?>"
-          data-ajax autocomplete="off">
-        <?= csrf_field() ?>
 
     <div class="int-icons" role="tablist" aria-label="Integrations">
         <?php foreach ($integrations as $it):
@@ -151,38 +145,52 @@ $isSet = static function (array $entry) use ($byKey): bool {
                 <?php foreach ($it['keys'] as $k):
                     $s = $byKey[$k] ?? null;
                     if ($s === null) { continue; } ?>
-                    <div class="field">
-                        <label for="set-<?= e($s['key']) ?>"><?= e($s['label']) ?></label>
-                        <div class="set-row">
-                            <input id="set-<?= e($s['key']) ?>" name="value[<?= e($s['key']) ?>]"
-                                   type="<?= $s['secret'] ? 'password' : 'text' ?>"
-                                   placeholder="<?= $s['set'] ? e($s['mask']) : 'Not set' ?>"
-                                   value="<?= $s['secret'] ? '' : e($s['mask']) ?>"
-                                   <?= $s['secret'] ? 'autocomplete="new-password"' : '' ?>>
-                            <?php if ($s['secret'] && $s['set']): ?>
-                                <button class="input-btn" type="button" aria-label="Show value"
-                                        data-toggle-password="set-<?= e($s['key']) ?>"><?= icon('eye', 'icon--sm') ?></button>
-                            <?php endif; ?>
+                    <form method="post" action="<?= e(url('key', ['action' => 'save_setting'])) ?>"
+                          data-ajax autocomplete="off" class="settings-form">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="key" value="<?= e($s['key']) ?>">
+                        <div class="field">
+                            <label for="set-<?= e($s['key']) ?>"><?= e($s['label']) ?></label>
+                            <div class="set-row">
+                                <input id="set-<?= e($s['key']) ?>" name="value"
+                                       type="<?= $s['secret'] ? 'password' : 'text' ?>"
+                                       placeholder="<?= $s['set'] ? e($s['mask']) : 'Not set' ?>"
+                                       value="<?= $s['secret'] ? '' : e($s['mask']) ?>"
+                                       <?= $s['secret'] ? 'autocomplete="new-password"' : '' ?>>
+                                <button class="btn btn--primary" type="submit">Save</button>
+                                <?php if ($s['set']): ?>
+                                    <button class="btn" type="submit" name="clear" value="1"
+                                            data-confirm-submit
+                                            data-confirm-title="Clear <?= e($s['label']) ?>?"
+                                            data-confirm-text="This removes the saved value. The integration will stop working until it is set again.">
+                                        Clear
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                            <p class="field__hint">
+                                <?= e($s['hint']) ?>
+                                <?php if ($s['set']): ?>
+                                    · Saved<?= $s['updater'] ? ' by ' . e($s['updater']) : '' ?><?= $s['updated_at'] ? ' ' . e(date('j M Y', strtotime((string) $s['updated_at']))) : '' ?>
+                                <?php else: ?>
+                                    · Not set yet
+                                <?php endif; ?>
+                            </p>
+                            <p class="field__error" data-error-for="value"></p>
                         </div>
-                        <p class="field__hint">
-                            <?= e($s['hint']) ?>
-                            <?php if ($s['set']): ?>
-                                · Saved<?= $s['updater'] ? ' by ' . e($s['updater']) : '' ?><?= $s['updated_at'] ? ' ' . e(date('j M Y', strtotime((string) $s['updated_at']))) : '' ?>
-                            <?php else: ?>
-                                · Not set yet
-                            <?php endif; ?>
-                        </p>
-                        <p class="field__error" data-error-for="value[<?= e($s['key']) ?>]"></p>
-                    </div>
+                    </form>
                 <?php endforeach; ?>
+
+                <?php if ($it['id'] === 'google'): ?>
+                    <div class="int-panel__meta">
+                        <p class="field__hint">
+                            Add this <strong>Authorised redirect URI</strong> in the Google Cloud Console:
+                            <code><?= e(GOOGLE_REDIRECT_URI) ?></code>
+                        </p>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     <?php endforeach; ?>
-
-    <div class="form-actions">
-        <button class="btn btn--primary" type="submit"><?= icon('check', 'icon--sm') ?> Save changes</button>
-    </div>
-    </form>
 </section>
 
 <section class="card card--flush">

@@ -32,56 +32,65 @@ class KeyController
     }
 
     /**
-     * POST ?page=key&action=save_all - store every config value in one go
-     * (the Key page submits all integrations with a single Save button).
+     * POST ?page=key&action=save_setting - store one config value.
      *
-     * Blank value -> "no change": a secret renders as an empty password input
-     * (only the mask shows as the placeholder), so Save on an untouched field
-     * must not destroy a working integration. To replace a value, type the
-     * new one over it and save.
+     * One endpoint for every key in Setting::SCHEMA, so the panel adapts to a
+     * new key by adding a row there - no new route or method per key.
+     *
+     * Empty-vs-clear: an empty value is treated as "no change" for a key that
+     * already has a value, because a secret renders as an empty password input
+     * (only the mask shows as the placeholder). Wiping a saved credential must
+     * be explicit, via name="clear". That is what stops a well-meaning "Save"
+     * on an untouched field from destroying a working integration.
      */
-    public function saveAll(): void
+    public function saveSetting(): void
     {
-        $admin  = require_admin();
-        $values = (array) ($_POST['value'] ?? []);
-        $errors = [];
-        $saved  = 0;
-        $settings = new Setting();
+        $admin = require_admin();
+        $key   = (string) ($_POST['key'] ?? '');
+        $value = trim((string) ($_POST['value'] ?? ''));
+        $clear = isset($_POST['clear']);
 
-        $touched = [];
-        foreach (Setting::SCHEMA as $key => $meta) {
-            if (array_key_exists($key, $values)) {
-                $touched[$key] = $meta;
-            }
-        }
-
-        foreach ($touched as $key => $meta) {
-            $value = trim((string) $values[$key]);
-            if ($value === '') {
-                continue; // blank respects whatever is stored
-            }
-            $error = $settings->put($key, $value, (int) $admin['id']);
-            if ($error !== '') {
-                $errors["value[{$key}]"] = $error;
-                continue;
-            }
-            $saved++;
-        }
-
-        if ($errors !== []) {
+        if (!isset(Setting::SCHEMA[$key])) {
             if (wants_json()) {
-                json_response(false, ['errors' => $errors], 'Please fix the highlighted fields.', 422);
+                json_response(false, [], 'Unknown setting.', 404);
             }
-            flash('error', implode(' ', $errors));
+            flash('error', 'Unknown setting.');
             redirect(url('key'));
         }
 
-        if ($saved === 0) {
-            respond_ok('Nothing to update.', url('key'));
+        $label    = Setting::SCHEMA[$key]['label'];
+        $settings = new Setting();
+
+        // Explicit clear: drop the row and say so.
+        if ($clear) {
+            $error = $settings->put($key, '', (int) $admin['id']);
+            if ($error !== '') {
+                if (wants_json()) {
+                    json_response(false, ['errors' => ['value' => $error]], $error, 422);
+                }
+                flash('error', $error);
+                redirect(url('key'));
+            }
+            respond_ok($label . ' cleared.', url('key'));
         }
 
-        $summary = $saved . ' value' . ($saved === 1 ? '' : 's') . ' saved.';
-        respond_ok(ucfirst($summary), url('key'));
+        // Nothing typed and something is already saved: leave it alone.
+        if ($value === '' && $settings->isSet($key)) {
+            respond_ok($label . ' unchanged.', url('key'));
+        }
+
+        $error = $settings->put($key, $value, (int) $admin['id']);
+        if ($error !== '') {
+            if (wants_json()) {
+                json_response(false, ['errors' => ['value' => $error]], $error, 422);
+            }
+            flash('error', $error);
+            redirect(url('key'));
+        }
+
+        // An empty value with nothing saved is a no-op, not a "clear".
+        $verb = $value === '' ? 'has no value to save.' : 'saved.';
+        respond_ok($label . ' ' . $verb, url('key'));
     }
 
     /** POST ?page=key&action=store - add a key (label + secret). */

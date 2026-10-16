@@ -53,10 +53,6 @@ view('layouts/header', ['title' => 'Sign in', 'bare' => true]);
         <a class="btn btn--google btn--block" href="<?= e(url('auth', ['action' => 'google'])) ?>">
             <?= $googleSvg ?>Continue with Google
         </a>
-        <p class="auth__oauth-note">
-            Google handles that sign-in end to end. This app never sees, asks for, or stores your
-            Google password.
-        </p>
     <?php else: ?>
         <button class="btn btn--google btn--block" type="button" disabled
                 title="This service is not configured yet. Please contact your administrator.">
