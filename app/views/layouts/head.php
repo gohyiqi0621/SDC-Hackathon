@@ -13,6 +13,9 @@ $pageTitle = $pageTitle ?? 'Dashboard';
 <title><?= e($pageTitle) ?> &middot; <?= e(APP_NAME) ?></title>
 <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
 <meta name="theme-color" content="#0f7f47">
+<!-- Google Search Console ownership verification. Do not remove, even after
+     verification succeeds - Google re-checks it. -->
+<meta name="google-site-verification" content="B6dq_TxSaY1iPwUdC36KZTmOsyEcmipegbL6RCHNGiA">
 <?php if (ONESIGNAL_APP_ID !== '' && current_user() !== null): ?>
 <?php
 /**
