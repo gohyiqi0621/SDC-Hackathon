@@ -21,15 +21,9 @@ view('layouts/header', ['title' => 'AI Chat', 'contentClass' => 'content--chat']
     <div class="notice notice--warn" role="status">
         <?= icon('alert') ?>
         <div>
-            <strong>The AI service is offline</strong>
-            <?php if (AI_SERVICE_URL === ''): ?>
-                <p>It is not configured yet — <code>AI_SERVICE_URL</code> is empty. Set it in your
-                   environment (and start the service with <code>cd ai-service &amp;&amp; python app.py</code>)
-                   so the assistant can answer.</p>
-            <?php else: ?>
-                <p>It is not answering at <code><?= e(AI_SERVICE_URL) ?></code>. Start it with
-                   <code>cd ai-service &amp;&amp; python app.py</code>.</p>
-            <?php endif; ?>
+            <strong>The AI assistant is temporarily unavailable</strong>
+            <p>It cannot answer right now. Please try again in a moment — and let your
+               administrator know if it keeps happening.</p>
         </div>
     </div>
 <?php endif; ?>

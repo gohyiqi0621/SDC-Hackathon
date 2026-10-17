@@ -32,12 +32,16 @@ function callAiService(string $endpoint, array $payload = [], string $method = '
         : aiRequestViaStream($url, $payload, $method);
 
     if ($result['body'] === null) {
+        // The technical detail goes to the log, not to the visitor: the message
+        // below is rendered in the AI panel, and AI_SERVICE_URL is an internal
+        // hostname nobody outside the deployment should ever see.
+        error_log('[ai] service unreachable at ' . AI_SERVICE_URL . ' (via ' . $result['via'] . ')');
+
         return [
             'ok'     => false,
             'status' => 0,
             'data'   => [],
-            'error'  => 'The AI service is not reachable at ' . AI_SERVICE_URL
-                . '. Start it with: cd ai-service && python app.py',
+            'error'  => 'The AI service is not reachable right now. Please try again in a moment.',
             'via'    => $result['via'],
         ];
     }
