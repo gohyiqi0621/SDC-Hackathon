@@ -13,17 +13,30 @@ declare(strict_types=1);
 
 class Setting
 {
-    /** The keys the Key panel knows about. Add a row here, get a field for free. */
+    /**
+     * The keys the panels know about. Add a row here, get a field for free.
+     *
+     * `group` keeps the two panels apart: 'keys' feeds the Key page (credentials),
+     * 'policy' feeds the Password rules card on Admin. all() filters on it, so a
+     * new policy row never shows up as an API-key field.
+     */
     public const SCHEMA = [
-        'onesignal_app_id'  => ['label' => 'OneSignal App ID',        'secret' => false, 'hint' => 'Public. Safe to send to the browser.'],
-        'onesignal_api_key' => ['label' => 'OneSignal REST API Key',  'secret' => true,  'hint' => 'Secret. Never leaves the server.'],
-        'google_client_id'  => ['label' => 'Google Client ID',        'secret' => false, 'hint' => 'Public OAuth client id.'],
-        'google_secret'     => ['label' => 'Google Client Secret',    'secret' => true,  'hint' => 'Secret. Used only in the token exchange.'],
-        'agnes_api_key'     => ['label' => 'Agnes AI API Key',        'secret' => true,  'hint' => 'Secret. Used only for AI Chat replies.'],
+        'onesignal_app_id'  => ['group' => 'keys', 'label' => 'OneSignal App ID',        'secret' => false, 'hint' => 'Public. Safe to send to the browser.'],
+        'onesignal_api_key' => ['group' => 'keys', 'label' => 'OneSignal REST API Key',  'secret' => true,  'hint' => 'Secret. Never leaves the server.'],
+        'google_client_id'  => ['group' => 'keys', 'label' => 'Google Client ID',        'secret' => false, 'hint' => 'Public OAuth client id.'],
+        'google_secret'     => ['group' => 'keys', 'label' => 'Google Client Secret',    'secret' => true,  'hint' => 'Secret. Used only in the token exchange.'],
+        'agnes_api_key'     => ['group' => 'keys', 'label' => 'Agnes AI API Key',        'secret' => true,  'hint' => 'Secret. Used only for AI Chat replies.'],
+
+        // Password rules. Plain values: no secret, and they are meant to be read
+        // back into the form. See password_policy() in helpers.php.
+        'password_min_length'      => ['group' => 'policy', 'label' => 'Minimum length',        'secret' => false, 'hint' => 'Between 6 and 72 characters.'],
+        'password_require_upper'   => ['group' => 'policy', 'label' => 'Require a capital letter', 'secret' => false, 'hint' => 'A-Z'],
+        'password_require_number'  => ['group' => 'policy', 'label' => 'Require a number',       'secret' => false, 'hint' => '0-9'],
+        'password_require_special' => ['group' => 'policy', 'label' => 'Require a symbol',       'secret' => false, 'hint' => 'Anything that is not a letter or number.'],
     ];
 
     /** Rows the admin can see: label, mask/dates. Never a secret's plaintext. */
-    public function all(): array
+    public function all(string $group = 'keys'): array
     {
         $rows = [];
         foreach (db()->query('SELECT s.key, s.value_plain, s.value_encrypted, s.last4, s.is_secret, s.updated_at, u.name AS updater
@@ -33,6 +46,9 @@ class Setting
 
         $out = [];
         foreach (self::SCHEMA as $key => $meta) {
+            if (($meta['group'] ?? 'keys') !== $group) {
+                continue;
+            }
             $row = $rows[$key] ?? null;
             $out[] = [
                 'key'    => $key,

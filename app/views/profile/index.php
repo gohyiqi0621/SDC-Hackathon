@@ -89,7 +89,7 @@ $isGoogleOnly = ($user['google_id'] ?? null) !== null && ($user['password_hash']
                            <?= isset($pwErrors['password']) ? 'class="is-invalid" aria-invalid="true"' : '' ?>>
                     <button class="input-btn" type="button" aria-label="Show password" data-toggle-password="password"><?= icon('eye', 'icon--sm') ?></button>
                 </div>
-                <p class="field__hint">At least 8 characters.</p>
+                <p class="field__hint"><?= e(password_policy_hint()) ?></p>
                 <p class="field__error" data-error-for="password"><?= e($pwErrors['password'] ?? '') ?></p>
             </div>
 

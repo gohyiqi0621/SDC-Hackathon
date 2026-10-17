@@ -262,6 +262,7 @@ textarea.input, .field textarea { min-height: 96px; resize: vertical; line-heigh
 .input-wrap .input, .input-wrap input { padding-right: 50px; }
 .input-btn { position: absolute; right: 4px; top: 4px; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; background: none; border: 0; border-radius: var(--r-sm); color: var(--text-3); cursor: pointer; }
 @media (hover: hover) { .input-btn:hover { color: var(--text); background: var(--surface-3); } }
+.input-btn.is-revealed { color: var(--accent); }
 .check { display: flex; gap: 10px; align-items: flex-start; font-size: var(--fs-sm); color: var(--text-2); cursor: pointer; margin-bottom: var(--sp-4); }
 .check input { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--btn); flex: none; }
 .field-row { display: grid; gap: var(--sp-4); }

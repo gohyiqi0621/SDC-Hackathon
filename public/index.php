@@ -25,6 +25,7 @@ $actionAliases = [
     'google-callback' => 'googleCallback',
     'set_password'    => 'setPassword',
     'save_setting'    => 'saveSetting',
+    'save_policy'     => 'savePolicy',
 ];
 $action = $actionAliases[strtolower($action)] ?? $action;
 

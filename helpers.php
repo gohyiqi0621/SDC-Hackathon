@@ -36,6 +36,92 @@ function setting(string $key, string $default = ''): string
     }
 }
 
+/**
+ * The password rules an admin has configured on Admin -> Password rules.
+ *
+ * Defaults deliberately reproduce the pre-policy behaviour: 8 characters and no
+ * character-class rules, so upgrading changes nothing until an admin opts in.
+ *
+ * @return array{min:int,upper:bool,number:bool,special:bool}
+ */
+function password_policy(): array
+{
+    static $policy = null;
+    if ($policy !== null) {
+        return $policy;
+    }
+
+    $min = (int) setting('password_min_length', '8');
+    if ($min < 6 || $min > 72) {
+        $min = 8;
+    }
+
+    return $policy = [
+        'min'     => $min,
+        'upper'   => setting('password_require_upper', '0') === '1',
+        'number'  => setting('password_require_number', '0') === '1',
+        'special' => setting('password_require_special', '0') === '1',
+    ];
+}
+
+/**
+ * The rule as one sentence, for a field hint. Kept next to the validator so the
+ * hint can never drift from what is actually enforced.
+ *
+ * @param array{min:int,upper:bool,number:bool,special:bool}|null $policy
+ */
+function password_policy_hint(?array $policy = null): string
+{
+    $policy = $policy ?? password_policy();
+
+    $extras = [];
+    if ($policy['upper'])   { $extras[] = 'a capital letter'; }
+    if ($policy['number'])  { $extras[] = 'a number'; }
+    if ($policy['special']) { $extras[] = 'a symbol'; }
+
+    $text = 'At least ' . $policy['min'] . ' characters';
+
+    if ($extras !== []) {
+        $last = array_pop($extras);
+        $text .= ', including ' . ($extras === [] ? $last : implode(', ', $extras) . ' and ' . $last);
+    }
+
+    return $text . '.';
+}
+
+/**
+ * Check a password against the configured policy.
+ *
+ * @return string|null null when it is acceptable, otherwise a message naming
+ *                     every rule it misses (so the user fixes them in one go).
+ */
+function password_problem(string $password): ?string
+{
+    $policy  = password_policy();
+    $missing = [];
+
+    if (mb_strlen($password) < $policy['min']) {
+        $missing[] = 'at least ' . $policy['min'] . ' characters';
+    }
+    if ($policy['upper'] && !preg_match('/[A-Z]/', $password)) {
+        $missing[] = 'a capital letter';
+    }
+    if ($policy['number'] && !preg_match('/[0-9]/', $password)) {
+        $missing[] = 'a number';
+    }
+    if ($policy['special'] && !preg_match('/[^A-Za-z0-9]/', $password)) {
+        $missing[] = 'a symbol';
+    }
+
+    if ($missing === []) {
+        return null;
+    }
+
+    $last = array_pop($missing);
+
+    return 'Use ' . ($missing === [] ? $last : implode(', ', $missing) . ' and ' . $last) . '.';
+}
+
 /** Escape any value for safe HTML output. Use this on every echo in a view. */
 function e(mixed $value): string
 {

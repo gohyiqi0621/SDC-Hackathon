@@ -79,8 +79,9 @@ class AdminController
         } elseif ((new User())->emailExists($email)) {
             $errors['email'] = 'That email is already registered.';
         }
-        if (strlen($password) < 8) {
-            $errors['password'] = 'Use at least 8 characters.';
+        $problem = password_problem($password);
+        if ($problem !== null) {
+            $errors['password'] = $problem;
         }
         if (!in_array($role, User::ROLES, true)) {
             $errors['role'] = 'Pick a valid role.';
@@ -99,6 +100,42 @@ class AdminController
             json_response(true, ['redirect' => url('admin'), 'id' => $id], $name . ' created as ' . $role . '.');
         }
         flash('success', $name . ' created as ' . $role . '.');
+        redirect(url('admin'));
+    }
+
+    /**
+     * POST ?page=admin&action=save_policy - the password rules.
+     *
+     * Stored as plain settings (never secrets) so the form can read them back.
+     * '0' is a real value here, not "unset": Setting::put() only deletes on ''.
+     */
+    public function savePolicy(): void
+    {
+        $admin = require_admin();
+
+        $min   = (int) ($_POST['min_length'] ?? 8);
+        $upper = isset($_POST['require_upper']) ? '1' : '0';
+        $num   = isset($_POST['require_number']) ? '1' : '0';
+        $spec  = isset($_POST['require_special']) ? '1' : '0';
+
+        if ($min < 6 || $min > 72) {
+            $this->fail('Minimum length must be between 6 and 72 characters.');
+        }
+
+        $settings = new Setting();
+        foreach ([
+            'password_min_length'      => (string) $min,
+            'password_require_upper'   => $upper,
+            'password_require_number'  => $num,
+            'password_require_special' => $spec,
+        ] as $key => $value) {
+            $error = $settings->put($key, $value, (int) $admin['id']);
+            if ($error !== '') {
+                $this->fail($error);
+            }
+        }
+
+        flash('success', 'Password rules updated.');
         redirect(url('admin'));
     }
 

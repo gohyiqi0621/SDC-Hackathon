@@ -253,6 +253,42 @@
         syncViewport();
     }
 
+    /* -------------------------------------------------- password reveal -- */
+    // <button data-toggle-password="inputId"> flips a field between masked and
+    // plain text. Delegated from the document, so it also covers fields inside
+    // <dialog> modals and any markup added later without re-binding.
+    //
+    // Deliberately ABOVE the tab-bar block: that block ends with an early
+    // `return` when the page has no .tabbar (auth screens), which would kill
+    // everything registered after it.
+    document.addEventListener('click', function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest('[data-toggle-password]') : null;
+        if (!btn) { return; }
+
+        var input = document.getElementById(btn.getAttribute('data-toggle-password'));
+        if (!input) { return; }
+
+        e.preventDefault();
+
+        var reveal = input.type === 'password';
+        input.type = reveal ? 'text' : 'password';
+
+        btn.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+        btn.setAttribute('aria-pressed', String(reveal));
+        btn.classList.toggle('is-revealed', reveal);
+
+        // Swap the sprite reference rather than replacing the <svg>, so the
+        // button keeps its event target and focus ring.
+        var use = btn.querySelector('use');
+        if (use) {
+            use.setAttribute('href', reveal ? '#i-eye-off' : '#i-eye');
+            use.setAttribute('xlink:href', reveal ? '#i-eye-off' : '#i-eye');
+        }
+
+        // Keep the caret in the field the user just acted on.
+        input.focus({ preventScroll: true });
+    });
+
     /* --------------------------------------------- liquid tab-bar pill ---- */
     // One shared indicator slides between tabs. Pages are separate documents,
     // so we remember the previous tab and animate FROM it to the current one.

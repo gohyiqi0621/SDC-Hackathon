@@ -155,6 +155,48 @@ view('layouts/header', ['title' => 'Admin']);
     ]); ?>
 </section>
 
+<?php $policy = password_policy(); ?>
+<section class="card" aria-labelledby="pw-policy-title">
+    <div class="card__head">
+        <div>
+            <h3 id="pw-policy-title">Password rules</h3>
+            <p>Enforced on new accounts, password changes, and Google sign-ups that still need a password.</p>
+        </div>
+    </div>
+
+    <form method="post" action="<?= e(url('admin', ['action' => 'save_policy'])) ?>">
+        <?= csrf_field() ?>
+        <div class="field-row">
+            <div class="field">
+                <label for="pw-min">Minimum length</label>
+                <input id="pw-min" name="min_length" type="number" min="6" max="72" step="1"
+                       value="<?= (int) $policy['min'] ?>" required>
+                <p class="field__hint">Between 6 and 72 characters.</p>
+            </div>
+
+            <fieldset class="field">
+                <legend>Also require</legend>
+                <label class="check">
+                    <input type="checkbox" name="require_upper" value="1"<?= $policy['upper'] ? ' checked' : '' ?>>
+                    <span>A capital letter (A&ndash;Z)</span>
+                </label>
+                <label class="check">
+                    <input type="checkbox" name="require_number" value="1"<?= $policy['number'] ? ' checked' : '' ?>>
+                    <span>A number (0&ndash;9)</span>
+                </label>
+                <label class="check">
+                    <input type="checkbox" name="require_special" value="1"<?= $policy['special'] ? ' checked' : '' ?>>
+                    <span>A symbol (!&nbsp;@&nbsp;#&nbsp;$&hellip;)</span>
+                </label>
+            </fieldset>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn--primary" type="submit">Save rules</button>
+        </div>
+    </form>
+</section>
+
 <dialog class="modal" id="user-dialog" aria-labelledby="user-dialog-title">
     <form class="modal__panel" method="post" action="<?= e(url('admin', ['action' => 'create'])) ?>" data-ajax>
         <?= csrf_field() ?>
@@ -175,8 +217,11 @@ view('layouts/header', ['title' => 'Admin']);
         <div class="field-row">
             <div class="field">
                 <label for="u-pass">Password</label>
-                <input id="u-pass" name="password" type="password" autocomplete="new-password" required>
-                <p class="field__hint">At least 8 characters.</p>
+                <div class="input-wrap">
+                    <input id="u-pass" name="password" type="password" autocomplete="new-password" required>
+                    <button class="input-btn" type="button" aria-label="Show password" data-toggle-password="u-pass"><?= icon('eye', 'icon--sm') ?></button>
+                </div>
+                <p class="field__hint"><?= e(password_policy_hint()) ?></p>
                 <p class="field__error" data-error-for="password"></p>
             </div>
             <div class="field">
