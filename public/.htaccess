@@ -3,7 +3,12 @@ Options -Indexes
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /sdc-project/public/
+    # NO RewriteBase here on purpose. It used to be the hardcoded
+    # "/sdc-project/public/", which is only true under XAMPP: on Railway the
+    # Dockerfile sets APACHE_DOCUMENT_ROOT=/var/www/html/public, so this folder
+    # IS the site root and every rewritten URL came back 404. Leaving RewriteBase
+    # out lets Apache derive it from the directory this file sits in, which is
+    # correct in both places.
 
     # Real files and folders (css, js, index.php) are served as-is.
     RewriteCond %{REQUEST_FILENAME} -f [OR]
