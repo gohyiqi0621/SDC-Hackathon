@@ -1,9 +1,12 @@
 # SDC AI service - Flask + gunicorn.
 #
-# Deployed as its OWN Railway service, built from this subdirectory
-# (see RAILWAY_DOCKERFILE_PATH in the notes at the bottom of this file).
-# It is never given a public domain: only the PHP service reaches it, over
-# Railway's private network.
+# IMPORTANT: Railway builds this from the REPOSITORY ROOT.
+# RAILWAY_DOCKERFILE_PATH only chooses which Dockerfile to read; it does NOT
+# move the build context. Every COPY path below is therefore repo-root-relative
+# (`ai-service/...`), and a local `docker build ai-service` will NOT work.
+#
+# The service is never given a public domain: only the PHP service reaches it,
+# over Railway's private network.
 
 FROM python:3.12-slim
 
@@ -14,19 +17,21 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Dependencies first, so a code edit does not invalidate the pip layer.
-COPY requirements.txt ./
+COPY ai-service/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . ./
+COPY ai-service/ ./
 
-# Railway injects PORT; 5000 is the fallback for a bare `docker run`.
+# Railway injects PORT (pinned to 5000 on this service); 5000 is the fallback
+# for a bare `docker run`.
 ENV PORT=5000
 EXPOSE 5000
 
 # 1 request = 1 blocking call to Agnes (up to 60s), so a single sync worker
 # would serialise every chat. Threads keep a slow reply from stalling the rest,
 # and the timeout sits above agnes.TIMEOUT_SECONDS so gunicorn is never the
-# first thing to give up.
+# first thing to give up. `exec` matters: it replaces the shell, so gunicorn is
+# PID 1 and receives Railway's SIGTERM on redeploy.
 CMD exec gunicorn \
         --bind "0.0.0.0:${PORT}" \
         --workers 2 \
@@ -36,9 +41,3 @@ CMD exec gunicorn \
         --access-logfile - \
         --error-logfile - \
         app:app
-
-# Railway wiring (for reference, not applied here):
-#   Service:            sdc-ai
-#   Variable:           PORT=5000
-#   RAILWAY_DOCKERFILE_PATH=ai-service/Dockerfile   (on the PHP service's repo build)
-#   PHP service var:    AI_SERVICE_URL=http://sdc-ai.railway.internal:5000
