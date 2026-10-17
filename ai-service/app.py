@@ -12,8 +12,9 @@ Run it (from the project root):
     pip install -r requirements.txt
     python app.py
 
-It listens on http://127.0.0.1:5000 and is only ever called by PHP, so CORS is
-deliberately NOT enabled.
+It listens on http://127.0.0.1:5000 locally and is only ever called by PHP, so
+CORS is deliberately NOT enabled. In production it runs under gunicorn inside
+Railway's private network, with no public domain.
 """
 
 import re
@@ -198,5 +199,11 @@ def server_error(_error):
 
 
 if __name__ == "__main__":
-    # 127.0.0.1 only - the service is never exposed to the network.
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    # Local development keeps the loopback default: the service is never meant
+    # to be exposed. Hosted deployments run gunicorn (see Dockerfile) and only
+    # reach the network inside Railway's private network.
+    import os
+
+    host = os.environ.get("HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", "5000"))
+    app.run(host=host, port=port, debug=False)
