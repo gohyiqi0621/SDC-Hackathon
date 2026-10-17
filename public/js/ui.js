@@ -1,6 +1,6 @@
 /**
  * ui.js — reusable UI pieces. Everything hangs off window.UI:
- * UI.toast, UI.openModal / closeModal, UI.confirm, UI.setLoading, UI.escapeHtml.
+ * UI.toast, UI.openModal / closeModal, UI.confirm, UI.setLoading, UI.escapeHtml, UI.countUp.
  */
 (function () {
     'use strict';
@@ -38,16 +38,64 @@
         el.innerHTML = svg(kind) + '<span>' + escapeHtml(message) + '</span>'
             + '<button type="button" class="toast__close" aria-label="Dismiss">' + svg('close', 14) + '</button>';
 
+        var timer = 0, remaining = typeof timeout === 'number' ? timeout : 4000, startedAt = 0;
+
         function dismiss() {
+            clearTimeout(timer);
             if (el.classList.contains('is-leaving')) { return; }
+            el.classList.remove('is-dragging', 'is-returning');
             el.classList.add('is-leaving');
             el.addEventListener('animationend', function () { el.remove(); });
         }
+        function arm() {
+            if (remaining <= 0) { return; }
+            startedAt = Date.now();
+            timer = setTimeout(dismiss, remaining);
+        }
+        function hold() {
+            if (!timer) { return; }
+            clearTimeout(timer); timer = 0;
+            remaining = Math.max(1200, remaining - (Date.now() - startedAt));
+        }
         el.querySelector('.toast__close').addEventListener('click', dismiss);
         region.appendChild(el);
+        arm();
 
-        var delay = typeof timeout === 'number' ? timeout : 4000;
-        if (delay > 0) { setTimeout(dismiss, delay); }
+        // Reading it? Don't take it away: pause on hover/focus, resume (min 1.2s) after.
+        el.addEventListener('pointerenter', hold);
+        el.addEventListener('pointerleave', function () { if (!timer && !el.classList.contains('is-leaving')) { arm(); } });
+        el.addEventListener('focusin', hold);
+
+        // Swipe up to dismiss (iOS banner). Springs back when released short of the threshold.
+        var y0 = 0, dy = 0, dragging = false;
+        el.addEventListener('pointerdown', function (e) {
+            if (e.target.closest('.toast__close') || (e.pointerType === 'mouse' && e.button !== 0)) { return; }
+            dragging = true; y0 = e.clientY; dy = 0;
+            el.setPointerCapture(e.pointerId);
+            el.classList.remove('is-returning'); el.classList.add('is-dragging');
+            hold();
+        });
+        el.addEventListener('pointermove', function (e) {
+            if (!dragging) { return; }
+            var d = e.clientY - y0;
+            dy = d < 0 ? d : d * 0.15;                       // resist downward pulls
+            el.style.transform = 'translateY(' + dy + 'px)';
+        });
+        function release() {
+            if (!dragging) { return; }
+            dragging = false;
+            el.classList.remove('is-dragging');
+            if (dy < -28) {
+                el.style.setProperty('--dy', dy + 'px'); el.style.transform = '';
+                dismiss();
+            } else {
+                el.classList.add('is-returning'); el.style.transform = '';
+                arm();
+            }
+        }
+        el.addEventListener('pointerup', release);
+        el.addEventListener('pointercancel', release);
+
         return el;
     }
 
@@ -77,6 +125,35 @@
         var closer = e.target.closest && e.target.closest('[data-close-modal]');
         if (closer) { closeModal(closer.closest('dialog')); }
     });
+
+    // Phone bottom sheets: drag down from the top strip (grabber area) to dismiss.
+    (function () {
+        var sheetMq = window.matchMedia ? matchMedia('(max-width: 600px)') : null;
+        var dlg = null, y0 = 0, dy = 0, t0 = 0;
+        document.addEventListener('pointerdown', function (e) {
+            var d = e.target.closest && e.target.closest('dialog.modal[open]');
+            if (!d || !sheetMq || !sheetMq.matches) { return; }
+            if (e.clientY - d.getBoundingClientRect().top > 56) { return; }     // grabber strip only
+            dlg = d; y0 = e.clientY; dy = 0; t0 = Date.now();
+            d.classList.add('is-dragging');
+            d.setPointerCapture && d.setPointerCapture(e.pointerId);
+        });
+        document.addEventListener('pointermove', function (e) {
+            if (!dlg) { return; }
+            dy = Math.max(0, e.clientY - y0);
+            dlg.style.transform = 'translateY(' + dy + 'px)';
+        });
+        function end() {
+            if (!dlg) { return; }
+            var d = dlg, fast = dy / Math.max(1, Date.now() - t0) > 0.6;
+            dlg = null;
+            d.classList.remove('is-dragging');
+            d.style.transform = '';
+            if (dy > 110 || (fast && dy > 30)) { d.close('cancel'); }
+        }
+        document.addEventListener('pointerup', end);
+        document.addEventListener('pointercancel', end);
+    })();
 
     /** Native <dialog> confirmation: resolves true only on the confirm button. */
     function confirmDialog(options) {
@@ -136,5 +213,36 @@
         });
     });
 
-    window.UI = { toast: toast, openModal: openModal, closeModal: closeModal, confirm: confirmDialog, setLoading: setLoading, escapeHtml: escapeHtml };
+    /* --------------------------------------------------------- count-up --- */
+    // Whole-number stats ease up from 0 once they scroll into view. Anything that is not a
+    // plain number ("User", "17 Oct 2026") is left alone. Reduced motion: no-op.
+    function countUp(el, duration) {
+        var text = el.textContent.trim();
+        if (!/^\d{1,3}(,\d{3})*$|^\d+$/.test(text)) { return; }
+        var target = parseInt(text.replace(/,/g, ''), 10);
+        if (!target || target > 1e9) { return; }
+        var comma = text.indexOf(',') !== -1, ms = duration || 700, t0 = 0;
+        el.setAttribute('data-count', text);
+        function fmt(n) { return comma ? n.toLocaleString('en-US') : String(n); }
+        function frame(now) {
+            if (!t0) { t0 = now; }
+            var p = Math.min((now - t0) / ms, 1), eased = 1 - Math.pow(1 - p, 4);
+            el.textContent = fmt(Math.round(target * eased));
+            if (p < 1) { requestAnimationFrame(frame); } else { el.textContent = text; }
+        }
+        el.textContent = fmt(0);
+        requestAnimationFrame(frame);
+    }
+    function initCountUp() {
+        if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) { return; }
+        var els = document.querySelectorAll('.stat__value');
+        if (!('IntersectionObserver' in window)) { return; }
+        var io = new IntersectionObserver(function (entries) {
+            entries.forEach(function (en) { if (en.isIntersecting) { io.unobserve(en.target); countUp(en.target); } });
+        }, { threshold: 0.4 });
+        Array.prototype.forEach.call(els, function (el) { io.observe(el); });
+    }
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initCountUp); } else { initCountUp(); }
+
+    window.UI = { countUp: countUp, toast: toast, openModal: openModal, closeModal: closeModal, confirm: confirmDialog, setLoading: setLoading, escapeHtml: escapeHtml };
 })();

@@ -3,7 +3,11 @@
  * ai/panel.php - the user's AI chat.
  * Sends via fetch (public/js/chat.js); falls back to a full post without JS.
  */
-view('layouts/header', ['title' => 'AI Chat']);
+// content--chat makes <main> a bounded flex column so the composer sits above
+// the floating tab bar instead of sliding under it (Phase 5 fix). It has to be
+// passed here: view() extracts each array into the included file's own scope,
+// so a variable set in the controller does not reach app_header.php.
+view('layouts/header', ['title' => 'AI Chat', 'contentClass' => 'content--chat']);
 ?>
 <?php if (!$configured): ?>
     <div class="notice notice--warn" role="status">

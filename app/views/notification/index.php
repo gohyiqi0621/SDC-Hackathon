@@ -10,7 +10,7 @@ view('layouts/header', ['title' => 'Notification']);
 
 $subscriberCount = count($recipients);
 ?>
-<div class="page-head">
+<div class="page-head page-head--inline">
     <div>
         <h2 class="page-head__title">Notifications</h2>
         <p class="page-head__sub">

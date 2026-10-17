@@ -70,7 +70,7 @@ $statusBadge = static function (string $status): string {
     return $map[$status] ?? '';
 };
 ?>
-<div class="page-head">
+<div class="page-head page-head--duo">
     <div>
         <h2 class="page-head__title">Hello, <?= e($user['name']) ?></h2>
         <p class="page-head__sub">
@@ -117,7 +117,7 @@ $statusBadge = static function (string $status): string {
         <article class="stat">
             <span class="stat__icon"><?= icon($card['icon']) ?></span>
             <p class="stat__label"><?= e($card['label']) ?></p>
-            <p class="stat__value"><?= e($card['value']) ?></p>
+            <p class="stat__value<?= preg_match('/^[\d,.\s%]+$/', (string) $card['value']) ? '' : ' stat__value--text' ?>"><?= e($card['value']) ?></p>
             <p class="stat__hint"><?= e($card['hint']) ?></p>
         </article>
     <?php endforeach; ?>

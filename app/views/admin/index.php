@@ -63,7 +63,7 @@ view('layouts/header', ['title' => 'Admin']);
     </div>
 
     <div class="table-wrap">
-        <table class="table">
+        <table class="table table--users">
             <thead>
                 <tr>
                     <th scope="col">User</th>
@@ -100,15 +100,15 @@ view('layouts/header', ['title' => 'Admin']);
                                     </span>
                                 </div>
                             </td>
-                            <td class="muted"><?= e($row['items_count']) ?></td>
-                            <td class="muted"><?= e($row['ai_count']) ?></td>
+                            <td class="muted" data-label="Items"><?= e($row['items_count']) ?></td>
+                            <td class="muted" data-label="AI calls"><?= e($row['ai_count']) ?></td>
                             <td>
                                 <span class="badge <?= $row['role'] === 'admin' ? 'badge--accent' : '' ?>"><?= e($row['role']) ?></span>
                             </td>
                             <td>
                                 <span class="badge <?= $row['status'] === 'active' ? 'badge--ok' : 'badge--danger' ?> badge--dot"><?= e($row['status']) ?></span>
                             </td>
-                            <td class="muted"><?= e(date('j M Y', strtotime((string) $row['created_at']))) ?></td>
+                            <td class="muted" data-label="Joined"><?= e(date('j M Y', strtotime((string) $row['created_at']))) ?></td>
                             <td>
                                 <?php if ($isSelf): ?>
                                     <span class="badge badge--accent">This is you</span>

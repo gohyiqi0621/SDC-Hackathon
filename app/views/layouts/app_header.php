@@ -7,6 +7,7 @@
  * absent: this project has no notifications feature.
  */
 $pageTitle = $pageTitle ?? 'Dashboard';
+$contentClass = $contentClass ?? '';   // e.g. 'content--chat' on the AI chat page
 $pageKey   = $pageKey ?? current_page_key();
 $user      = current_user() ?? ['name' => 'User', 'email' => '', 'role' => 'user'];
 $isAdmin   = ($user['role'] ?? '') === 'admin';
@@ -30,10 +31,15 @@ $groupLabels = ['main' => 'Main', 'admin' => 'Admin', 'account' => 'Account'];
       <span class="brand__name">SDC <em>App</em></span>
     </a>
     <nav class="sidenav__nav" aria-label="Main navigation">
-      <?php $prevGroup = null; ?>
+      <?php $prevGroup = null; $seenGroups = []; ?>
       <?php foreach ($nav as $link): ?>
         <?php if ($link['group'] !== $prevGroup): ?>
-          <p class="sidenav__label"><?= e($groupLabels[$link['group']] ?? '') ?></p>
+          <?php if (isset($seenGroups[$link['group']])): ?>
+            <span class="sidenav__sep" role="presentation"></span>
+          <?php else: ?>
+            <p class="sidenav__label"><?= e($groupLabels[$link['group']] ?? '') ?></p>
+            <?php $seenGroups[$link['group']] = true; ?>
+          <?php endif; ?>
           <?php $prevGroup = $link['group']; ?>
         <?php endif; ?>
         <a class="sidenav__item" href="<?= e($link['url']) ?>"<?= $link['page'] === $pageKey ? ' aria-current="page"' : '' ?>><?= icon($link['icon']) ?><span><?= e($link['label']) ?></span></a>
@@ -91,6 +97,6 @@ $groupLabels = ['main' => 'Main', 'admin' => 'Admin', 'account' => 'Account'];
       </div>
     </header>
 
-    <main class="content" id="content">
+    <main class="content<?= !empty($contentClass) ? ' ' . e($contentClass) : '' ?>" id="content">
       <nav class="crumbs" aria-label="Breadcrumb"><a href="<?= e($home) ?>">Home</a><span aria-hidden="true">/</span><span aria-current="page"><?= e($pageTitle) ?></span></nav>
       <?php view('layouts/flashes', ['flashes' => flashes()]); ?>

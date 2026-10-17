@@ -17,7 +17,7 @@ $columns  = $scoped ? 4 : 5;
 $query = array_filter(['q' => $search, 'status' => $status], static fn($v) => $v !== '');
 $query += ['page' => 'items'];
 ?>
-<div class="page-head">
+<div class="page-head page-head--inline">
     <div>
         <h2 class="page-head__title">Items</h2>
         <p class="page-head__sub">

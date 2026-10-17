@@ -20,9 +20,8 @@ $hint = [
     500 => 'Try again in a moment. If it keeps happening, check the Apache error log.',
 ][$code] ?? '';
 ?>
-<section class="card empty">
-    <span class="empty__icon"><?= icon('alert') ?></span>
-    <h3><?= e($code) ?> &middot; <?= e($title) ?></h3>
+<section class="card empty error-state">
+    <h3 class="error-state__title"><span class="error-state__code"><?= e($code) ?></span><?= e($title) ?></h3>
     <p><?= e($copy) ?></p>
     <?php if ($message !== ''): ?>
         <p class="muted"><code><?= e($message) ?></code></p>

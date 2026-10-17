@@ -10,7 +10,7 @@ $isEdit = $item !== null;
 $action = $isEdit ? url('items', ['action' => 'update']) : url('items', ['action' => 'store']);
 $error  = static fn(string $field): string => $errors[$field] ?? '';
 ?>
-<div class="page-head">
+<div class="page-head page-head--inline">
     <div>
         <h2 class="page-head__title"><?= e($title) ?></h2>
         <p class="page-head__sub"><?= $isEdit ? 'Update the details and save.' : 'Fill in the details and save.' ?></p>

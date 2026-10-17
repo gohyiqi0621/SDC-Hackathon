@@ -39,9 +39,9 @@ $scripts = $scripts ?? [];
 </dialog>
 <div class="toast-region" id="toast-stack" aria-live="polite"></div>
 
-<script src="<?= e(asset('js/main.js')) ?>"></script>
-<script src="<?= e(asset('js/ui.js')) ?>"></script>
-<script src="<?= e(asset('js/api.js')) ?>"></script>
+<script src="<?= e(asset_versioned('js/main.js')) ?>"></script>
+<script src="<?= e(asset_versioned('js/ui.js')) ?>"></script>
+<script src="<?= e(asset_versioned('js/api.js')) ?>"></script>
 <?php if (ONESIGNAL_APP_ID !== ''): ?>
 <script src="<?= e(asset('js/onesignal.js')) ?>" defer></script>
 <?php endif; ?>

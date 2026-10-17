@@ -12,7 +12,17 @@ $pageTitle = $pageTitle ?? 'Dashboard';
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><?= e($pageTitle) ?> &middot; <?= e(APP_NAME) ?></title>
 <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
-<meta name="theme-color" content="#0f7f47">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="<?= e(asset('manifest.webmanifest')) ?>">
+<link rel="icon" href="<?= e(asset('favicon.ico')) ?>" sizes="any">
+<link rel="icon" href="<?= e(asset('icons/icon.svg')) ?>" type="image/svg+xml">
+<link rel="apple-touch-icon" href="<?= e(asset('icons/apple-touch-icon.png')) ?>">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SDC">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="format-detection" content="telephone=no">
 <!-- Google Search Console ownership verification. Do not remove, even after
      verification succeeds - Google re-checks it. -->
 <meta name="google-site-verification" content="B6dq_TxSaY1iPwUdC36KZTmOsyEcmipegbL6RCHNGiA">
@@ -42,7 +52,7 @@ $workerUrl = asset('OneSignalSDKWorker.js');
   if(!t){t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}
   document.documentElement.dataset.theme=t;document.documentElement.classList.add('js')})();
 </script>
-<link rel="stylesheet" href="<?= e(asset('css/base.css')) ?>">
-<link rel="stylesheet" href="<?= e(asset('css/layout.css')) ?>">
-<link rel="stylesheet" href="<?= e(asset('css/components.css')) ?>">
+<link rel="stylesheet" href="<?= e(asset_versioned('css/base.css')) ?>">
+<link rel="stylesheet" href="<?= e(asset_versioned('css/layout.css')) ?>">
+<link rel="stylesheet" href="<?= e(asset_versioned('css/components.css')) ?>">
 </head>

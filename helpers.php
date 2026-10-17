@@ -57,6 +57,24 @@ function asset(string $path): string
     return APP_URL . '/' . ltrim($path, '/');
 }
 
+/**
+ * Same as asset(), plus ?v=<filemtime>.
+ *
+ * Use this for CSS and JS. Browsers cache /css/base.css aggressively and the URL
+ * never changes, so a redesigned stylesheet can sit behind a stale cache for days -
+ * on the developer's machine and on every visitor's after a deploy. The stamp makes
+ * a changed file a changed URL, so the cache busts itself.
+ *
+ * Deliberately NOT used for service-worker scripts: appending a query string to a
+ * worker URL changes its scope resolution in some browsers.
+ */
+function asset_versioned(string $path): string
+{
+    $file  = PUBLIC_ROOT . '/' . ltrim($path, '/');
+    $stamp = is_file($file) ? (string) filemtime($file) : '';
+    return asset($path) . ($stamp !== '' ? '?v=' . $stamp : '');
+}
+
 function redirect(string $url): void
 {
     header('Location: ' . $url);

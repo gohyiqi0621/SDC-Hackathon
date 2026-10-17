@@ -12,6 +12,9 @@ require_once __DIR__ . '/app/ai.php';
 require_once __DIR__ . '/app/onesignal.php';
 
 define('APP_ROOT', __DIR__);
+// The served directory (where index.php, css/ and js/ live). asset_versioned()
+// uses this to stat files; it is NOT a URL.
+define('PUBLIC_ROOT', APP_ROOT . '/public');
 
 // --- Environment loader (hand-rolled so XAMPP needs no Composer) ------------
 // 1) Real environment variables (Railway, Docker) are read first.

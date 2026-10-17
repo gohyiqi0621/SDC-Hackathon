@@ -40,3 +40,10 @@ Options -Indexes
 <Files "default-icon">
     ForceType image/png
 </Files>
+
+# The web app manifest (PWA installability). Apache's stock mime.types has no
+# entry for .webmanifest, so without this it is served as octet-stream and the
+# browser refuses to treat it as a manifest.
+<IfModule mod_mime.c>
+    AddType application/manifest+json .webmanifest
+</IfModule>

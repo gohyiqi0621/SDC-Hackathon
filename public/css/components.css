@@ -18,7 +18,7 @@
 
 .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); margin-bottom: var(--sp-4); }
 .stat { display: flex; flex-direction: column; gap: 3px; padding: var(--sp-5); border-radius: var(--r-xl); background: var(--surface); box-shadow: var(--shadow-card); transition: transform var(--t), box-shadow var(--t); }
-.stat:hover { transform: translateY(-2px); box-shadow: var(--shadow-pop); }
+@media (hover: hover) { .stat:hover { transform: translateY(-2px); box-shadow: var(--shadow-pop); } }
 .stat__icon { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: var(--sp-3); border-radius: 12px; background: var(--accent-soft); color: var(--accent); }
 .stat__label { font-size: var(--fs-xs); font-weight: 500; color: var(--text-3); }
 .stat__value { font-size: 1.875rem; font-weight: 600; letter-spacing: -.045em; font-variant-numeric: tabular-nums; line-height: 1.1; }
@@ -27,7 +27,8 @@
 
 .quick { display: grid; gap: var(--sp-3); margin-bottom: var(--sp-4); }
 .quick__item { display: grid; grid-template-columns: auto 1fr; gap: 2px var(--sp-3); align-items: center; padding: var(--sp-4); border-radius: var(--r-xl); background: var(--surface); box-shadow: var(--shadow-card); color: var(--text); text-decoration: none; transition: transform var(--t), box-shadow var(--t); }
-.quick__item:hover { transform: translateY(-2px); box-shadow: var(--shadow-pop); }
+@media (hover: hover) { .quick__item:hover { transform: translateY(-2px); box-shadow: var(--shadow-pop); } }
+.quick__item:active { transform: scale(var(--press-scale-lg)); box-shadow: var(--shadow-1); transition-duration: var(--d-instant); }
 .quick__item .stat__icon { grid-row: span 2; margin: 0; }
 .quick__item strong { font-size: var(--fs-sm); } .quick__item span:last-child { font-size: var(--fs-xs); color: var(--text-3); }
 @media (min-width: 600px) { .quick { grid-template-columns: repeat(3, 1fr); } }
@@ -52,7 +53,7 @@
 .table th { padding: 12px var(--sp-5); text-align: left; font-size: .75rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); white-space: nowrap; border-bottom: 1px solid var(--line); }
 .table td { padding: 14px var(--sp-5); border-bottom: 1px solid var(--line); vertical-align: middle; }
 .table tbody tr { transition: background-color var(--t-fast); }
-.table tbody tr:hover { background: var(--surface-2); }
+@media (hover: hover) { .table tbody tr:hover { background: var(--surface-2); } }
 .table tbody tr:last-child td { border-bottom: 0; }
 .table td:last-child, .table th:last-child { text-align: right; }
 .table__title { display: flex; align-items: center; gap: var(--sp-3); font-weight: 600; }
@@ -80,14 +81,17 @@
 .modal__body p { font-size: var(--fs-sm); color: var(--text-2); }
 
 /* -------------------------------------------------------------- toast --- */
-.toast-region { position: fixed; left: 50%; transform: translateX(-50%); z-index: 90; bottom: calc(var(--tabbar-h) + 26px + var(--safe-b)); display: flex; flex-direction: column; gap: 8px; width: min(92vw, 420px); pointer-events: none; }
-.toast { display: flex; align-items: flex-start; gap: 10px; padding: 13px 14px 13px 16px; border-radius: var(--r-lg); box-shadow: var(--shadow-pop); font-size: var(--fs-sm); color: var(--text); pointer-events: auto; animation: toast-in .55s var(--spring); }
+/* iOS-style banners: drop in from the top edge, swipe up to dismiss. */
+.toast-region { position: fixed; left: 50%; transform: translateX(-50%); z-index: var(--z-toast); top: calc(var(--safe-t) + 10px); display: flex; flex-direction: column; gap: 8px; width: min(92vw, 420px); pointer-events: none; }
+.toast { display: flex; align-items: flex-start; gap: 10px; padding: 13px 14px 13px 16px; border-radius: var(--r-lg); box-shadow: var(--shadow-pop); font-size: var(--fs-sm); color: var(--text); background: color-mix(in srgb, var(--surface) 95%, transparent); pointer-events: auto; touch-action: pan-x; animation: banner-in var(--d-slow) var(--spring-ios) both; will-change: transform; }
 .toast > .icon { margin-top: 1px; width: 20px; height: 20px; color: var(--accent); }
 .toast span { flex: 1; padding-top: 1px; }
 .toast--error > .icon { color: var(--danger); } .toast--warning > .icon { color: var(--warn-ink); } .toast--info > .icon { color: var(--info); }
 .toast__close { display: grid; place-items: center; width: 28px; height: 28px; margin: -3px 0 -3px 0; border: 0; border-radius: 50%; background: none; color: var(--text-3); cursor: pointer; }
-.toast__close:hover { background: var(--surface-3); color: var(--text); }
-.toast.is-leaving { animation: toast-out .25s var(--ease) forwards; }
+@media (hover: hover) { .toast__close:hover { background: var(--surface-3); color: var(--text); } }
+.toast.is-leaving { animation: banner-out var(--d-base) var(--ease) forwards; }
+.toast.is-dragging { animation: none; transition: none; cursor: grabbing; }
+.toast.is-returning { animation: none; transition: transform var(--d-base) var(--spring-ios); }
 
 /* --------------------------------------------------------------- chat --- */
 .chat-shell { display: flex; flex-direction: column; height: calc(100dvh - var(--nav-h) - var(--tabbar-h) - var(--safe-b) - 56px); min-height: 440px; margin-bottom: 0; }
@@ -124,7 +128,7 @@
 .composer__input { flex: 1 1 140px; min-width: 0; min-height: 48px; max-height: 140px; padding: 12px 20px; border: 1px solid var(--line-strong); border-radius: 24px; background: var(--surface); color: var(--text); font-size: var(--fs-input); line-height: 1.4; resize: none; transition: border-color var(--t-fast), box-shadow var(--t-fast); }
 .composer__input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus); }
 .composer__send { display: grid; place-items: center; flex: none; width: 48px; height: 48px; border: 0; border-radius: 50%; background: var(--btn); color: #fff; cursor: pointer; transition: transform var(--t-fast), background-color var(--t-fast); }
-.composer__send:hover:not(:disabled) { background: var(--btn-hover); } .composer__send:active { transform: scale(.88); }
+.composer__send:active { transform: scale(.88); } @media (hover: hover) { .composer__send:hover:not(:disabled) { background: var(--btn-hover); } }
 .composer__send:disabled { opacity: .5; }
 .composer__attach { position: relative; overflow: hidden; }
 .composer__attach input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
@@ -176,7 +180,7 @@
 .notif-panel__head { padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
 .notif-panel__list { max-height: 340px; overflow-y: auto; }
 .notif-panel__item { display: block; padding: 12px 16px; border-bottom: 1px solid var(--line); text-decoration: none; color: inherit; }
-.notif-panel__item:hover { background: var(--surface-2); }
+@media (hover: hover) { .notif-panel__item:hover { background: var(--surface-2); } }
 .notif-panel__item.is-unread { box-shadow: inset 3px 0 0 var(--accent); }
 .notif-panel__item strong { display: block; font-size: var(--fs-sm); }
 .notif-panel__item span { display: block; font-size: var(--fs-xs); color: var(--text-2); margin-top: 2px; }
@@ -192,8 +196,6 @@
 .notif-item__title { font-size: var(--fs-sm); font-weight: 600; }
 .notif-item__body { font-size: var(--fs-sm); color: var(--text-2); margin-top: 2px; }
 .notif-item__meta { font-size: var(--fs-xs); color: var(--text-3); margin-top: 6px; }
-.badge--warn { background: var(--warn-soft, #fff4d6); color: var(--warn, #8a6100); }
-.badge--danger { background: var(--danger-soft, #ffe2e0); color: var(--danger, #b3261e); }
 
 /* ------------------------------------------------- notif composer --- */
 /* The modal body scrolls, not the whole dialog, so the footer buttons and the
@@ -211,7 +213,7 @@
     background: var(--surface-2, rgba(0, 0, 0, .035));
     cursor: pointer; transition: background-color var(--t-fast), box-shadow var(--t-fast);
 }
-.choice:hover { background: var(--surface-3, rgba(0, 0, 0, .06)); }
+@media (hover: hover) { .choice:hover { background: var(--surface-3, rgba(0, 0, 0, .06)); } }
 .choice:has(input:checked) { background: var(--accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
 .choice.is-disabled { opacity: .55; cursor: not-allowed; }
 .choice > input { margin-top: 2px; accent-color: var(--accent); }
@@ -232,7 +234,7 @@
     transition: background-color var(--t-fast);
 }
 .picker__row:last-child { border-bottom: 0; }
-.picker__row:hover { background: var(--surface-3, rgba(0, 0, 0, .05)); }
+@media (hover: hover) { .picker__row:hover { background: var(--surface-3, rgba(0, 0, 0, .05)); } }
 .picker__row:has(input:checked) { background: var(--accent-soft); }
 .picker__row input { accent-color: var(--accent); flex: none; }
 .picker__text { display: grid; gap: 1px; min-width: 0; flex: 1; }
@@ -248,10 +250,15 @@
     font: inherit; font-size: var(--fs-xs); color: var(--text-2); cursor: pointer;
     transition: background-color var(--t-fast), color var(--t-fast), border-color var(--t-fast);
 }
-.chip:hover { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+@media (hover: hover) { .chip:hover { background: var(--accent-soft); border-color: transparent; color: var(--accent); } }
 
 /* A stat that just changed, so the update is noticed without a reload. */
-.stat__value.is-bumped { animation: stat-bump .5s var(--spring); }
+.stat__value.is-bumped { animation: stat-bump .5s var(--spring-bounce); }
+.stat__value[data-count] { font-variant-numeric: tabular-nums; }   /* count-up must not jiggle the layout */
+/* chart: shimmer while the first frame is drawn */
+.chart-wrap.is-loading canvas { visibility: hidden; }
+.chart-wrap.is-loading::after { content: ""; position: absolute; inset: 0; border-radius: var(--r-lg); background: var(--fill-3); }
+.chart-wrap.is-loading::before { content: ""; position: absolute; inset: 0; z-index: 1; overflow: hidden; border-radius: var(--r-lg); background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface) 70%, transparent), transparent); animation: shimmer 1.2s var(--ease-in-out) infinite; }
 @keyframes stat-bump {
     0%   { transform: scale(1); color: var(--accent); }
     45%  { transform: scale(1.14); color: var(--accent); }
@@ -325,10 +332,11 @@
 .int-icon.is-configured .int-icon__state { color: var(--ok); }
 
 /* Hover / active / focus are all visible, and the icon reacts. */
-.int-icon:hover .int-icon__logo {
+@media (hover: hover) {
+  .int-icon:hover .int-icon__logo {
     transform: translateY(-2px);
-    box-shadow: inset 0 0 0 1px var(--border, rgba(0, 0, 0, .14)),
-                0 6px 16px rgba(0, 0, 0, .1);
+    box-shadow: inset 0 0 0 1px var(--border, rgba(0, 0, 0, .14)), 0 6px 16px rgba(0, 0, 0, .1);
+  }
 }
 .int-icon:active .int-icon__logo { transform: translateY(0) scale(.97); }
 .int-icon:focus-visible { outline: none; }
@@ -410,4 +418,207 @@
 /* Respect reduced motion: no slide, just show/hide. */
 @media (prefers-reduced-motion: reduce) {
     .int-panel { transition: none; }
+}
+
+/* =====================================================================
+   Phase 4: component polish
+   Buttons, fields, badges, list rows (mobile), bottom sheets (mobile), chat.
+   Appended last so it refines the rules above without renaming anything.
+   ===================================================================== */
+
+/* ---- buttons: translucent neutral over glass, weighty primary, springy press ---- */
+.btn { transition: transform var(--d-quick) var(--spring-ios), background-color var(--t-fast), color var(--t-fast), box-shadow var(--d-base) var(--ease); }
+.btn:not(.btn--primary):not(.btn--danger-solid):not(.btn--quiet):not(.btn--ghost):not(.btn--danger):not(.btn--google) { background: var(--fill-3); }
+.btn--primary, .btn--danger-solid { font-weight: 600; }
+.btn--primary { box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 1px 2px color-mix(in srgb, var(--btn) 45%, transparent); }
+.btn:active:not(:disabled) { transform: scale(var(--press-scale)); transition-duration: var(--d-instant); }
+.btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: var(--r-pill); }
+.icon-btn:active, .input-btn:active { transform: scale(.9); background: var(--fill-2); }
+.chip:active { transform: scale(.96); }
+.seg__btn:active { opacity: .7; }
+.chip, .icon-btn, .input-btn { transition: transform var(--d-quick) var(--spring-ios), background-color var(--t-fast), color var(--t-fast), border-color var(--t-fast); }
+
+/* ---- fields ---- */
+.field:focus-within > label { color: var(--accent); }
+.field > label { transition: color var(--t-fast); }
+input:-webkit-autofill, input:-webkit-autofill:focus { -webkit-text-fill-color: var(--text); box-shadow: 0 0 0 100px var(--surface) inset; caret-color: var(--text); }
+.input:focus-visible, .field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible { outline: none; }
+.field input[aria-invalid="true"], .field textarea[aria-invalid="true"] { box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 18%, transparent); }
+
+/* ---- inline row selects (admin role/status): same language as .field select ---- */
+.row-actions { align-items: center; }
+.row-actions select { -webkit-appearance: none; appearance: none; min-height: 36px; padding: 6px 30px 6px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-pill); background-color: var(--surface); color: var(--text); font: inherit; font-size: .875rem; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%236e6e73' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 11px center; transition: border-color var(--t-fast), box-shadow var(--t-fast); }
+.row-actions select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus); }
+.row-actions:has(select) { gap: 8px; }
+@media (pointer: coarse) { .row-actions select { min-height: var(--touch-min); } }
+
+/* ---- badges ---- */
+.badge { line-height: 1.2; letter-spacing: .01em; font-variant-numeric: tabular-nums; }
+
+/* ---- tap feedback on list-like rows ---- */
+.notif-panel__item { transition: background-color var(--t-fast); }
+.notif-panel__item:active, .picker__row:active, .choice:active { background: var(--fill-4); }
+
+/* ---- table -> list rows (phones) ----
+   Same markup, no JS. Header stays for screen readers (visually hidden). Cells that are bare
+   numbers/dates can opt into a label with data-label="Items". Note: display overrides can make
+   some screen readers drop table semantics; the header row and cell order are unchanged. */
+@media (max-width: 640px) {
+  .table-wrap { overflow: visible; }
+  .table, .table tbody { display: block; }
+  .table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .table tbody tr { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 14px var(--sp-4); border-bottom: 1px solid var(--line); transition: background-color var(--t-fast); }
+  .table tbody tr:last-child { border-bottom: 0; }
+  .table tbody tr:active { background: var(--fill-4); }
+  .table td { display: inline-flex; align-items: center; padding: 0; border: 0; font-size: var(--fs-xs); }
+  /* title + actions share the first line; badges and meta wrap beneath */
+  .table td:first-child { flex: 1 1 calc(100% - 112px); min-width: 0; font-size: var(--fs-sm); }
+  .table td:last-child { order: 1; margin-left: auto; align-self: flex-start; text-align: right; }
+  .table td:not(:first-child):not(:last-child) { order: 2; }
+  .table tr:has(select) td:first-child { flex-basis: 100%; }
+  .table tr:has(select) td:last-child { order: 3; }
+  .table td[data-label]::before { content: attr(data-label); margin-right: 5px; color: var(--text-3); }
+  .table td[data-label]::after { content: none; }
+  .table td:has(select) { flex: 1 0 100%; margin-left: 0; }
+  .table td:has(select) .row-actions { display: flex; flex-wrap: wrap; width: 100%; gap: 8px; }
+  .table td:has(select) .row-actions select { flex: 1 1 96px; min-width: 0; }
+  .table td:has(select) .row-actions .btn { flex: none; }
+  .table__title small { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+  .card--flush .pager { padding: var(--sp-3) var(--sp-4); }
+}
+
+/* ---- dialogs -> bottom sheets (phones) ----
+   Slides up with a grabber; swipe down on the top strip to dismiss (ui.js). The exit uses
+   discrete transitions (Chromium, Safari 17.4+); elsewhere it simply closes. */
+@media (max-width: 600px) {
+  .modal { width: 100%; max-width: none; margin: auto 0 0; max-height: 92dvh; border-radius: var(--r-sheet) var(--r-sheet) 0 0; padding-bottom: var(--safe-b); overscroll-behavior: contain;
+    transform: translateY(100%); transition: transform var(--d-slow) var(--spring-ios), overlay var(--d-slow) allow-discrete, display var(--d-slow) allow-discrete; }
+  .modal[open] { animation: none; transform: none; }
+  .modal.is-dragging { transition: none; }
+  @starting-style { .modal[open] { transform: translateY(100%); } }
+  .modal::backdrop { animation: none; opacity: 1; transition: opacity var(--d-slow) var(--ease), overlay var(--d-slow) allow-discrete, display var(--d-slow) allow-discrete; }
+  .modal:not([open])::backdrop { opacity: 0; }
+  @starting-style { .modal[open]::backdrop { opacity: 0; } }
+  .modal__panel { padding: var(--sp-3) var(--sp-5) var(--sp-5); }
+  .modal__panel::before { content: ""; display: block; width: 36px; height: 5px; margin: 0 auto var(--sp-4); border-radius: 3px; background: var(--fill-1); }
+  .modal__foot { flex-direction: column-reverse; align-items: stretch; }
+  .modal__foot .btn { width: 100%; }
+}
+
+/* ---- chat ---- */
+.msg--user { transform-origin: bottom right; }
+.msg--bot  { transform-origin: bottom left; }
+.msg--user + .msg--user, .msg--bot + .msg--bot { margin-top: -5px; }
+.msg--user:has(+ .msg--user) { border-bottom-right-radius: 8px; } .msg--user + .msg--user { border-top-right-radius: 8px; }
+.msg--bot:has(+ .msg--bot) { border-bottom-left-radius: 8px; }   .msg--bot + .msg--bot { border-top-left-radius: 8px; }
+.composer__send { transition: transform var(--d-quick) var(--spring-ios), background-color var(--t-fast), opacity var(--t-fast); }
+.composer__send:disabled { opacity: .4; transform: scale(.92); }
+.composer__send:active:not(:disabled) { transform: scale(.88); }
+/* keyboard-aware height: main.js publishes the visual viewport as --vvh; with the keyboard
+   up the tab bar is gone, so its height is not subtracted. */
+.chat-shell { height: calc(var(--vvh, 100dvh) - var(--nav-h) - var(--tabbar-h) - var(--safe-b) - 56px); }
+.kb-open .chat-shell { height: calc(var(--vvh, 100dvh) - var(--nav-h) - var(--sp-4)); }
+@media (min-width: 1024px) { .chat-shell, .kb-open .chat-shell { height: calc(100dvh - var(--nav-h) - 120px); } }
+
+@media (prefers-reduced-motion: reduce) { .modal, .modal::backdrop { transition-duration: .01ms !important; } }
+
+/* =====================================================================
+   Phase 5: screen-by-screen pass
+   Defects found while walking all 16 screens (light + dark, 390px + 1280px) and the few
+   modifier classes the pages now use. Appended last; nothing above is renamed.
+   ===================================================================== */
+
+/* ---- notices: space below, inline emphasis stays inline ---- */
+.notice { margin-bottom: var(--sp-4); }
+.notice p { line-height: var(--lh-body); }
+.notice p strong { display: inline; margin: 0; color: var(--text); }
+
+/* ---- side-by-side groups keep their gap to whatever follows (Profile) ---- */
+.split { margin-bottom: var(--sp-4); }
+
+/* ---- sidebar: a repeated group name becomes a hairline instead of a second "Main" ---- */
+.sidenav__sep { display: block; height: 1px; margin: var(--sp-3) var(--sp-3) var(--sp-1); background: var(--line); }
+
+/* ---- page head ---- */
+@media (max-width: 640px) {
+  /* one action: it stays on the title row, whatever the subtitle length */
+  .page-head--inline { flex-wrap: nowrap; align-items: flex-end; gap: var(--sp-3); }
+  .page-head--inline > :first-child { flex: 1 1 0; min-width: 0; }
+  .page-head--inline .page-head__actions { flex: none; }
+  /* two actions: an equal-width row instead of two left-aligned pills */
+  .page-head--duo .page-head__actions { width: 100%; flex-wrap: nowrap; }
+  .page-head--duo .page-head__actions > .btn { flex: 1 1 0; justify-content: center; }
+}
+
+/* ---- dashboard ---- */
+/* a stat whose value is a word or a date ("User", "17 Oct 2026"): same baseline, no 3-line wrap */
+.stat__value--text { display: flex; align-items: flex-end; min-height: 2.06rem; font-size: 1.25rem; letter-spacing: -.03em; line-height: 1.2; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .overview { padding: var(--sp-5); gap: var(--sp-4); }
+  .overview__value { font-size: clamp(3.5rem, 15vw, 4.5rem); }
+}
+
+/* ---- forms: full-width actions on phones, primary first ---- */
+@media (max-width: 640px) {
+  .form-actions { flex-direction: column; align-items: stretch; }
+  .form-actions .btn { width: 100%; justify-content: center; }
+}
+
+/* ---- tables ---- */
+.table td > small { display: block; font-size: var(--fs-xs); color: var(--text-3); }
+@media (max-width: 640px) { .table td > small { display: inline; margin-left: 6px; } }
+
+/* Admin users: tighter cells so the row fits at 1280px, and Save stays reachable if it does not. */
+.table--users th, .table--users td { padding-left: var(--sp-2); padding-right: var(--sp-2); }
+.table--users th:first-child, .table--users td:first-child { padding-left: var(--sp-5); }
+.table--users th:last-child, .table--users td:last-child { padding-right: var(--sp-5); }
+.table--users td[data-label="Joined"], .table--users .badge { white-space: nowrap; }
+@media (min-width: 641px) {
+  .table--users th:last-child, .table--users td:last-child { position: sticky; right: 0; z-index: 1; background: var(--surface); }
+}
+@media (hover: hover) and (min-width: 641px) { .table--users tbody tr:hover td:last-child { background: var(--surface-2); } }
+
+/* ---- AI chat: the shell takes whatever height the notice leaves ----
+   Replaces the calc() guess in the Phase 4 block. The page (<main class="content content--chat">)
+   is a bounded flex column; the notice is natural height, the shell flexes. */
+.content--chat { flex: none; display: flex; flex-direction: column; height: calc(var(--vvh, 100dvh) - var(--nav-h)); padding-top: var(--sp-4); padding-bottom: calc(var(--tabbar-h) + var(--sp-4) + var(--safe-b)); }
+.content--chat > .crumbs, .content--chat > .notice { flex: none; }
+.content--chat .notice { padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-3); }
+.content--chat .chat-shell { flex: 1 1 0; height: auto; min-height: 320px; }
+.kb-open .content--chat { padding-bottom: var(--sp-3); }
+@media (min-width: 1024px) {
+  .content--chat { height: calc(100dvh - var(--nav-h) - 64px); padding-top: var(--sp-6); padding-bottom: var(--sp-5); }
+}
+
+/* ---- error pages: the code is the hero ---- */
+.error-state { gap: var(--sp-2); padding-block: var(--sp-9); }
+.error-state__title { display: grid; justify-items: center; gap: var(--sp-2); font-size: 1.25rem; }
+.error-state__code { display: block; font-size: clamp(4.5rem, 24vw, 7rem); font-weight: 600; letter-spacing: -.07em; line-height: .95; font-variant-numeric: tabular-nums; color: var(--accent); }
+.error-state p { max-width: 36ch; }
+.error-state code { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
+.error-state .btn { margin-top: var(--sp-3); }
+
+/* ---- notifications: "unread" is a marker, not a frame (when everything is unread, a full outline on every row is noise) ---- */
+.notif-item.is-unread { background: color-mix(in srgb, var(--accent) 6%, var(--surface-2)); box-shadow: inset 0 0 0 1px var(--line), inset 3px 0 0 var(--accent); }
+
+/* ---- integration: OneSignal's own bell launcher ----
+   OneSignal injects #onesignal-bell-launcher (position:absolute, bottom/right 20px)
+   straight into <body>, outside any of our layout. It has two collisions:
+     - phones: it lands on top of the floating tab pill, so the bell is unreadable and
+       it swallows taps meant for the Profile tab;
+     - desktop: it sits on the last line of the footer, over the copyright.
+   Lift it clear of both. This is a third-party widget, so !important is the only way
+   to win. The proper alternative is to switch the bell off in the OneSignal dashboard:
+   the app already has its own bell in the top bar and a push switch on Profile. */
+#onesignal-bell-launcher {
+  bottom: 84px !important;
+  right: 16px !important;
+}
+
+@media (max-width: 900px) {
+  #onesignal-bell-launcher {
+    bottom: calc(var(--tabbar-h, 64px) + 30px + var(--safe-b, 0px)) !important;
+  }
 }
