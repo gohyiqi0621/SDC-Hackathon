@@ -8,7 +8,9 @@
     RewriteRule ^(app|ai-service)/ - [F,L]
 
     # Root PHP files and SQL dumps are includes, not endpoints.
-    RewriteRule ^(config\.php|db\.php|helpers\.php|database\.sql)$ - [F,L]
+    # setup.php is CLI-only (it writes .env), so it is blocked twice: here and
+    # by its own PHP_SAPI check.
+    RewriteRule ^(config\.php|db\.php|helpers\.php|setup\.php|database\.sql)$ - [F,L]
 
     # .env, .env.example, .env.local ...
     RewriteRule ^\.env - [F,L]
