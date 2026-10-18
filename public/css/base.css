@@ -258,6 +258,20 @@ textarea.input, .field textarea { min-height: 96px; resize: vertical; line-heigh
 .field__error:empty { display: none; }
 .field__error:not(:empty)::before { content: "!"; display: inline-grid; place-items: center; flex: none; width: 16px; height: 16px; border-radius: 50%; background: var(--danger); color: var(--surface); font-size: 11px; font-weight: 700; }
 .field__hint { margin-top: 6px; font-size: var(--fs-xs); color: var(--text-3); }
+/* Label on the left, a quiet action on the right (e.g. "Forgot password?"). */
+.field__label-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); }
+.field__label-row > label { display: block; margin-bottom: 6px; font-size: var(--fs-sm); font-weight: 500; color: var(--text-2); }
+.field__link { flex: none; font-size: var(--fs-xs); font-weight: 500; color: var(--accent); text-decoration: none; }
+.field__link:hover { text-decoration: underline; }
+/* Six-digit one-time code: big, centred, tabular so the digits line up. */
+.otp-input {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: .42em;
+  text-indent: .42em;      /* cancels the trailing letter-space so it stays centred */
+  font-variant-numeric: tabular-nums;
+}
 .input-wrap { position: relative; }
 .input-wrap .input, .input-wrap input { padding-right: 50px; }
 .input-btn { position: absolute; right: 4px; top: 4px; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; background: none; border: 0; border-radius: var(--r-sm); color: var(--text-3); cursor: pointer; }

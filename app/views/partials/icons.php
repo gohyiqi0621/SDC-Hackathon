@@ -49,6 +49,7 @@ $GLOBALS['__sdc_icons'] = [
     'refresh' => '<path d="M20 11a8 8 0 0 0-14-4M4 5v4h4M4 13a8 8 0 0 0 14 4M20 19v-4h-4"/>',
     'calendar' => '<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M8 3v4M16 3v4"/>',
     'alert' => '<path d="M12 3 2.5 20h19z"/><path d="M12 10v4M12 17v.1"/>',
+    'mail' => '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M4 8l8 5.5L20 8"/>',
 ];
 
 if (!function_exists('icon')) {

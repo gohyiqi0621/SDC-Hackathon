@@ -11,6 +11,7 @@ USE `sdc_app`;
 -- Drop children before parents (foreign keys).
 DROP TABLE IF EXISTS `notification_reads`;
 DROP TABLE IF EXISTS `notifications`;
+DROP TABLE IF EXISTS `password_resets`;
 DROP TABLE IF EXISTS `settings`;
 DROP TABLE IF EXISTS `chat_messages`;
 DROP TABLE IF EXISTS `chat_sessions`;
@@ -122,6 +123,27 @@ CREATE TABLE `settings` (
     PRIMARY KEY (`key`),
     CONSTRAINT `fk_settings_user` FOREIGN KEY (`updated_by`)
         REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------ password reset (OTP) ---
+-- "Forgot password" issues a 6-digit code and mails it through Brevo. The code
+-- is stored hashed (password_hash), never in the clear, and is single-use:
+-- `used_at` is stamped on redemption, `expires_at` bounds its lifetime and
+-- `attempts` caps guessing at 5 tries per code.
+CREATE TABLE `password_resets` (
+    `id`         INT UNSIGNED     NOT NULL AUTO_INCREMENT,
+    `user_id`    INT UNSIGNED     NOT NULL,
+    `email`      VARCHAR(190)     NOT NULL,   -- address the code was sent to
+    `otp_hash`   VARCHAR(255)     NOT NULL,   -- password_hash() of the 6-digit code
+    `attempts`   TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    `expires_at` DATETIME         NOT NULL,   -- app wall clock
+    `used_at`    DATETIME         NULL,
+    `created_at` TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_pwreset_user` (`user_id`),
+    KEY `idx_pwreset_created` (`created_at`),
+    CONSTRAINT `fk_pwreset_user` FOREIGN KEY (`user_id`)
+        REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------- notifications ---

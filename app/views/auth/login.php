@@ -27,7 +27,10 @@ view('layouts/header', ['title' => 'Sign in', 'bare' => true]);
         </div>
 
         <div class="field">
-            <label for="password">Password</label>
+            <div class="field__label-row">
+                <label for="password">Password</label>
+                <a class="field__link" href="<?= e(url('auth', ['action' => 'forgot'])) ?>">Forgot password?</a>
+            </div>
             <div class="input-wrap">
                 <input id="password" name="password" type="password" autocomplete="current-password" required
                        placeholder="Your password"

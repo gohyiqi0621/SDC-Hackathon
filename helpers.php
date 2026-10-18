@@ -37,6 +37,43 @@ function setting(string $key, string $default = ''): string
 }
 
 /**
+ * Path to a CA bundle, or null when the platform already has a trust store.
+ *
+ * PHP on Windows ships WITHOUT a CA store, so both cURL and the HTTPS stream
+ * wrapper fail every outbound TLS call with "unable to get local issuer
+ * certificate". XAMPP does ship a bundle next to Apache; Linux (Railway) has
+ * the system store, so null is returned there and default verification is left
+ * alone. A `CA_BUNDLE` env var wins if it points at something readable.
+ *
+ * Only pass this to a transport that supports it - a bogus path would break
+ * verification instead of fixing it, which is why the file is checked first.
+ */
+function ca_bundle_path(): ?string
+{
+    static $resolved = false;
+    if ($resolved !== false) {
+        return $resolved;
+    }
+
+    $candidates = [
+        (string) env('CA_BUNDLE', ''),
+        APP_ROOT . '/storage/cacert.pem',
+        'C:/xampp/apache/bin/curl-ca-bundle.crt',
+        'C:/xampp/php/extras/ssl/cacert.pem',
+        '/etc/ssl/certs/ca-certificates.crt',
+        '/etc/pki/tls/certs/ca-bundle.crt',
+    ];
+
+    foreach ($candidates as $path) {
+        if ($path !== '' && is_file($path) && is_readable($path)) {
+            return $resolved = $path;
+        }
+    }
+
+    return $resolved = null;
+}
+
+/**
  * The password rules an admin has configured on Admin -> Password rules.
  *
  * Defaults deliberately reproduce the pre-policy behaviour: 8 characters and no

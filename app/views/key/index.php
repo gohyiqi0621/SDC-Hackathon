@@ -41,11 +41,24 @@ $integrations = [
         'desc'  => 'Generates the replies in AI Chat, through the Python service.',
         'keys'  => ['agnes_api_key'],
     ],
+    [
+        'id'       => 'brevo',
+        'name'     => 'Brevo',
+        'desc'     => 'Sends the one-time codes for "Forgot password".',
+        'keys'     => ['brevo_api_key', 'brevo_sender_email', 'brevo_sender_name'],
+        // A sender name is a nicety: without it the app name is used, so it
+        // must not keep the integration marked "Not configured".
+        'optional' => ['brevo_sender_name'],
+    ],
 ];
 
 // Which integrations are fully configured (every required key present).
 $isSet = static function (array $entry) use ($byKey): bool {
+    $optional = $entry['optional'] ?? [];
     foreach ($entry['keys'] as $k) {
+        if (in_array($k, $optional, true)) {
+            continue;
+        }
         if (empty($byKey[$k]['set'])) {
             return false;
         }
@@ -107,6 +120,12 @@ $isSet = static function (array $entry) use ($byKey): bool {
                         <svg viewBox="0 0 32 32" aria-hidden="true">
                             <circle cx="16" cy="16" r="16" fill="#E54B4D"/>
                             <path fill="#fff" d="M16 6.2a9.8 9.8 0 0 0-9.8 9.8c0 4.3 2.8 8 6.6 9.3.5.1.7-.2.7-.5v-1.7c-2.7.6-3.3-1.3-3.3-1.3-.4-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.3-2.2-.2-4.5-1.1-4.5-4.9 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.7 1a9.3 9.3 0 0 1 5 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.8-2.3 4.7-4.5 4.9.4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5a9.8 9.8 0 0 0 6.6-9.3A9.8 9.8 0 0 0 16 6.2z"/>
+                        </svg>
+                    <?php elseif ($it['id'] === 'brevo'): ?>
+                        <svg viewBox="0 0 48 48" aria-hidden="true">
+                            <circle cx="24" cy="24" r="24" fill="#0B996E"/>
+                            <path fill="#fff" d="M13 17.6 24 25l11-7.4v14.4a2 2 0 0 1-2 2H15a2 2 0 0 1-2-2z" opacity=".9"/>
+                            <path fill="#fff" d="M13 17.6V16a2 2 0 0 1 2-2h18a2 2 0 0 1 2 2v1.6L24 25z"/>
                         </svg>
                     <?php else: ?>
                         <svg viewBox="0 0 48 48" aria-hidden="true">
@@ -188,6 +207,25 @@ $isSet = static function (array $entry) use ($byKey): bool {
                             <code><?= e(GOOGLE_REDIRECT_URI) ?></code>
                         </p>
                     </div>
+                <?php elseif ($it['id'] === 'brevo'): ?>
+                    <div class="int-panel__meta">
+                        <p class="field__hint">
+                            Create the key in Brevo under <strong>SMTP &amp; API &rarr; API Keys</strong> (it starts with
+                            <code>xkeysib-</code>). The sender address must be a <strong>verified sender</strong>
+                            (<strong>Senders &amp; IP &rarr; Senders</strong>) or Brevo rejects the message.
+                        </p>
+                        <p class="field__hint">
+                            Codes are mailed from the
+                            <a href="<?= e(url('auth', ['action' => 'forgot'])) ?>" target="_blank" rel="noopener">Forgot password</a>
+                            page.
+                        </p>
+                        <?php /* Belongs to the hidden form after </form> - same trick as the
+                                 Clear buttons, because a <form> cannot nest. */ ?>
+                        <button class="btn btn--sm" type="submit" form="brevo-test">
+                            <?= icon('send', 'icon--sm') ?> Send a test email
+                        </button>
+                        <p class="field__hint">Sends to the saved sender address. Save first, then test.</p>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
@@ -196,6 +234,14 @@ $isSet = static function (array $entry) use ($byKey): bool {
         <div class="form-actions int-save">
             <button class="btn btn--primary" type="submit" data-save-all>Save all changes</button>
         </div>
+    </form>
+
+    <?php /* The Brevo "send a test email" form. Its button lives inside the panel
+             above and reaches it with form="brevo-test". data-ajax so the result
+             arrives as a toast instead of a page reload. */ ?>
+    <form id="brevo-test" method="post" action="<?= e(url('key', ['action' => 'test_mail'])) ?>" data-ajax>
+        <?= csrf_field() ?>
+        <button type="submit" hidden>Send a test email</button>
     </form>
 
     <?php /* Clear targets live outside the main form - nesting <form> is illegal.

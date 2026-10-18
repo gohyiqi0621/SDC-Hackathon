@@ -26,6 +26,9 @@ class Setting
         'google_client_id'  => ['group' => 'keys', 'label' => 'Google Client ID',        'secret' => false, 'hint' => 'Public OAuth client id.'],
         'google_secret'     => ['group' => 'keys', 'label' => 'Google Client Secret',    'secret' => true,  'hint' => 'Secret. Used only in the token exchange.'],
         'agnes_api_key'     => ['group' => 'keys', 'label' => 'Agnes AI API Key',        'secret' => true,  'hint' => 'Secret. Used only for AI Chat replies.'],
+        'brevo_api_key'     => ['group' => 'keys', 'label' => 'Brevo API Key',           'secret' => true,  'hint' => 'Secret. Starts with xkeysib-. Used only to send password-reset codes.'],
+        'brevo_sender_email' => ['group' => 'keys', 'label' => 'Brevo Sender Email',     'secret' => false, 'hint' => 'Must be a verified sender in Brevo (Senders & IP -> Senders).'],
+        'brevo_sender_name' => ['group' => 'keys', 'label' => 'Brevo Sender Name',       'secret' => false, 'hint' => 'Optional. Shown as the sender name; defaults to the app name.'],
 
         // Password rules. Plain values: no secret, and they are meant to be read
         // back into the form. See password_policy() in helpers.php.

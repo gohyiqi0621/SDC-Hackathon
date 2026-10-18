@@ -126,6 +126,214 @@ class AuthController
         redirect(url('auth', ['action' => 'login']));
     }
 
+    /* ---------------------------------------------------- password reset ---- */
+
+    /**
+     * GET/POST ?page=auth&action=forgot - step 1 of the reset flow.
+     *
+     * Asks for the email address and mails a 6-digit code through Brevo.
+     *
+     * Anti-enumeration: the response and the next screen are identical whether
+     * or not the address belongs to an account. An unknown address still gets a
+     * session and still sees the code form - every code just fails to verify.
+     * The one place the two differ is the rate-limit message, which only an
+     * account that has genuinely asked three times can ever see.
+     */
+    public function forgot(): void
+    {
+        if (current_user() !== null) {
+            redirect(url('dashboard'));
+        }
+
+        $errors = [];
+        $old    = ['email' => (string) ($_GET['email'] ?? '')];
+
+        if (is_post()) {
+            $email = trim((string) ($_POST['email'] ?? ''));
+            $old['email'] = $email;
+
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $errors['email'] = 'Enter a valid email address.';
+            }
+
+            if ($errors === []) {
+                $user   = $this->users->findByEmail($email);
+                $resets = new PasswordReset();
+
+                // A disabled account must not be able to reset its way back in,
+                // and it is treated exactly like an unknown address.
+                $active = $user !== null && ($user['status'] ?? '') === 'active';
+
+                if ($active && $resets->countRecent((int) $user['id']) >= PasswordReset::MAX_PER_WINDOW) {
+                    $errors['form'] = 'You have requested several codes already. '
+                        . 'Please wait a few minutes before asking for another one.';
+                } else {
+                    if ($active) {
+                        $sent = $this->sendResetCode($user, $resets);
+                        if ($sent !== null) {
+                            $errors['form'] = $sent;
+                        }
+                    }
+
+                    if ($errors === []) {
+                        // Decoy sessions get user id 0: the screen is the same,
+                        // but no row exists, so no code can ever verify.
+                        $_SESSION['pwreset_user']  = $active ? (int) $user['id'] : 0;
+                        $_SESSION['pwreset_email'] = $active ? (string) $user['email'] : $email;
+
+                        respond_ok(
+                            'If that address is registered, a 6-digit code is on its way.',
+                            url('auth', ['action' => 'reset'])
+                        );
+                    }
+                }
+            }
+
+            if (wants_json()) {
+                json_response(false, ['errors' => $errors], 'Please fix the errors below.', 422);
+            }
+        }
+
+        view('auth/forgot', [
+            'title'  => 'Forgot password',
+            'errors' => $errors,
+            'old'    => $old,
+            'ready'  => brevo_configured(),
+        ]);
+    }
+
+    /**
+     * Issue a code and mail it. Returns an error message for the user, or null
+     * when the mail went out.
+     *
+     * The row is created first so the code that is mailed is the code that is
+     * stored; if the send fails the row is removed again, otherwise a live code
+     * would exist that nobody ever received.
+     */
+    private function sendResetCode(array $user, PasswordReset $resets): ?string
+    {
+        $code = (string) random_int(100000, 999999);
+
+        $rowId = $resets->create((int) $user['id'], (string) $user['email'], password_hash($code, PASSWORD_DEFAULT));
+
+        $mail = brevo_send(
+            (string) $user['email'],
+            (string) $user['name'],
+            'Your ' . APP_NAME . ' verification code',
+            otp_email_html((string) $user['name'], $code, PasswordReset::TTL_MINUTES),
+            otp_email_text((string) $user['name'], $code, PasswordReset::TTL_MINUTES)
+        );
+
+        if ($mail['ok']) {
+            return null;
+        }
+
+        // Only this row: the older rows stay so the rate limiter keeps counting.
+        $resets->delete($rowId);
+
+        // Configuration problems are worth naming - the admin can fix them and
+        // the visitor knows to ask. Anything else stays vague on purpose.
+        return $mail['error'] === 'not_configured'
+            ? 'Email delivery is not set up yet. Please contact your administrator.'
+            : 'We could not send the email just now. Please try again in a moment.';
+    }
+
+    /**
+     * GET/POST ?page=auth&action=reset - step 2: enter the code, choose a password.
+     *
+     * Reachable only through the session written by forgot(), so the account is
+     * never taken from the request. The code is verified against its hash before
+     * the password is even looked at, and a code is retired after
+     * PasswordReset::MAX_ATTEMPTS wrong guesses.
+     */
+    public function reset(): void
+    {
+        if (current_user() !== null) {
+            redirect(url('dashboard'));
+        }
+
+        $userId = (int) ($_SESSION['pwreset_user'] ?? 0);
+        $email  = (string) ($_SESSION['pwreset_email'] ?? '');
+
+        if ($email === '') {
+            flash('error', 'Enter your email address to start a password reset.', 'Reset your password');
+            redirect(url('auth', ['action' => 'forgot']));
+        }
+
+        $resets  = new PasswordReset();
+        $row     = $userId > 0 ? $resets->latest($userId) : null;
+        $expired = $row !== null && $resets->isExpired($row);
+        $errors  = [];
+
+        if (is_post()) {
+            $otp      = (string) preg_replace('/\D/', '', (string) ($_POST['otp'] ?? ''));
+            $password = (string) ($_POST['password'] ?? '');
+            $confirm  = (string) ($_POST['password_confirm'] ?? '');
+
+            if (strlen($otp) !== 6) {
+                $errors['otp'] = 'Enter the 6-digit code from the email.';
+            }
+
+            if ($errors === [] && $row === null) {
+                $errors['otp'] = 'That code is not correct. Request a new one.';
+            }
+            if ($errors === [] && $expired) {
+                $errors['otp'] = 'That code has expired. Request a new one.';
+            }
+            if ($errors === [] && (int) $row['attempts'] >= PasswordReset::MAX_ATTEMPTS) {
+                $errors['otp'] = 'Too many incorrect attempts on this code. Request a new one.';
+            }
+            if ($errors === [] && !password_verify($otp, (string) $row['otp_hash'])) {
+                $resets->bumpAttempts((int) $row['id']);
+                $left = PasswordReset::MAX_ATTEMPTS - ((int) $row['attempts'] + 1);
+                $errors['otp'] = $left > 0
+                    ? 'That code is not correct. ' . $left . ($left === 1 ? ' attempt' : ' attempts') . ' left.'
+                    : 'That code is not correct. Request a new one.';
+            }
+
+            // Only reached with a valid code, so a bad password never burns one.
+            if ($errors === []) {
+                $problem = password_problem($password);
+                if ($problem !== null) {
+                    $errors['password'] = $problem;
+                }
+                if ($confirm !== $password) {
+                    $errors['password_confirm'] = 'The two passwords do not match.';
+                }
+            }
+
+            if ($errors === []) {
+                $this->users->updatePassword($userId, password_hash($password, PASSWORD_DEFAULT));
+                $resets->deleteForUser($userId);
+                unset($_SESSION['pwreset_user'], $_SESSION['pwreset_email']);
+
+                // api.js navigates as soon as it sees data.redirect, which kills
+                // the toast, so stash a flash for the login page as well.
+                if (wants_json()) {
+                    flash('success', 'Password updated. Sign in with your new password.');
+                }
+
+                // Never log the user in from a reset: proving inbox access is not
+                // the same as knowing the new password.
+                respond_ok('Password updated. Sign in with your new password.',
+                    url('auth', ['action' => 'login']));
+            }
+
+            if (wants_json()) {
+                json_response(false, ['errors' => $errors], 'Please fix the errors below.', 422);
+            }
+        }
+
+        view('auth/reset', [
+            'title'   => 'Reset your password',
+            'email'   => $email,
+            'errors'  => $errors,
+            'expired' => $expired,
+            'ttl'     => PasswordReset::TTL_MINUTES,
+            'ready'   => brevo_configured(),
+        ]);
+    }
+
     /* ----------------------------------------------------------- Google ---- */
 
     /** GET ?page=auth&action=google - start the OAuth authorization-code flow. */

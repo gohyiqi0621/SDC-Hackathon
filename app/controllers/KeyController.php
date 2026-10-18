@@ -166,6 +166,69 @@ class KeyController
         respond_ok($message, url('key'));
     }
 
+    /**
+     * POST ?page=key&action=test_mail - send one real email through Brevo.
+     *
+     * Brevo's failure modes are all invisible from the browser (wrong key, an
+     * unverified sender, an IP allow-list on the account), and they all look
+     * like "the reset email never arrived". This button turns that into a
+     * readable answer, and mails the configured sender address itself so it
+     * also proves the sender is the one that works.
+     */
+    public function testMail(): void
+    {
+        require_admin();
+
+        $fail = function (string $message, int $code = 422): void {
+            if (wants_json()) {
+                json_response(false, [], $message, $code);
+            }
+            flash('error', $message);
+            redirect(url('key'));
+        };
+
+        if (!brevo_configured()) {
+            $fail('Add the API key and a sender address first.');
+        }
+
+        $html = '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Arial,sans-serif;'
+            . 'max-width:480px;margin:0 auto;padding:28px;background:#fff;border-radius:16px;">'
+            . '<h1 style="margin:0 0 12px;font-size:20px;color:#14181c;">Brevo is connected</h1>'
+            . '<p style="margin:0;font-size:15px;line-height:1.6;color:#4a5259;">'
+            . 'If you can read this, the Key page credentials work and password-reset codes can be delivered.'
+            . '</p></div>';
+
+        $res = brevo_send(
+            BREVO_SENDER_EMAIL,
+            BREVO_SENDER_NAME !== '' ? BREVO_SENDER_NAME : APP_NAME,
+            'Brevo connection test - ' . APP_NAME,
+            $html,
+            'If you can read this, the Key page credentials work and password-reset codes can be delivered.'
+        );
+
+        if (!$res['ok']) {
+            // Brevo's own words are safe to paraphrase but never to echo: they
+            // can name the account or the rejected sender.
+            $fail(match ($res['error']) {
+                'unauthorized' => 'Brevo rejected the API key. Check the key, and check whether the account '
+                    . 'restricts API keys to an IP allow-list.',
+                'transport'    => 'Could not reach Brevo. Check this server\'s outbound HTTPS connection.',
+                default        => 'Brevo rejected the message (' . (string) $res['error'] . '). '
+                    . 'See storage/logs/mail.log for its reason.',
+            });
+        }
+
+        $message = 'Test email sent to ' . BREVO_SENDER_EMAIL . '. Check that inbox (and the spam folder).';
+
+        // No redirect: api.js would navigate away and kill the toast that
+        // carries the result, which is the whole point of this button.
+        if (wants_json()) {
+            json_response(true, [], $message);
+        }
+        flash('success', $message);
+        redirect(url('key'));
+    }
+
     /** POST ?page=key&action=store - add a key (label + secret). */
     public function store(): void
     {

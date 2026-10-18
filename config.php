@@ -10,6 +10,7 @@ require_once __DIR__ . '/app/security.php';
 require_once __DIR__ . '/app/google.php';
 require_once __DIR__ . '/app/ai.php';
 require_once __DIR__ . '/app/onesignal.php';
+require_once __DIR__ . '/app/mail.php';
 
 define('APP_ROOT', __DIR__);
 // The served directory (where index.php, css/ and js/ live). asset_versioned()
@@ -145,6 +146,12 @@ define('ONESIGNAL_API_KEY', setting('onesignal_api_key'));
 // Agnes AI powers the chat replies. The Python service receives this per
 // request and holds it for that call only.
 define('AGNES_API_KEY', setting('agnes_api_key'));
+
+// Brevo sends the "Forgot password" one-time codes. The API key is a secret;
+// the sender address must be a verified sender on the Brevo account.
+define('BREVO_API_KEY', setting('brevo_api_key'));
+define('BREVO_SENDER_EMAIL', setting('brevo_sender_email'));
+define('BREVO_SENDER_NAME', setting('brevo_sender_name'));
 
 if (APP_DEBUG) {
     ini_set('display_errors', '1');
