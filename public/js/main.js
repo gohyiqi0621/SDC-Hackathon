@@ -7,6 +7,12 @@
     var root = document.documentElement;
     root.classList.add('js');
 
+    // The AI Chat screen owns the viewport height. Marking it lets CSS lock the document
+    // while the keyboard is open without affecting pages that are meant to scroll.
+    if (document.querySelector('.content--chat')) {
+        root.classList.add('is-chat');
+    }
+
     // Installed to the home screen? (iOS: navigator.standalone, others: display-mode)
     if (window.navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches)) {
         root.classList.add('is-standalone');
@@ -240,16 +246,40 @@
     /* ------------------------------------- visual viewport (keyboard) ---- */
     // Publishes the visible height as --vvh so the chat fills exactly the space left above
     // the on-screen keyboard, and keeps the newest message in view while it opens.
+    //
+    // The scroll reset matters as much as the height. iOS Safari does NOT shrink the layout
+    // viewport for the keyboard, so the document stays a keyboard-height taller than what
+    // you can actually see; Safari scrolls it up to reveal the caret and never scrolls back.
+    // That is what pushed the header off-screen and left the composer floating with a gap.
     if (window.visualViewport) {
         var vv = window.visualViewport;
+        var isChat = root.classList.contains('is-chat');
+
+        var anchorTop = function () {
+            // html has scroll-behavior:smooth, which would animate the correction.
+            var prev = root.style.scrollBehavior;
+            root.style.scrollBehavior = 'auto';
+            window.scrollTo(0, 0);
+            root.style.scrollBehavior = prev;
+        };
+
         var syncViewport = function () {
             root.style.setProperty('--vvh', vv.height + 'px');
-            if (root.classList.contains('kb-open')) {
+
+            var typing = root.classList.contains('kb-open');
+            // Never fight a pinch-zoom: only re-anchor at 1x.
+            if (isChat && typing && vv.scale === 1 && (window.scrollY > 0 || vv.offsetTop > 0)) {
+                anchorTop();
+            }
+
+            if (typing) {
                 var body = document.getElementById('chat-body');
                 if (body) { body.scrollTop = body.scrollHeight; }
             }
         };
+
         vv.addEventListener('resize', syncViewport);
+        vv.addEventListener('scroll', syncViewport);
         syncViewport();
     }
 

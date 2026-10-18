@@ -104,7 +104,11 @@
 .chat-empty .empty__icon { width: 56px; height: 56px; }
 .chat-suggest { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: var(--sp-2); }
 .msg { max-width: min(84%, 540px); padding: 10px 16px; border-radius: 20px; font-size: var(--fs-sm); line-height: 1.55; text-align: left; overflow-wrap: anywhere; animation: bubble .55s var(--spring) both; }
-.msg--user { align-self: flex-end; background: var(--btn); color: #fff; border-bottom-right-radius: 6px; white-space: pre-wrap; }
+.msg--user { align-self: flex-end; background: var(--btn); color: #fff; border-bottom-right-radius: 6px; }
+/* pre-wrap belongs on the TEXT, not the bubble: on the bubble it also preserves the
+   newlines and indentation of the template around .msg__text, which rendered as blank
+   lines and made every user message several times taller than its content. */
+.msg--user .msg__text { white-space: pre-wrap; }
 .msg--bot { align-self: flex-start; background: var(--surface); box-shadow: var(--shadow-card); border-bottom-left-radius: 6px; }
 .msg--error { align-self: stretch; max-width: none; background: color-mix(in srgb, var(--danger) 10%, var(--surface)); color: var(--danger-ink); }
 
@@ -588,6 +592,13 @@ input:-webkit-autofill, input:-webkit-autofill:focus { -webkit-text-fill-color: 
 .content--chat > .crumbs, .content--chat > .notice { flex: none; }
 .content--chat .notice { padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-3); }
 .content--chat .chat-shell { flex: 1 1 0; height: auto; min-height: 320px; }
+/* Every part of the shell keeps its natural height. The head, the composer and each bubble
+   are flex items too, so a short container (keyboard up) would otherwise shrink them -
+   that is what made bubbles look stretched with empty space inside. Only .chat-body scrolls. */
+.content--chat .chat-head,
+.content--chat .composer { flex: none; }
+.content--chat .chat-body > * { flex: none; }
+.kb-open .content--chat .chat-shell { min-height: 0; }
 .kb-open .content--chat { padding-bottom: var(--sp-3); }
 @media (min-width: 1024px) {
   .content--chat { height: calc(100dvh - var(--nav-h) - 64px); padding-top: var(--sp-6); padding-bottom: var(--sp-5); }

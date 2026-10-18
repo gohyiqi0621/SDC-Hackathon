@@ -12,6 +12,19 @@
 .shell { min-height: 100dvh; }
 .shell__main { min-width: 0; display: flex; flex-direction: column; min-height: 100dvh; }
 
+/* ------------------------------------------------ chat + keyboard lock --- */
+/* iOS Safari does not resize the layout viewport when the on-screen keyboard opens, so a
+   100dvh shell stays roughly a keyboard taller than the area you can actually see. Safari
+   scrolls the document up to reveal the caret and never scrolls back - that is what pushed
+   the header and history out of view and left the composer floating with a gap below it.
+   While the keyboard is open on the chat screen the document is frozen; the chat's own
+   flex column decides what scrolls, and the composer tracks --vvh (visual viewport).
+   Scoped to .is-chat so ordinary pages can still scroll with a keyboard open. */
+.is-chat.kb-open,
+.is-chat.kb-open body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+.is-chat.kb-open .shell,
+.is-chat.kb-open .shell__main { min-height: 0; height: 100%; }
+
 /* top bar
    The glass lives on ::before so it can fade in/out (large-title collapse) without
    animating backdrop-filter. --nav-h already includes the status-bar safe area. */
