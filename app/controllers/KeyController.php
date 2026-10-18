@@ -93,6 +93,79 @@ class KeyController
         respond_ok($label . ' ' . $verb, url('key'));
     }
 
+    /**
+     * POST ?page=key&action=save_all - store every integration field at once.
+     *
+     * The Key page is one form with one Save button, so this is what the button
+     * hits. Same empty-vs-clear rule as saveSetting(): a blank field on a key
+     * that already holds a value is "no change", never a wipe. Clearing stays an
+     * explicit per-key action.
+     *
+     * Values arrive as settings[<key>], and an unknown key is simply ignored -
+     * the loop is driven by Setting::SCHEMA, not by the request, so a crafted
+     * field name cannot reach a policy row or an arbitrary setting.
+     */
+    public function saveAll(): void
+    {
+        $admin    = require_admin();
+        $settings = new Setting();
+
+        $input = $_POST['settings'] ?? [];
+        if (!is_array($input)) {
+            $input = [];
+        }
+
+        $saved  = 0;
+        $errors = [];
+
+        foreach (Setting::SCHEMA as $key => $meta) {
+            if (($meta['group'] ?? 'keys') !== 'keys' || !array_key_exists($key, $input)) {
+                continue;
+            }
+
+            $value = trim((string) $input[$key]);
+
+            // Blank + already stored = leave it alone (secrets render empty).
+            if ($value === '') {
+                continue;
+            }
+
+            // A plain value echoed back unchanged is not a change.
+            if (!$meta['secret'] && $settings->plain($key) === $value) {
+                continue;
+            }
+
+            $error = $settings->put($key, $value, (int) $admin['id']);
+            if ($error !== '') {
+                $errors['settings[' . $key . ']'] = $error;
+                continue;
+            }
+            $saved++;
+        }
+
+        if ($errors !== []) {
+            $message = implode(' ', array_unique($errors));
+            if (wants_json()) {
+                json_response(false, ['errors' => $errors], $message, 422);
+            }
+            flash('error', $message);
+            redirect(url('key'));
+        }
+
+        $message = $saved === 0
+            ? 'No changes to save.'
+            : $saved . ($saved === 1 ? ' setting saved.' : ' settings saved.');
+
+        // api.js navigates as soon as it sees data.redirect, which would kill the
+        // toast before it renders. Stash a flash too, so the reloaded page still
+        // confirms what happened.
+        if (wants_json()) {
+            flash('success', $message);
+        }
+
+        respond_ok($message, url('key'));
+    }
+
     /** POST ?page=key&action=store - add a key (label + secret). */
     public function store(): void
     {

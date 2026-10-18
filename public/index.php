@@ -26,6 +26,7 @@ $actionAliases = [
     'set_password'    => 'setPassword',
     'save_setting'    => 'saveSetting',
     'save_policy'     => 'savePolicy',
+    'save_all'        => 'saveAll',
 ];
 $action = $actionAliases[strtolower($action)] ?? $action;
 

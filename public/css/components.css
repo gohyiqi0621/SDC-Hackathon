@@ -171,8 +171,9 @@
 /* -------------------------------------------------- notifications ----- */
 .set-row { display: flex; gap: var(--sp-2); align-items: center; }
 .set-row input { flex: 1; }
-.settings-form { padding: var(--sp-4) 0; border-top: 1px solid var(--line); }
-.settings-form:first-of-type { padding-top: 0; border-top: 0; }
+.setting-field { padding: var(--sp-4) 0; border-top: 1px solid var(--line); }
+.setting-field:first-of-type { padding-top: 0; border-top: 0; }
+.int-save { margin-top: 0; padding-top: var(--sp-4); border-top: 1px solid var(--line); }
 
 .notif-bell { position: relative; }
 .notif-bell__count { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-pill); background: var(--danger, #d33); color: #fff; font-size: 10px; font-weight: 700; line-height: 18px; text-align: center; }
@@ -389,7 +390,7 @@
     color: var(--text-3);
 }
 
-.int-panel .settings-form + .settings-form {
+.int-panel .setting-field + .setting-field {
     margin-top: var(--sp-4);
     padding-top: var(--sp-4);
     border-top: 1px solid var(--border, rgba(0, 0, 0, .07));

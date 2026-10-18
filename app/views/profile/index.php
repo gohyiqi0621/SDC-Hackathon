@@ -150,4 +150,4 @@ $isGoogleOnly = ($user['google_id'] ?? null) !== null && ($user['password_hash']
     </div>
 </section>
 
-<?php view('layouts/footer', ['scripts' => [asset('js/api.js')]]); ?>
+<?php view('layouts/footer'); // api.js is already loaded by app_footer ?>

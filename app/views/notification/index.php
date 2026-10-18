@@ -263,4 +263,4 @@ $subscriberCount = count($recipients);
 </dialog>
 <?php endif; ?>
 
-<?php view('layouts/footer', ['scripts' => [$isAdmin ? asset('js/notification.js') : asset('js/api.js')]]); ?>
+<?php view('layouts/footer', ['scripts' => $isAdmin ? [asset('js/notification.js')] : []]); // api.js comes from app_footer ?>

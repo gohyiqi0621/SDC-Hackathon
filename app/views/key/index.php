@@ -80,7 +80,7 @@ $isSet = static function (array $entry) use ($byKey): bool {
     <div class="card__head">
         <div>
             <h3 id="integrations-title">Integrations</h3>
-            <p>Select an integration to configure it.</p>
+            <p>Select an integration to configure it. One Save at the bottom writes every change.</p>
         </div>
     </div>
 
@@ -128,6 +128,13 @@ $isSet = static function (array $entry) use ($byKey): bool {
         <?php endforeach; ?>
     </div>
 
+    <?php /* One form for every integration: the Save button at the bottom writes
+             all five fields in a single request. Fields inside a collapsed panel
+             still submit, so edits survive closing one panel to open another. */ ?>
+    <form method="post" action="<?= e(url('key', ['action' => 'save_all'])) ?>"
+          data-ajax autocomplete="off" class="settings-form">
+        <?= csrf_field() ?>
+
     <?php foreach ($integrations as $it): ?>
         <div class="int-panel" id="panel-<?= e($it['id']) ?>" role="tabpanel"
              aria-labelledby="tab-<?= e($it['id']) ?>" data-int-panel="<?= e($it['id']) ?>" hidden>
@@ -145,26 +152,20 @@ $isSet = static function (array $entry) use ($byKey): bool {
                 <?php foreach ($it['keys'] as $k):
                     $s = $byKey[$k] ?? null;
                     if ($s === null) { continue; } ?>
-                    <form method="post" action="<?= e(url('key', ['action' => 'save_setting'])) ?>"
-                          data-ajax autocomplete="off" class="settings-form">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="key" value="<?= e($s['key']) ?>">
+                    <div class="setting-field">
                         <div class="field">
                             <label for="set-<?= e($s['key']) ?>"><?= e($s['label']) ?></label>
                             <div class="set-row">
-                                <input id="set-<?= e($s['key']) ?>" name="value"
+                                <input id="set-<?= e($s['key']) ?>" name="settings[<?= e($s['key']) ?>]"
                                        type="<?= $s['secret'] ? 'password' : 'text' ?>"
                                        placeholder="<?= $s['set'] ? e($s['mask']) : 'Not set' ?>"
                                        value="<?= $s['secret'] ? '' : e($s['mask']) ?>"
                                        <?= $s['secret'] ? 'autocomplete="new-password"' : '' ?>>
-                                <button class="btn btn--primary" type="submit">Save</button>
                                 <?php if ($s['set']): ?>
-                                    <button class="btn" type="submit" name="clear" value="1"
-                                            data-confirm-submit
-                                            data-confirm-title="Clear <?= e($s['label']) ?>?"
-                                            data-confirm-text="This removes the saved value. The integration will stop working until it is set again.">
-                                        Clear
-                                    </button>
+                                    <?php /* Sits in this form but belongs to the hidden clear
+                                             form below (HTML5 form= attribute), so it posts
+                                             on its own without nesting forms. */ ?>
+                                    <button class="btn" type="submit" form="clear-<?= e($s['key']) ?>">Clear</button>
                                 <?php endif; ?>
                             </div>
                             <p class="field__hint">
@@ -175,9 +176,9 @@ $isSet = static function (array $entry) use ($byKey): bool {
                                     · Not set yet
                                 <?php endif; ?>
                             </p>
-                            <p class="field__error" data-error-for="value"></p>
+                            <p class="field__error" data-error-for="settings[<?= e($s['key']) ?>]"></p>
                         </div>
-                    </form>
+                    </div>
                 <?php endforeach; ?>
 
                 <?php if ($it['id'] === 'google'): ?>
@@ -190,6 +191,28 @@ $isSet = static function (array $entry) use ($byKey): bool {
                 <?php endif; ?>
             </div>
         </div>
+    <?php endforeach; ?>
+
+        <div class="form-actions int-save">
+            <button class="btn btn--primary" type="submit" data-save-all>Save all changes</button>
+        </div>
+    </form>
+
+    <?php /* Clear targets live outside the main form - nesting <form> is illegal.
+             Each Clear button above reaches its own form with form="clear-<key>",
+             so one field can still be wiped without touching the others. */ ?>
+    <?php foreach ($byKey as $k => $s): if (!$s['set']) { continue; } ?>
+        <form id="clear-<?= e($k) ?>" method="post"
+              action="<?= e(url('key', ['action' => 'save_setting'])) ?>"
+              data-confirm-submit
+              data-confirm-title="Clear <?= e($s['label']) ?>?"
+              data-confirm-text="This removes the saved value. The integration will stop working until it is set again.">
+            <?= csrf_field() ?>
+            <input type="hidden" name="key" value="<?= e($k) ?>">
+            <input type="hidden" name="clear" value="1">
+            <?php /* Present only so the confirm dialog can borrow the word "Clear". */ ?>
+            <button type="submit" hidden>Clear</button>
+        </form>
     <?php endforeach; ?>
 </section>
 
@@ -253,4 +276,4 @@ $isSet = static function (array $entry) use ($byKey): bool {
     </div>
 </section>
 
-<?php view('layouts/footer', ['scripts' => [asset('js/api.js'), asset('js/key.js')]]); ?>
+<?php view('layouts/footer', ['scripts' => [asset('js/key.js')]]); // api.js comes from app_footer ?>

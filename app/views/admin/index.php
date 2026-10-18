@@ -240,4 +240,4 @@ view('layouts/header', ['title' => 'Admin']);
     </form>
 </dialog>
 
-<?php view('layouts/footer', ['scripts' => [asset('js/api.js')]]); ?>
+<?php view('layouts/footer'); // api.js is already loaded by app_footer ?>

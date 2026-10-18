@@ -70,4 +70,4 @@ $error  = static fn(string $field): string => $errors[$field] ?? '';
     </form>
 </section>
 
-<?php view('layouts/footer', ['scripts' => [asset('js/api.js')]]); ?>
+<?php view('layouts/footer'); // api.js is already loaded by app_footer ?>
