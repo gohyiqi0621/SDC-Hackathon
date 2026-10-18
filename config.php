@@ -157,14 +157,6 @@ define('GOOGLE_CLIENT_SECRET', setting('google_secret'));
 define('ONESIGNAL_APP_ID', setting('onesignal_app_id'));
 define('ONESIGNAL_API_KEY', setting('onesignal_api_key'));
 
-// A REST key with no App ID is a half-configured integration: the bell, the push
-// switch and the SDK all key off the App ID, so they simply vanish from the UI
-// and nothing looks broken until a send fails. Record it instead of hiding it.
-if (ONESIGNAL_API_KEY !== '' && ONESIGNAL_APP_ID === '') {
-    error_log('[onesignal] REST API key is set but the App ID is empty - the notification bell '
-        . 'and the Profile push switch are hidden on every page.');
-}
-
 // Agnes AI powers the chat replies. The Python service receives this per
 // request and holds it for that call only.
 define('AGNES_API_KEY', setting('agnes_api_key'));

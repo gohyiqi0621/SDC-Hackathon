@@ -119,10 +119,6 @@
 
     var externalId = meta.getAttribute('data-user-id') || '';
     var role = meta.getAttribute('data-user-role') || 'user';
-    // 'production' or 'dev', decided server-side from APP_ENV. One OneSignal app
-    // is shared by every environment, so this tag is what lets the server keep a
-    // dev device out of a production audience even if its alias looks valid.
-    var env = meta.getAttribute('data-user-env') || '';
 
     /*
      * Where the service worker must live.
@@ -186,20 +182,10 @@
             return;
         }
 
-        /* The tags the server filters on: role for role-targeted sends, env so a
-         * device that subscribed in another environment is never treated as a
-         * production recipient. */
-        async function tagUser() {
-            await OneSignal.User.addTag('role', role);
-            if (env) {
-                await OneSignal.User.addTag('env', env);
-            }
-        }
-
         if (externalId) {
             // Without this, subscriptions stay anonymous.
             await OneSignal.login(externalId);
-            await tagUser();
+            await OneSignal.User.addTag('role', role);
         }
 
         /*
@@ -230,7 +216,7 @@
             if (!sub || !sub.id) return;          // no endpoint yet - nothing to link
             try {
                 await OneSignal.login(externalId);
-                await tagUser();
+                await OneSignal.User.addTag('role', role);
                 console.info('[push] alias linked after subscription (' + externalId + ')');
             } catch (err) {
                 console.warn('[push] alias re-link failed:', err);
@@ -315,40 +301,17 @@
 (function () {
     'use strict';
 
-    /*
-     * Sign-out asks for confirmation first (ui.js prevents the first submit and
-     * re-submits with form.submit(), which fires no event). Listening on 'submit'
-     * therefore ran on the CANCELLABLE pass: pressing "Log out" and then
-     * "Cancel" unlinked push while the session stayed alive. And because the
-     * call was never awaited, the navigation could cancel it instead - leaving
-     * the device linked to a signed-out user on a shared browser.
-     *
-     * ui.js now dispatches a cancelable 'app:confirmed-submit' on the confirmed
-     * pass only. Hold that submit until logout() settles, with a short deadline
-     * so a hung SDK can never block signing out.
-     */
-    document.addEventListener('app:confirmed-submit', function (e) {
+    // The logout form posts to a confirm dialog; unlinking is best-effort and
+    // must never block the navigation.
+    document.addEventListener('submit', function (e) {
         var form = e.target;
         if (!(form instanceof HTMLFormElement)) return;
         if (!/action=logout/.test(form.getAttribute('action') || '')) return;
-        if (!window.OneSignal || typeof window.OneSignal.logout !== 'function') return;
 
-        e.preventDefault();
-
-        var done = false;
-        var go = function () {
-            if (done) { return; }
-            done = true;
-            form.submit();
-        };
-
-        setTimeout(go, 1200);
-        try {
-            Promise.resolve(window.OneSignal.logout()).then(go, go);
-        } catch (err) {
-            go();
+        if (window.OneSignal) {
+            try { window.OneSignal.logout(); } catch (err) { /* SDK not ready */ }
         }
-    });
+    }, true);
 })();
 
 /* ------------------------------------------------ Profile push switch --- */
@@ -361,65 +324,24 @@
 
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(async function (OneSignal) {
-        var sub = OneSignal.User && OneSignal.User.PushSubscription;
-
-        function browserPermission() {
-            return (typeof Notification !== 'undefined') ? Notification.permission : 'default';
-        }
-
-        /*
-         * The switch reflects DELIVERY for this device, not just the browser
-         * permission: a device can be permitted and still opted out. Those are
-         * two independent states and the old code only ever read the first, so
-         * "off" looked like it worked while the device kept receiving.
-         */
-        function reflect() {
-            var optedIn = !!(sub && sub.optedIn);
-            var perm = browserPermission();
-
-            sw.checked = optedIn && perm === 'granted';
-
-            if (!hint) return;
-            if (perm === 'denied') {
-                hint.textContent = 'Your browser is blocking notifications for this site. '
-                    + 'Allow them in the browser site settings, then reload.';
-            } else if (sw.checked) {
-                hint.textContent = 'This device receives notifications. Other devices are unaffected.';
-            } else {
-                hint.textContent = 'Turn this on to let your browser ask for permission.';
-            }
-        }
-
-        reflect();
-
-        try {
-            if (sub) { sub.addEventListener('change', reflect); }
-        } catch (err) { /* older SDK: the next page load reflects the state */ }
+        // Reflect the current state; the SDK exposes both the browser permission
+        // and whether this device actually has a subscription.
+        var granted = OneSignal.Notifications.permission;
+        sw.checked = granted;
 
         sw.addEventListener('change', async function () {
             if (sw.checked) {
                 await OneSignal.Notifications.requestPermission();
-
-                if (browserPermission() !== 'granted') {
-                    reflect();
-                    if (hint) {
-                        hint.textContent = 'Your browser blocked the request. Allow notifications '
-                            + 'for this site in its settings, then try again.';
-                    }
-                    return;
-                }
-
-                try { await sub.optIn(); } catch (err) { /* already opted in */ }
-                reflect();
-                if (sw.checked) { UI.toast('Notifications turned on for this device.', 'success'); }
+                var ok = OneSignal.Notifications.permission;
+                sw.checked = ok;
+                if (hint) hint.textContent = ok
+                    ? 'This device will receive notifications.'
+                    : 'Your browser blocked notifications. Allow them in site settings.';
+                if (ok) UI.toast('Notifications turned on.', 'success');
             } else {
-                // optOut() is per subscription, i.e. per device and browser.
-                // Other devices keep their own subscription and keep receiving.
-                try { await sub.optOut(); } catch (err) { /* SDK not ready */ }
-                reflect();
-                UI.toast('Notifications turned off for this device.', 'info');
-            }
-        });
+                if (hint) hint.textContent = 'Turn this on to let your browser ask for permission.';
+                UI.toast('Turn notifications off from your browser site settings.', 'info');
+            }        });
     });
 })();
 
