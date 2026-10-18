@@ -1,41 +1,59 @@
-/* base.css — SDC design system (Apple-calm + liquid glass).
+/* base.css — SDC design system (landing look: black, Inter, dot-matrix display, pills).
    Tokens, reset, typography, the glass material, buttons, forms, badges.
    Every value lives in a variable here: edit once, the whole UI follows.
-   Theme = <html data-theme="light|dark">. Never hard-code a colour elsewhere.
+   Theme: one dark palette (see v3 below). Never hard-code a colour elsewhere.
 
    v2 foundations (Phase 1): type scale, material (glass) levels, elevation scale,
    semantic radii, fills, motion tokens (durations + springs), z-index + safe-area
    tokens. Every pre-existing token name is unchanged, so layout.css and
-   components.css keep working untouched. */
+   components.css keep working untouched.
+
+   v3 (landing look): one dark theme that matches the public landing page (home/index.php,
+   landing.css). White pills on black, #28282a dark pills, hairline white borders, and the
+   dot-matrix display face for large titles. data-theme is always "dark" now; the light
+   values are gone so there is a single palette to maintain. */
+
+@font-face {
+  font-family: "Geist Pixel Circle";
+  src: url("../fonts/GeistPixel-Circle.woff2") format("woff2");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
 
 :root {
-  color-scheme: light;
-  --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: dark;
+  --font: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-display: "BubbledotICG-FinePos", "Geist Pixel Circle", monospace;   /* large titles only */
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* surfaces */
-  --bg: #f5f5f7; --surface: #ffffff; --surface-2: #f5f5f7; --surface-3: #e8e8ed;
-  --glass: rgba(255,255,255,.72); --glass-strong: rgba(255,255,255,.93);
-  --line: rgba(0,0,0,.08); --line-strong: rgba(0,0,0,.16);
-  --surface-raised: #ffffff;                       /* sheets, popovers, menus */
-  --fill-1: rgba(120,120,128,.20); --fill-2: rgba(120,120,128,.16);
-  --fill-3: rgba(120,120,128,.12); --fill-4: rgba(120,120,128,.08);  /* system fills: chips, tracks, skeletons */
-  --scrim: rgba(0,0,0,.32);                        /* behind sheets and dialogs */
+  --bg: #000000; --surface: #121213; --surface-2: #1c1c1e; --surface-3: #28282a;
+  --glass: rgba(18,18,19,.72); --glass-strong: rgba(18,18,19,.9);
+  --line: rgba(255,255,255,.10); --line-strong: rgba(255,255,255,.22);
+  --line-pill: rgba(255,255,255,.4);               /* the landing's trust-pill border */
+  --surface-raised: #1c1c1e;                       /* sheets, popovers, menus */
+  --fill-1: rgba(120,120,128,.36); --fill-2: rgba(120,120,128,.32);
+  --fill-3: rgba(120,120,128,.24); --fill-4: rgba(120,120,128,.18);  /* system fills: chips, tracks, skeletons */
+  --scrim: rgba(0,0,0,.62);                        /* behind sheets and dialogs */
 
   /* text (all pass AA on --surface and --bg) */
-  --text: #1d1d1f; --text-2: #424245; --text-3: #6e6e73;
+  --text: #ffffff; --text-2: #d0d0d0; --text-3: #8e8e8e;
 
-  /* brand green: the only brand colour (hue 110°–185°) */
-  --btn: #0f7f47; --btn-hover: #0b6a3b;
-  --accent: #0b7a43; --accent-strong: #095f34; --accent-bright: #34d27b;
-  --accent-ink: #ffffff; --accent-soft: rgba(15,127,71,.10); --focus: rgba(15,127,71,.38);
+  /* monochrome brand: white is the primary action, #28282a the secondary pill */
+  --btn: #ffffff; --btn-hover: #e9e9ea;
+  --accent: #ffffff; --accent-strong: #ffffff; --accent-bright: #ffffff;
+  --accent-ink: #000000; --accent-soft: rgba(255,255,255,.10); --focus: rgba(255,255,255,.35);
+  --pill-dark: #28282a; --pill-dark-hover: #323234; --pill-dark-text: #c8c8c8;
+  --nav-text: #2e2e2e;                             /* text on the white nav pill */
+  --nav-shadow: 0 4px 14px rgba(0,0,0,.16);
+  --glow: 0 0 0 1px rgba(255,255,255,.15), 0 0 22px rgba(255,255,255,.32), 0 0 44px rgba(255,255,255,.12);
+  --glow-strong: 0 0 0 1px rgba(255,255,255,.25), 0 0 30px rgba(255,255,255,.45), 0 0 60px rgba(255,255,255,.2);
 
   /* status: colour always travels with a label */
-  --ok: #1a8f4f;      --ok-ink: hsl(150 85% 20%);
-  --warn: hsl(28 88% 50%);  --warn-ink: hsl(22 90% 28%);
-  --danger: #d70015;  --danger-ink: #b00012;
-  --info: #0a64c8;    --info-ink: #0a4f9f;
-  --viz-1: var(--accent); --viz-2: var(--info);
+  --ok: #34d27b;      --ok-ink: #6ee7a0;
+  --warn: hsl(28 88% 50%);  --warn-ink: #ffb066;
+  --danger: #ff6961;  --danger-ink: #ff8a84;
+  --info: #5aa9ff;    --info-ink: #8bc2ff;
+  --viz-1: #ffffff; --viz-2: var(--info);
 
   /* type: Apple-style scale (17px body). Existing names kept; new roles added.
      large-title 34-46px · title-1 28 · title-2 22 · title-3 20 · headline 17 · body 17
@@ -59,18 +77,18 @@
 
   /* elevation: 1 resting · 2 card · 3 floating · 4 sheet. Hairline first, then a
      tight contact shadow, then a long soft one (reads as depth, not as a grey smudge). */
-  --shadow-1: 0 0 0 1px var(--line), 0 1px 2px rgba(0,0,0,.04);
-  --shadow-2: 0 0 0 1px var(--line), 0 1px 2px rgba(0,0,0,.04), 0 12px 32px -22px rgba(0,0,0,.26);
-  --shadow-3: 0 0 0 1px var(--line), 0 2px 6px rgba(0,0,0,.06), 0 24px 56px -26px rgba(0,0,0,.38);
-  --shadow-4: 0 0 0 1px var(--line), 0 -8px 40px -12px rgba(0,0,0,.28);
+  --shadow-1: 0 0 0 1px var(--line);
+  --shadow-2: 0 0 0 1px var(--line);
+  --shadow-3: 0 0 0 1px var(--line), 0 24px 60px -28px rgba(0,0,0,.9);
+  --shadow-4: 0 0 0 1px var(--line), 0 -8px 40px -12px rgba(0,0,0,.8);
   --shadow-card: var(--shadow-2);   /* legacy names */
   --shadow-pop:  var(--shadow-3);
 
   /* material: glass levels. thin = bars, regular = cards/toasts, thick = sheets/menus.
      --glass-edge is the specular rim; keep the @supports and reduced-transparency fallbacks below. */
-  --glass-thin: rgba(255,255,255,.60);
+  --glass-thin: rgba(0,0,0,.55);
   --glass-blur: 24px; --glass-blur-thick: 40px; --glass-sat: 180%;
-  --glass-edge: inset 0 0 0 .5px rgba(255,255,255,.55), inset 0 1px 0 rgba(255,255,255,.7);
+  --glass-edge: inset 0 0 0 .5px rgba(255,255,255,.10), inset 0 1px 0 rgba(255,255,255,.14);
 
   /* motion: durations. Interaction feedback is instant, state changes quick,
      entrances base, page and sheet movement slow. */
@@ -80,7 +98,7 @@
 
   /* motion: curves. --spring-ios settles with no overshoot; --spring-bounce has a small
      overshoot for pops and the tab pill. Browsers without linear() get cubic-bezier fallbacks. */
-  --ease: cubic-bezier(.25,.1,.25,1); --ease-out: cubic-bezier(.16,1,.3,1); --spring: cubic-bezier(.34,1.56,.64,1);
+  --ease: cubic-bezier(.25,.1,.25,1); --ease-landing: cubic-bezier(.22,1,.36,1); --ease-out: cubic-bezier(.16,1,.3,1); --spring: cubic-bezier(.34,1.56,.64,1);
   --ease-in-out: cubic-bezier(.65,0,.35,1); --ease-emphasized: cubic-bezier(.2,0,0,1);
   --spring-ios: cubic-bezier(.22,1,.36,1); --spring-bounce: cubic-bezier(.34,1.4,.64,1);
   --t-fast: 140ms var(--ease); --t: 280ms var(--ease-out);
@@ -95,7 +113,7 @@
   --z-bar: 50; --z-sheet: 70; --z-toast: 90;
 
   /* controls */
-  --switch-on: var(--btn);
+  --switch-on: var(--ok);
 
   /* runtime geometry (main.js writes these) */
   --pill-x: 0px; --pill-w: 0px; --push-dir: 1;
@@ -109,27 +127,6 @@
 @media (min-width: 768px)  { :root { --content-x: 28px; } }
 @media (min-width: 1024px) { :root { --content-x: 40px; } }
 
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #000; --surface: #1c1c1e; --surface-2: #2c2c2e; --surface-3: #3a3a3c;
-  --glass: rgba(28,28,30,.72); --glass-strong: rgba(28,28,30,.88);
-  --line: rgba(255,255,255,.10); --line-strong: rgba(255,255,255,.22);
-  --surface-raised: #2c2c2e;
-  --fill-1: rgba(120,120,128,.36); --fill-2: rgba(120,120,128,.32);
-  --fill-3: rgba(120,120,128,.24); --fill-4: rgba(120,120,128,.18);
-  --scrim: rgba(0,0,0,.55);
-  --text: #f5f5f7; --text-2: #d2d2d7; --text-3: #a1a1a6;
-  --accent: #34d27b; --accent-strong: #5ee09a; --accent-soft: rgba(52,210,123,.14); --focus: rgba(52,210,123,.45);
-  --ok: #34d27b; --ok-ink: #6ee7a0; --warn-ink: #ffb066; --danger: #ff6961; --danger-ink: #ff8a84;
-  --info: #5aa9ff; --info-ink: #8bc2ff;
-  --glass-thin: rgba(28,28,30,.55);
-  --glass-edge: inset 0 0 0 .5px rgba(255,255,255,.10), inset 0 1px 0 rgba(255,255,255,.14);
-  --shadow-1: 0 0 0 1px var(--line);
-  --shadow-2: 0 0 0 1px var(--line);
-  --shadow-3: 0 0 0 1px var(--line), 0 24px 60px -28px rgba(0,0,0,.9);
-  --shadow-4: 0 0 0 1px var(--line), 0 -8px 40px -12px rgba(0,0,0,.8);
-  --switch-on: var(--accent);
-}
 
 /* ------------------------------------------------------------- reset --- */
 *, *::before, *::after { box-sizing: border-box; }
@@ -158,9 +155,8 @@ code { font-family: var(--mono); font-size: .875em; padding: 2px 7px; border-rad
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 8px; }
 .visually-hidden, .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; clip-path: inset(50%); overflow: hidden; white-space: nowrap; }
 .muted { color: var(--text-3); }
-.only-dark { display: none; }
-:root[data-theme="dark"] .only-dark { display: inline-flex; }
-:root[data-theme="dark"] .only-light { display: none; }
+.only-dark { display: inline-flex; }
+.only-light { display: none; }
 
 /* ---------------------------------------------------- liquid glass ------ */
 .liquid-glass, .liquid-glass-strong, .liquid-glass-thin, .liquid-glass-thick {
@@ -174,7 +170,8 @@ code { font-family: var(--mono); font-size: .875em; padding: 2px 7px; border-rad
 
 /* ------------------------------------------------- type utilities ------ */
 /* Use these in new markup instead of hard-coded font sizes. */
-.t-large-title { font-size: var(--fs-large-title); font-weight: var(--fw-bold); letter-spacing: var(--tr-display); line-height: var(--lh-tight); }
+.t-large-title { font-family: var(--font-display); font-size: var(--fs-large-title); font-weight: 400; letter-spacing: -.04em; line-height: 1.12; }
+.t-display { font-family: var(--font-display); font-weight: 400; letter-spacing: -.04em; }
 .t-title-1   { font-size: var(--fs-title-1);   font-weight: var(--fw-bold);     letter-spacing: var(--tr-title);   line-height: var(--lh-tight); }
 .t-title-2   { font-size: var(--fs-title-2);   font-weight: var(--fw-semibold); letter-spacing: var(--tr-title);   line-height: var(--lh-snug); }
 .t-title-3   { font-size: var(--fs-title-3);   font-weight: var(--fw-semibold); letter-spacing: -.022em;           line-height: var(--lh-snug); }
@@ -245,7 +242,7 @@ code { font-family: var(--mono); font-size: .875em; padding: 2px 7px; border-rad
 textarea.input, .field textarea { min-height: 96px; resize: vertical; line-height: 1.45; }
 .field select, select.input {
   padding-right: 40px; cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%236e6e73' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%238e8e8e' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 16px center;
 }
 .input::placeholder, .field input::placeholder, .field textarea::placeholder { color: var(--text-3); }
@@ -369,8 +366,7 @@ textarea.input, .field textarea { min-height: 96px; resize: vertical; line-heigh
   .liquid-glass, .liquid-glass-strong, .liquid-glass-thin, .liquid-glass-thick { background: var(--surface); }
 }
 @media (prefers-contrast: more) {
-  :root { --line: rgba(0,0,0,.4); --line-strong: rgba(0,0,0,.7); --text-2: #1d1d1f; --text-3: #3a3a3c; }
-  :root[data-theme="dark"] { --line: rgba(255,255,255,.5); --line-strong: rgba(255,255,255,.8); --text-2: #fff; --text-3: #e5e5ea; }
+  :root { --line: rgba(255,255,255,.5); --line-strong: rgba(255,255,255,.8); --text-2: #fff; --text-3: #e5e5ea; }
 }
 @media (pointer: coarse) {
   .btn, .chip, .seg__btn, .icon-btn, .input-btn { min-height: var(--touch-min); }

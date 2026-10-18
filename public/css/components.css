@@ -634,3 +634,70 @@ input:-webkit-autofill, input:-webkit-autofill:focus { -webkit-text-fill-color: 
     bottom: calc(var(--tabbar-h, 64px) + 30px + var(--safe-b, 0px)) !important;
   }
 }
+
+/* =====================================================================
+   Phase 6: landing look
+   Components in the public landing page's language (landing.css): the white
+   glowing CTA pill is the primary button, the #28282a "Sign in" pill is the
+   neutral one, surfaces are near-black with a hairline white border. Text on a
+   white fill uses --accent-ink (black). Appended last; nothing above is renamed.
+   ===================================================================== */
+
+/* ---- buttons ---- */
+.btn:not(.btn--primary):not(.btn--danger-solid):not(.btn--quiet):not(.btn--ghost):not(.btn--danger):not(.btn--google) { background: var(--pill-dark); color: var(--pill-dark-text); box-shadow: var(--nav-shadow); }
+@media (hover: hover) {
+  .btn:not(.btn--primary):not(.btn--danger-solid):not(.btn--quiet):not(.btn--ghost):not(.btn--danger):not(.btn--google):hover:not(:disabled) { background: var(--pill-dark-hover); color: #fff; transform: translateY(-1px); }
+}
+.btn--primary { background: var(--btn); color: var(--accent-ink); box-shadow: var(--glow); }
+@media (hover: hover) { .btn--primary:hover:not(:disabled) { background: var(--btn); box-shadow: var(--glow-strong); transform: translateY(-2px) scale(1.02); } }
+.btn--google { background: var(--pill-dark); color: #fff; box-shadow: inset 0 0 0 1px var(--line-pill); }
+@media (hover: hover) { .btn--google:hover:not(:disabled) { background: var(--pill-dark-hover); } }
+.icon-btn { background: var(--pill-dark); color: var(--pill-dark-text); box-shadow: var(--nav-shadow); }
+@media (hover: hover) { .icon-btn:hover { background: var(--pill-dark-hover); color: #fff; } }
+.icon-btn--flat { background: transparent; box-shadow: none; }
+.spinner--lg { color: var(--text); }
+
+/* ---- surfaces: near-black with a hairline, no grey smudge shadows ---- */
+.card, .stat, .quick__item, .chat-head, .settings-group, .notif-panel { border: 1px solid var(--line); box-shadow: none; }
+.card.liquid-glass, .card.liquid-glass-strong { background: var(--surface); }
+@media (hover: hover) { .stat:hover, .quick__item:hover { box-shadow: none; border-color: var(--line-strong); } }
+.overview { border: 1px solid var(--line); background: var(--surface); }
+.overview::before { background: radial-gradient(closest-side, rgba(255,255,255,.10), transparent); }
+.stat__icon, .empty__icon { background: #fff; color: #000; border-radius: 50%; }
+.notice { background: var(--surface-2); border: 1px solid var(--line); }
+.notice .icon { color: var(--text); }
+.modal { background: var(--surface-raised); border: 1px solid var(--line); }
+.modal::backdrop { background: var(--scrim); }
+.toast { border: 1px solid var(--line); }
+
+/* ---- display face for the big numbers and empty/error heroes ---- */
+.card__head h3, .modal__head h3 { letter-spacing: -.02em; font-weight: 600; }
+.error-state__code { font-family: var(--font-display); font-weight: 400; letter-spacing: -.04em; color: var(--text); }
+
+/* ---- avatar: white inner circle, as in the landing trust row ---- */
+.avatar { background: #fff; color: #000; box-shadow: 0 0 0 1px var(--line-pill); }
+
+/* ---- fields ---- */
+.input, .field input:not([type=checkbox]):not([type=radio]):not([type=file]), .field select, .field textarea, .search input, .row-actions select {
+  background-color: var(--surface-2); border-color: var(--line-strong);
+}
+.input:focus, .field input:focus, .field select:focus, .field textarea:focus, .search input:focus, .row-actions select:focus { border-color: #fff; }
+input:-webkit-autofill, input:-webkit-autofill:focus { box-shadow: 0 0 0 100px var(--surface-2) inset; }
+
+/* ---- chips + segmented: the active option is a white pill ---- */
+.chip { background: var(--pill-dark); color: var(--pill-dark-text); }
+.chip.is-active { background: #fff; color: var(--nav-text); }
+.seg { background: var(--pill-dark); border-radius: var(--r-pill); }
+.seg__thumb, .seg__btn { border-radius: var(--r-pill); }
+.seg__thumb { background: #fff; box-shadow: var(--nav-shadow); }
+.seg__btn.is-active { background: #fff; color: var(--nav-text); }
+.seg.has-thumb .seg__btn.is-active { color: var(--nav-text); }
+
+/* ---- chat: white user bubbles and send button need black ink ---- */
+.msg--user { color: var(--accent-ink); }
+.msg--user .md-inline { background: rgba(0,0,0,.08); }
+.chat-head__avatar, .composer__send { color: var(--accent-ink); }
+.composer__send { box-shadow: var(--glow); }
+
+/* ---- notifications ---- */
+.notif-item.is-unread { background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line), inset 3px 0 0 #fff; }

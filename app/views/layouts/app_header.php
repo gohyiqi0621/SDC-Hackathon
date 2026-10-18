@@ -27,7 +27,7 @@ $groupLabels = ['main' => 'Main', 'admin' => 'Admin', 'account' => 'Account'];
 
   <aside class="sidenav liquid-glass" id="sidenav">
     <a class="brand" href="<?= e($home) ?>" aria-label="<?= e(APP_NAME) ?> home">
-      <svg class="brand__mark" aria-hidden="true"><use href="#brand-mark"/></svg>
+      <span class="brand__mark" aria-hidden="true"><img src="<?= e(asset('assets/logo.webp')) ?>" alt="" width="52" height="52"></span>
       <span class="brand__name">SDC <em>App</em></span>
     </a>
     <nav class="sidenav__nav" aria-label="Main navigation">
@@ -57,14 +57,11 @@ $groupLabels = ['main' => 'Main', 'admin' => 'Admin', 'account' => 'Account'];
     <header class="topbar liquid-glass-strong">
       <div class="topbar__left">
         <span class="topbar__brand">
-          <a class="brand" href="<?= e($home) ?>" aria-label="<?= e(APP_NAME) ?> home"><svg class="brand__mark" aria-hidden="true"><use href="#brand-mark"/></svg><span class="brand__name">SDC <em>App</em></span></a>
+          <a class="brand" href="<?= e($home) ?>" aria-label="<?= e(APP_NAME) ?> home"><span class="brand__mark" aria-hidden="true"><img src="<?= e(asset('assets/logo.webp')) ?>" alt="" width="52" height="52"></span><span class="brand__name">SDC <em>App</em></span></a>
         </span>
         <h1 class="topbar__title"><?= e($pageTitle) ?></h1>
       </div>
       <div class="topbar__actions">
-        <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch theme" aria-pressed="false">
-          <span class="only-light"><?= icon('moon', 'icon--sm') ?></span><span class="only-dark"><?= icon('sun', 'icon--sm') ?></span>
-        </button>
 <?php if (ONESIGNAL_APP_ID !== ''): ?>
         <div class="notif-bell" data-notif-bell
              data-feed-url="<?= e(url('notification', ['action' => 'feed'])) ?>"

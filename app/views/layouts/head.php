@@ -6,14 +6,13 @@
 $pageTitle = $pageTitle ?? 'Dashboard';
 ?>
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><?= e($pageTitle) ?> &middot; <?= e(APP_NAME) ?></title>
 <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
-<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#000000">
 <link rel="manifest" href="<?= e(asset('manifest.webmanifest')) ?>">
 <link rel="icon" href="<?= e(asset('favicon.ico')) ?>" sizes="any">
 <link rel="icon" href="<?= e(asset('icons/icon.svg')) ?>" type="image/svg+xml">
@@ -47,11 +46,13 @@ $workerUrl = asset('OneSignalSDKWorker.js');
       data-worker-scope="<?= e($basePath) ?>/">
 <?php endif; ?>
 <script>
-  /* Runs before first paint: saved theme, else the OS preference. No flash. */
-  (function(){var t;try{t=localStorage.getItem('theme')}catch(e){}
-  if(!t){t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}
-  document.documentElement.dataset.theme=t;document.documentElement.classList.add('js')})();
+  /* One theme (the landing look), so data-theme is fixed; this only flags JS. */
+  document.documentElement.classList.add('js');
 </script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://db.onlinewebfonts.com/c/8cb707a9b8a73f8a7403336b861c3074?family=BubbledotICG-FinePos">
 <link rel="stylesheet" href="<?= e(asset_versioned('css/base.css')) ?>">
 <link rel="stylesheet" href="<?= e(asset_versioned('css/layout.css')) ?>">
 <link rel="stylesheet" href="<?= e(asset_versioned('css/components.css')) ?>">

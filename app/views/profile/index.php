@@ -111,14 +111,6 @@ $isGoogleOnly = ($user['google_id'] ?? null) !== null && ($user['password_hash']
     </section>
 </div>
 
-<section class="settings-group">
-    <h3 class="settings-group__title">Appearance</h3>
-    <label class="settings-row">
-        <span>Dark mode<small>Follows your device until you change it here.</small></span>
-        <input class="switch" type="checkbox" role="switch" data-theme-switch aria-label="Dark mode">
-    </label>
-</section>
-
 <?php if (ONESIGNAL_APP_ID !== ''): ?>
 <section class="settings-group">
     <h3 class="settings-group__title">Notifications</h3>

@@ -11,11 +11,11 @@ declare(strict_types=1);
 require_once dirname(__DIR__) . '/config.php';
 require_once APP_ROOT . '/db.php';
 
-$page   = (string) ($_GET['page'] ?? 'dashboard');
+$page   = (string) ($_GET['page'] ?? 'home');
 $action = (string) ($_GET['action'] ?? 'index');
 
 // Whitelist characters so the value can never escape app/controllers/.
-$page   = preg_replace('/[^a-z0-9_]/i', '', $page) ?: 'dashboard';
+$page   = preg_replace('/[^a-z0-9_]/i', '', $page) ?: 'home';
 $action = preg_replace('/[^a-z0-9_]/i', '', $action) ?: 'index';
 
 // Action aliases: snake/kebab route names that map to camelCase methods.

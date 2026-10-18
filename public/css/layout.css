@@ -4,7 +4,8 @@
 
 /* ------------------------------------------------------------- brand --- */
 .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); }
-.brand__mark { width: 30px; height: 30px; flex: none; }
+.brand__mark { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 50%; background: #fff; box-shadow: var(--nav-shadow); }
+.brand__mark img { width: 72%; height: 72%; object-fit: contain; display: block; }
 .brand__name { font-weight: 600; font-size: 1.0625rem; letter-spacing: -.025em; white-space: nowrap; }
 .brand__name em { font-style: normal; font-weight: 400; opacity: .6; }
 
@@ -162,12 +163,12 @@
 .tabbar__item.is-pop .icon { animation: tab-pop 400ms var(--spring) both; }
 
 /* ------------------------------------------------------------- auth ---- */
-body[data-kind="auth"] {
-  background:
-    radial-gradient(60% 50% at 80% 8%, color-mix(in srgb, var(--accent-bright) 28%, transparent), transparent 70%),
-    radial-gradient(50% 45% at 8% 92%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
-    var(--bg);
-}
+body[data-kind="auth"] { background: var(--bg); }
+/* The landing page's video, dimmed so the card reads on top of it. */
+.auth-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: #000; pointer-events: none; }
+.auth-bg__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.auth-bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.7)); }
+.screen--auth { position: relative; z-index: 1; }
 .screen--auth { min-height: 100dvh; display: grid; place-items: center; align-content: center; gap: var(--sp-6); padding: var(--sp-6) var(--content-x); }
 .screen--auth .brand { animation: rise .6s var(--ease-out) both; }
 .auth__card { width: min(100%, 420px); padding: var(--sp-7) var(--sp-6); border-radius: var(--r-2xl); box-shadow: var(--shadow-pop); animation: rise .6s var(--ease-out) .08s both; }
@@ -228,3 +229,55 @@ a, button, [role="button"], summary, label, input, select, textarea { touch-acti
 }
 @media (max-width: 767px) { .topbar__brand .brand__name { display: none; } .topbar__title { font-size: 1.0625rem; } }
 @media (min-width: 1440px) { .content { max-width: 1180px; } }
+
+/* =====================================================================
+   Phase 6: landing look
+   The shell takes the public landing page's language (landing.css): black ground,
+   white nav pill with the three-dot active marker, #28282a dark pills, hairline
+   white borders. Appended last; nothing above is renamed.
+   ===================================================================== */
+
+/* ---- brand: white circular mark, as on the landing header ---- */
+.brand__name { font-weight: 500; letter-spacing: -.01em; }
+.screen--auth .brand__mark { width: 46px; height: 46px; }
+.screen--auth .brand__name { font-size: 1.125rem; }
+
+/* ---- top bar: black glass, dark pills for the actions ---- */
+.topbar::before { background: rgba(0,0,0,.72); }
+.topbar__actions .icon-btn,
+.user-btn { background: var(--pill-dark); color: var(--pill-dark-text); box-shadow: var(--nav-shadow); }
+@media (hover: hover) {
+  .topbar__actions .icon-btn:hover, .user-btn:hover { background: var(--pill-dark-hover); color: #fff; }
+}
+.user-btn .user-name { color: var(--pill-dark-text); }
+.user-dropdown { background: var(--surface-raised); border: 1px solid var(--line); }
+
+/* ---- side nav: dimmed links, the current page is a white pill ---- */
+.sidenav { background: #000; border-right-color: var(--line); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.sidenav__item { color: var(--text); opacity: .55; border-radius: var(--r-pill); transition: background-color var(--t-fast), color var(--t-fast), opacity var(--t-fast); }
+@media (hover: hover) { .sidenav__item:hover { background: var(--surface-2); color: var(--text); opacity: .85; } }
+.sidenav__item[aria-current="page"] { opacity: 1; background: #fff; color: var(--nav-text); box-shadow: var(--nav-shadow); }
+.sidenav__label { color: var(--text-3); }
+.sidenav__user { background: var(--pill-dark); border: 1px solid var(--line-pill); box-shadow: none; border-radius: var(--r-pill); }
+
+/* ---- tab bar: the landing's white nav pill ---- */
+.tabbar {
+  background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none;
+  box-shadow: var(--nav-shadow), 0 12px 40px -12px rgba(0,0,0,.8);
+}
+.tabbar__pill { background: rgba(0,0,0,.06); box-shadow: none; }
+.tabbar__item { color: var(--nav-text); opacity: .5; transition: opacity var(--d-base) var(--ease-out), transform var(--d-quick) var(--spring-ios); }
+.tabbar__item[aria-current="page"] { color: var(--nav-text); opacity: 1; }
+
+/* ---- page titles: dot-matrix display face ---- */
+.page-head__title, .auth__title {
+  font-family: var(--font-display); font-weight: 400; letter-spacing: -.04em; line-height: 1.12;
+}
+@media (max-width: 720px) { .page-head__title { letter-spacing: -.08em; line-height: 1.05; } }
+
+/* ---- auth card: dark glass over the video ---- */
+.auth__card { background: rgba(18,18,19,.72); border: 1px solid var(--line); box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+.auth__icon { border-radius: 50%; background: #fff; color: #000; }
+.auth__title { font-size: 2rem; }
+
+.footer { color: var(--text-3); }

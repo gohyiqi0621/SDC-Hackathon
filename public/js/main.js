@@ -37,7 +37,7 @@
         if (themeSwitch) { themeSwitch.checked = theme === 'dark'; }
         syncThemeColor();
     }
-    applyTheme(root.dataset.theme || 'light');
+    applyTheme(root.dataset.theme || 'dark');
 
     var reduceMotion = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
 
