@@ -198,6 +198,74 @@ function asset_versioned(string $path): string
     return asset($path) . ($stamp !== '' ? '?v=' . $stamp : '');
 }
 
+/**
+ * Resolve a user-supplied link to an absolute URL on this app.
+ *
+ * A push payload is built by the server and shipped verbatim, so a relative
+ * link ("/notification") or one typed while testing on localhost used to arrive
+ * on production devices exactly as typed - which is how a live push opened
+ * localhost. Everything returned here is absolute, which also means OneSignal's
+ * dashboard "default URL" is never consulted: it only applies when `url` is
+ * omitted from the payload.
+ *
+ * Returns null when the value cannot become an http(s) URL, so the caller can
+ * report it instead of storing it.
+ */
+function app_absolute_url(string $raw): ?string
+{
+    $raw = trim($raw);
+    if ($raw === '') {
+        return null;
+    }
+
+    // Anything carrying a scheme must be http(s). javascript:, data:, mailto:
+    // and friends must never become a push click target.
+    if (preg_match('#^([a-z][a-z0-9+.\-]*):#i', $raw, $m)) {
+        if (!in_array(strtolower($m[1]), ['http', 'https'], true)) {
+            return null;
+        }
+
+        $parts = parse_url($raw);
+        if ($parts === false || empty($parts['host'])) {
+            return null;
+        }
+
+        $host    = strtolower((string) $parts['host']);
+        $isLocal = in_array($host, ['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]'], true);
+
+        // A localhost link is meaningless to anyone but the developer who typed
+        // it: in production keep the route and swap in the live origin.
+        if (!($isLocal && APP_ENV === 'production')) {
+            return $raw;
+        }
+
+        $path  = (string) ($parts['path'] ?? '/');
+        $query = isset($parts['query']) ? '?' . $parts['query'] : '';
+
+        // Local dev serves the app from a `.../public` directory, but the live
+        // app is served FROM that directory - so the segment is not part of the
+        // route and must not be carried across.
+        $stripped = preg_replace('#^.*?/public(?=/|$)#', '', $path);
+        $path     = ($stripped === null || $stripped === '') ? '/' : $stripped;
+        if ($path[0] !== '/') {
+            $path = '/' . $path;
+        }
+
+        $raw = $path . $query;
+    }
+
+    // What is left is a path inside this app. Drop our own base path first, so
+    // "/sdc-project/public/?page=notification" cannot be prefixed twice.
+    $base = rtrim((string) parse_url(APP_URL, PHP_URL_PATH), '/');
+    $path = '/' . ltrim($raw, '/');
+    if ($base !== '' && ($path === $base || str_starts_with($path, $base . '/'))) {
+        $path = substr($path, strlen($base));
+        $path = $path === '' ? '/' : $path;
+    }
+
+    return APP_URL . $path;
+}
+
 function redirect(string $url): void
 {
     header('Location: ' . $url);

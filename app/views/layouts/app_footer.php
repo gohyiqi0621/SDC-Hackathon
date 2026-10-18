@@ -43,7 +43,7 @@ $scripts = $scripts ?? [];
 <script src="<?= e(asset_versioned('js/ui.js')) ?>"></script>
 <script src="<?= e(asset_versioned('js/api.js')) ?>"></script>
 <?php if (ONESIGNAL_APP_ID !== ''): ?>
-<script src="<?= e(asset('js/onesignal.js')) ?>" defer></script>
+<script src="<?= e(asset_versioned('js/onesignal.js')) ?>" defer></script>
 <?php endif; ?>
 <?php foreach ($scripts as $src): ?>
 <script src="<?= e($src) ?>"></script>

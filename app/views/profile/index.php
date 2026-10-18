@@ -131,6 +131,15 @@ $isGoogleOnly = ($user['google_id'] ?? null) !== null && ($user['password_hash']
 <?php endif; ?>
 
 <section class="settings-group">
+    <h3 class="settings-group__title">Location</h3>
+    <div class="settings-row">
+        <span>Precise location<small>A separate permission. Nothing is stored on the server.</small></span>
+        <button class="btn btn--sm" type="button" data-geo-btn>Allow</button>
+    </div>
+    <p class="field__hint" data-geo-hint>Location is not requested until you press Allow.</p>
+</section>
+
+<section class="settings-group">
     <h3 class="settings-group__title">Your activity</h3>
     <div class="settings-row">
         <span>Items<small>Everything you have created</small></span>
@@ -150,4 +159,4 @@ $isGoogleOnly = ($user['google_id'] ?? null) !== null && ($user['password_hash']
     </div>
 </section>
 
-<?php view('layouts/footer'); // api.js is already loaded by app_footer ?>
+<?php view('layouts/footer', ['scripts' => [asset_versioned('js/location.js')]]); // api.js is already loaded by app_footer ?>

@@ -148,7 +148,16 @@ class Notification
         if ($audience === 'users' && $value !== null && $value !== '') {
             return ['subscriptions' => onesignal_subscription_ids(explode(',', $value))];
         }
-        return ['all' => true];
+
+        // "Everyone" resolves to the devices of the users we can reach in THIS
+        // environment, rather than to the app-wide "Total Subscriptions"
+        // segment. A segment is every subscription in the OneSignal app,
+        // including the ones created on localhost while developing - which is
+        // how a production push ended up displaying (and opening) localhost.
+        // The lookup already drops other-environment subscriptions.
+        $lookup = onesignal_subscribed_users();
+
+        return ['subscriptions' => onesignal_subscription_ids(array_keys($lookup['users']), $lookup['users'])];
     }
 
     /**

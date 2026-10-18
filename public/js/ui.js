@@ -209,7 +209,14 @@
             confirmLabel: btn ? btn.textContent.trim() : 'Confirm',
             danger: form.getAttribute('data-confirm-danger') !== 'false'
         }).then(function (ok) {
-            if (ok) { form.dataset.confirmed = '1'; form.submit(); }
+            if (!ok) { return; }
+            form.dataset.confirmed = '1';
+            // A confirmed submit is the only safe moment to run work that must
+            // finish before navigation (e.g. unlinking the OneSignal alias).
+            // A listener may cancel this event and navigate itself; otherwise we
+            // submit as before. form.submit() fires no event, so no loop.
+            var ev = new CustomEvent('app:confirmed-submit', { bubbles: true, cancelable: true });
+            if (form.dispatchEvent(ev)) { form.submit(); }
         });
     });
 

@@ -247,6 +247,15 @@ created one — see section 1.
 ### Variables
 Service > **Variables** tab. Add the database variables (`MYSQLHOST`, `MYSQLPORT`, `MYSQLUSER`, `MYSQLPASSWORD`, `MYSQLDATABASE`), usually by referencing the MySQL service's variables. The database login must be here, because it is needed to reach the database in the first place. The AI API key lives in the database. After changing a variable, Railway redeploys the service.
 
+Two more variables matter for links and push:
+
+| Variable | Set it to | Why |
+| --- | --- | --- |
+| `APP_ENV` | `production` | Push subscriptions are namespaced by environment (production `sdc-user-<id>`, everywhere else `sdc-dev-user-<id>`). Deploying with `APP_ENV=local` leaves the live app targeting nobody. |
+| `APP_URL` | `https://<your-domain>` | Optional but recommended. When blank the base URL is derived from each request, so a URL created on localhost is a perfectly valid-looking one; pinning it removes that whole class of bug. |
+
+`APP_KEY` must be the same value locally and here, or encrypted settings (the OneSignal REST key, Google secret, Brevo key) cannot be decrypted.
+
 ### Get a public link
 Service > **Settings** > **Networking** > **Generate Domain**. Put this link in the "Live demo" line at the top of this README.
 

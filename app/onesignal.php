@@ -60,6 +60,8 @@ function onesignal_config_state(): array
         'app_id_set'    => ONESIGNAL_APP_ID !== '',
         'api_key_set'   => ONESIGNAL_API_KEY !== '',
         'key_shape'     => secret_shape(ONESIGNAL_API_KEY),
+        'env'           => onesignal_env(),
+        'external_prefix' => onesignal_external_prefix(),
     ];
 }
 
@@ -79,18 +81,54 @@ function onesignal_config_state(): array
  */
 const ONESIGNAL_EXTERNAL_PREFIX = 'sdc-user-';
 
-function onesignal_external_id(int $userId): string
+/**
+ * Prefix used outside production.
+ *
+ * ONE OneSignal app is shared by every environment (the App ID is seeded into
+ * every database, and the REST key is the same), so a subscription created on
+ * `localhost/sdc-project/public` lands in the same app as production. With one
+ * shared prefix both environments resolve to the same identity, which made a
+ * production send reach dev devices - and those show `localhost` as their
+ * origin. A separate prefix keeps the two sets of subscriptions apart: the
+ * production picker and audience only ever resolve `sdc-user-*`, and a dev
+ * device stops matching the moment it loads the app again (OneSignal.login()
+ * replaces the alias).
+ */
+const ONESIGNAL_EXTERNAL_PREFIX_DEV = 'sdc-dev-user-';
+
+/** 'production' or 'dev'. Anything that is not explicitly production is dev. */
+function onesignal_env(): string
 {
-    return ONESIGNAL_EXTERNAL_PREFIX . $userId;
+    return APP_ENV === 'production' ? 'production' : 'dev';
 }
 
-/** Reverse of onesignal_external_id(): 'sdc-user-7' -> 7, anything else -> null. */
-function onesignal_user_id_from_external(string $externalId): ?int
+/** The external-id prefix this environment owns. */
+function onesignal_external_prefix(): string
 {
-    if (!str_starts_with($externalId, ONESIGNAL_EXTERNAL_PREFIX)) {
+    return onesignal_env() === 'production' ? ONESIGNAL_EXTERNAL_PREFIX : ONESIGNAL_EXTERNAL_PREFIX_DEV;
+}
+
+function onesignal_external_id(int $userId): string
+{
+    return onesignal_external_prefix() . $userId;
+}
+
+/**
+ * Reverse of onesignal_external_id() for a given prefix: 'sdc-user-7' -> 7,
+ * anything else -> null.
+ *
+ * The prefix is a parameter because the parser is also the environment filter:
+ * a production lookup passes the production prefix, so a dev subscription (or a
+ * legacy shared-prefix one once it reloads) is skipped rather than silently
+ * attributed to a production user.
+ */
+function onesignal_user_id_from_external(string $externalId, ?string $prefix = null): ?int
+{
+    $prefix ??= onesignal_external_prefix();
+    if ($prefix === '' || !str_starts_with($externalId, $prefix)) {
         return null;
     }
-    $tail = substr($externalId, strlen(ONESIGNAL_EXTERNAL_PREFIX));
+    $tail = substr($externalId, strlen($prefix));
     return ctype_digit($tail) ? (int) $tail : null;
 }
 
@@ -296,7 +334,11 @@ function onesignal_get_stream(string $url, array $headers): array
  * otherwise refused push), so it can never be delivered to and must not appear
  * as a choice.
  *
- * @return array{users:array<int,array{ids:list<string>,devices:int,last_active:int}>,total:int,valid:int,error:?string}
+ * Scoped to this environment: a subscription whose alias or `env` tag belongs to
+ * another environment is skipped, so a production send can never reach a device
+ * that subscribed on localhost.
+ *
+ * @return array{users:array<int,array{ids:list<string>,devices:int,last_active:int}>,total:int,valid:int,env:string,other_env:int,error:?string}
  */
 function onesignal_subscribed_users(): array
 {
@@ -307,31 +349,68 @@ function onesignal_subscribed_users(): array
         return $cache;
     }
 
-    $empty = ['users' => [], 'total' => 0, 'valid' => 0, 'error' => null];
+    $empty = ['users' => [], 'total' => 0, 'valid' => 0, 'env' => onesignal_env(),
+        'other_env' => 0, 'error' => null];
 
     if (!onesignal_configured()) {
-        return $cache = $empty + ['error' => 'OneSignal is not configured.'];
+        // array_merge, not `+`: the union keeps the LEFT-hand `error => null`,
+        // which silently threw the reason away and left every caller believing
+        // the lookup had succeeded with nobody subscribed.
+        return $cache = array_merge($empty, ['error' => 'OneSignal is not configured.']);
     }
 
-    [$status, $data] = onesignal_get(
-        'players?app_id=' . rawurlencode(ONESIGNAL_APP_ID) . '&limit=200&device_type=5'
-    );
+    // /players is paged. A single page used to be enough, but "Everyone" is now
+    // resolved from this list instead of a segment, so a silent truncation would
+    // quietly stop delivering to the users past the first page.
+    $rows   = [];
+    $total  = 0;
+    $offset = 0;
+    $limit  = 200;
+    $status = 0;
 
-    if ($data === null) {
-        return $cache = $empty + ['error' => 'OneSignal did not answer (HTTP ' . $status . ').'];
+    for ($page = 0; $page < 5; $page++) {
+        [$status, $data] = onesignal_get(
+            'players?app_id=' . rawurlencode(ONESIGNAL_APP_ID)
+            . '&limit=' . $limit . '&offset=' . $offset . '&device_type=5'
+        );
+
+        if ($data === null) {
+            return $cache = array_merge($empty, ['error' => 'OneSignal did not answer (HTTP ' . $status . ').']);
+        }
+
+        $batch  = $data['players'] ?? [];
+        $rows   = array_merge($rows, $batch);
+        $total  = (int) ($data['total_count'] ?? count($rows));
+        $offset += $limit;
+
+        if (count($batch) < $limit || $offset >= $total) {
+            break;
+        }
     }
 
-    $rows  = $data['players'] ?? [];
-    $users = [];
-    $valid = 0;
+    $prefix = onesignal_external_prefix();
+    $env    = onesignal_env();
+    $users  = [];
+    $valid  = 0;
+    $otherEnv = 0;
 
     foreach ($rows as $p) {
         if (!empty($p['invalid_identifier'])) {
             continue;
         }
+
+        // A subscription tagged for another environment never counts, even if
+        // its alias happens to parse - that is what keeps a dev device out of a
+        // production audience.
+        $tagEnv = $p['tags']['env'] ?? null;
+        if (is_string($tagEnv) && $tagEnv !== '' && $tagEnv !== $env) {
+            $otherEnv++;
+            continue;
+        }
+
         $valid++;
 
-        $userId = onesignal_user_id_from_external(trim((string) ($p['external_user_id'] ?? '')));
+        $userId = onesignal_user_id_from_external(trim((string) ($p['external_user_id'] ?? '')), $prefix);
         $subId  = (string) ($p['id'] ?? '');
         if ($userId === null || $subId === '') {
             continue;
@@ -347,10 +426,12 @@ function onesignal_subscribed_users(): array
     }
 
     return $cache = [
-        'users'  => $users,
-        'total'  => (int) ($data['total_count'] ?? count($rows)),
-        'valid'  => $valid,
-        'error'  => null,
+        'users'     => $users,
+        'total'     => $total,
+        'valid'     => $valid,
+        'env'       => $env,
+        'other_env' => $otherEnv,
+        'error'     => null,
     ];
 }
 
@@ -408,13 +489,23 @@ function onesignal_send(string $title, string $body, ?string $url, array $target
         $payload['url'] = $url;
     }
 
-    // Audience. "all" is the default; a role uses a OneSignal tag we set on login.
+    // Audience. Explicit subscription ids are the norm; a role uses a tag we set
+    // on login. The segment branch is kept for callers that genuinely want the
+    // whole app, but the composer no longer uses it: a segment spans every
+    // environment, so "Everyone" is resolved to this environment's devices by
+    // Notification::targetFor() instead.
     if (isset($target['subscriptions'])) {
         $ids = array_values(array_filter(array_map('strval', (array) $target['subscriptions'])));
         if ($ids === []) {
+            // The lookup is memoised, so this costs nothing - and it is the only
+            // place the reason (unreachable API, nobody subscribed) can be told
+            // apart from "the audience was empty".
+            $why = onesignal_subscribed_users();
+            $detail = is_string($why['error']) && $why['error'] !== '' ? ' ' . $why['error'] : '';
+
             return ['ok' => false, 'id' => null, 'recipients' => null,
-                'error' => 'None of the selected users have a subscribed device yet, '
-                    . 'so there is nobody to notify. Ask them to open the app and allow notifications.'];
+                'error' => 'No subscribed device was found for that audience, so there is nobody '
+                    . 'to notify.' . $detail];
         }
         $payload['include_subscription_ids'] = $ids;
     } elseif (isset($target['role'])) {

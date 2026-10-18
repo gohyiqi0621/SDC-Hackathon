@@ -71,6 +71,16 @@ class NotificationController
             $errors['audience'] = 'Choose who should receive this.';
         }
 
+        // The click-through link is normalised HERE, before it is stored or sent:
+        // a blank field becomes this app's notification page (so OneSignal's
+        // dashboard default URL is never used), a path is resolved against
+        // APP_URL, and a localhost URL is rewritten to the live origin. Anything
+        // that is not http(s) is refused.
+        $link = $in['url'] === '' ? url('notification') : app_absolute_url($in['url']);
+        if ($link === null) {
+            $errors['url'] = 'Enter a full http(s) link, or a path inside this app.';
+        }
+
         // Recipients arrive as recipients[] - one id per chosen user.
         $chosen = [];
         if ($in['audience'] === 'users') {
@@ -108,6 +118,7 @@ class NotificationController
             redirect(url('notification'));
         }
 
+        $in['url']            = $link;
         $in['scheduled_at']   = $scheduledAt;
         $in['audience_value'] = $chosen === [] ? null : implode(',', $chosen);
         $in['audience_label'] = $this->labelFor($in['audience'], $chosen);

@@ -187,8 +187,12 @@ $subscriberCount = count($recipients);
 
             <div class="field">
                 <label for="notif-url">Link <span class="muted">(optional)</span></label>
-                <input id="notif-url" name="url" type="url" placeholder="https://…">
-                <p class="field__hint">Opened when the notification is clicked.</p>
+                <input id="notif-url" name="url" type="text" inputmode="url"
+                       placeholder="<?= e(url('notification')) ?>">
+                <p class="field__error" data-error-for="url"></p>
+                <p class="field__hint">Opened when the notification is clicked. Leave blank to open this
+                    page. A path like <code>/items</code> is resolved against this site; a localhost
+                    address is swapped for the live one.</p>
             </div>
 
             <fieldset class="field">
@@ -198,7 +202,7 @@ $subscriberCount = count($recipients);
                         <input type="radio" name="audience" value="all" checked data-notif-audience>
                         <span class="choice__text">
                             <span>Everyone</span>
-                            <small>Every device subscribed to this app</small>
+                            <small>Every subscribed user on this site</small>
                         </span>
                     </label>
                     <label class="choice<?= $subscriberCount === 0 ? ' is-disabled' : '' ?>">
@@ -263,4 +267,4 @@ $subscriberCount = count($recipients);
 </dialog>
 <?php endif; ?>
 
-<?php view('layouts/footer', ['scripts' => $isAdmin ? [asset('js/notification.js')] : []]); // api.js comes from app_footer ?>
+<?php view('layouts/footer', ['scripts' => $isAdmin ? [asset_versioned('js/notification.js')] : []]); // api.js comes from app_footer ?>

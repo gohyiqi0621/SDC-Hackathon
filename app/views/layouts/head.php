@@ -42,6 +42,7 @@ $workerUrl = asset('OneSignalSDKWorker.js');
 <meta name="onesignal-app-id" content="<?= e(ONESIGNAL_APP_ID) ?>"
       data-user-id="<?= e(onesignal_external_id((int) current_user()['id'])) ?>"
       data-user-role="<?= e((string) current_user()['role']) ?>"
+      data-user-env="<?= e(onesignal_env()) ?>"
       data-worker-path="<?= e($basePath) ?>"
       data-worker-file="OneSignalSDKWorker.js"
       data-worker-scope="<?= e($basePath) ?>/">
