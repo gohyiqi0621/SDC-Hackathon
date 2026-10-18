@@ -24,6 +24,7 @@ discrepancy to resolve.
 **Upstream README (§5) says the connection file reads Railway's variables with a
 `getenv()` fallback:**
 
+## real? 
 
 ```php
 $host = getenv('MYSQLHOST')     ?: '127.0.0.1';
