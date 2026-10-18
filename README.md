@@ -18,25 +18,68 @@
 ### Clone the project
 **In VS Code:**
 1. Press `Ctrl+Shift+P` (Mac: `Cmd+Shift+P`) and type **Git: Clone**.
-2. Paste the repository URL: `https://github.com/YOUR-USERNAME/REPO-NAME.git`
+2. Paste the repository URL: `https://github.com/gohyiqi0621/SDC-Hackathon.git`
 3. Choose your XAMPP `htdocs` folder (for example `C:\xampp\htdocs`) as the location.
 4. Click **Open** when VS Code asks.
 
 **Or in a terminal** (inside `htdocs`):
 ```
-git clone https://github.com/YOUR-USERNAME/REPO-NAME.git
+git clone https://github.com/gohyiqi0621/SDC-Hackathon.git
 ```
 
-### Set up the local database
+The folder is created as `htdocs/SDC-Hackathon`. The commands below use
+`cd SDC-Hackathon`; adjust if you cloned it under another name.
+
+### Run the setup script (this is the step people miss)
+
+**A fresh clone has no `.env` file.** That is deliberate: `.env` holds the database
+password and the encryption key, so it is listed in `.gitignore` and never reaches
+GitHub. Without it the app stops with:
+
+> Missing .env file or DB_HOST variable.
+
+Create it with one command, from the project root:
+
+```
+cd C:\xampp\htdocs\SDC-Hackathon
+php setup.php
+```
+
+It asks for your MySQL details (press Enter for the XAMPP defaults), writes
+`.env`, generates `APP_KEY`, and then tells you whether it can reach the database.
+Re-running it is safe — it never overwrites an existing `.env` unless you add
+`--force`.
+
+### Import the database
 1. Start **Apache** and **MySQL** in the XAMPP Control Panel.
-2. Open http://localhost/phpmyadmin and create a database named `YOUR_LOCAL_DB`.
-3. Import the SQL files from `database/` (see section 4).
+2. Import `database.sql` — it creates the `sdc_app` database and every table:
 
-### API key
-The AI API key is stored in the **database**, not in the code. The repository contains no keys.
-For local testing, add your own key to your local database (describe where, for example: table `settings`, column `ai_api_key`).
+```
+C:\xampp\mysql\bin\mysql.exe -u root < database.sql
+```
 
-Open the app at http://localhost/REPO-NAME
+   No MySQL on your PATH? Paste `database.sql` into phpMyAdmin → **SQL** instead.
+   `database.sql` is destructive: it drops and recreates the tables.
+
+### Open the app
+```
+http://localhost/SDC-Hackathon/public
+```
+
+Note the **`/public`** — the site is served from that folder, not the project root.
+Going to `http://localhost/SDC-Hackathon/` gives a directory listing or a 403.
+
+### API keys
+No keys are in the repository, and none go in `.env`. They live in the database:
+register the first account, promote it once with
+
+```
+UPDATE users SET role = 'admin' WHERE email = 'you@example.com';
+```
+
+then sign in and open **Key** to paste the Google, OneSignal, Agnes and Brevo
+credentials. AI Chat additionally needs the Python service (`cd ai-service` and
+`python app.py`); everything else works without it.
 
 ---
 
@@ -145,24 +188,24 @@ git merge --abort
 Each database is separate: your XAMPP database, each teammate's XAMPP database, and the Railway database do **not** sync automatically. Git only shares the SQL files, not the data.
 
 ### Folder and file format
-Each teammate has their own folder, and each file is named with the date and time it was created:
+`database.sql` at the repository root is the **single source of truth** — it creates the
+database and every table, so a fresh clone only needs that one file. Changes made *after*
+it go in `migrations/`, one folder per teammate:
 
 ```
-migrations/teammembername/migration_datetime.sql
+migrations/
+  jocelyn/
+    migration_20261015_143000.sql
+  gohyiqi/
+    migration_20261018_164500.sql
 ```
 
-Example:
-```
-database/
-  migrations/
-    jocelyn/
-      migration_20261015_143000.sql
-    yiqi/
-      migration_20261016_091500.sql
-  seed.sql        (dummy data only)
-```
+The date and time in the name (`YYYYMMDD_HHMMSS`) shows the order the files were made, and
+separate folders stop two people from creating the same file name. Record a file you have run:
 
-The date and time in the name (`YYYYMMDD_HHMMSS`) shows the order the files were made, and separate folders stop two people from creating the same file name.
+```sql
+INSERT INTO schema_migrations (filename) VALUES ('gohyiqi/migration_20261018_164500.sql');
+```
 
 ### When you change a table
 1. Write the change as a **new SQL file** in your own folder, for example `database/migrations/jocelyn/migration_20261015_143000.sql`.
@@ -186,17 +229,14 @@ The date and time in the name (`YYYYMMDD_HHMMSS`) shows the order the files were
 Railway hosts the live website and the central MySQL database.
 
 ### How the app connects to the database
-Your connection file (for example `config/db.php`) reads Railway's variables first and falls back to XAMPP values:
+`config.php` reads the connection settings from `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` and
+`DB_PASS`. Locally those come from your `.env`; on Railway they are supplied as environment
+variables pointing at the MySQL service (`DB_HOST=${{MySQL.MYSQLHOST}}`, and so on). Real
+environment variables are read first, so the same code works in both places and no password
+is ever committed.
 
-```php
-$host = getenv('MYSQLHOST')     ?: '127.0.0.1';
-$port = getenv('MYSQLPORT')     ?: '3306';
-$db   = getenv('MYSQLDATABASE') ?: 'YOUR_LOCAL_DB';
-$user = getenv('MYSQLUSER')     ?: 'root';
-$pass = getenv('MYSQLPASSWORD') !== false ? getenv('MYSQLPASSWORD') : '';
-```
-
-On Railway the variables exist, so it uses the Railway database. On XAMPP they don't, so it uses localhost. This keeps the database password out of GitHub.
+`.env` itself is git-ignored. That is why a fresh clone cannot boot until `php setup.php` has
+created one — see section 1.
 
 ### Deploy the website
 1. Railway project > your PHP service > **Settings** > connect the GitHub repository and choose the `main` branch.

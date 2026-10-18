@@ -29,8 +29,22 @@ foreach ((getenv() ?: []) as $k => $v) {
 }
 
 if (!is_file($envPath) && !isset($_ENV['DB_HOST'])) {
+    // A fresh clone lands here: .env is git-ignored on purpose (it holds the DB
+    // password and APP_KEY), so the file has to be created locally once.
     http_response_code(500);
-    exit('Missing .env file or DB_HOST variable. Copy .env.example to .env and fill in your database details.');
+    header('Content-Type: text/plain; charset=utf-8');
+    exit(
+        "Missing .env file or DB_HOST variable.\n"
+        . "\n"
+        . "This project keeps its database credentials and encryption key out of Git,\n"
+        . "so a fresh clone has no .env. Create one from the project root:\n"
+        . "\n"
+        . "    php setup.php\n"
+        . "\n"
+        . "It writes .env, generates APP_KEY and checks the database connection.\n"
+        . "Prefer to do it by hand? Copy .env.example to .env and fill in DB_HOST,\n"
+        . "DB_NAME, DB_USER and DB_PASS (plus a generated APP_KEY).\n"
+    );
 }
 
 $__envLines = is_file($envPath)
