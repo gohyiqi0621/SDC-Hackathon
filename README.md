@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Project Name
 
 > A one-sentence description of what your project does and who it is for.
@@ -7,20 +6,20 @@
 
 ## Team Information
 
-| Field                  | Details                                     |
-| ---------------------- | ------------------------------------------- |
-| **Team Name**          | Your Team Name                              |
-| **Team Domain**        | Domain 1 / Domain 2 *(choose one)*          |
-| **SDG Track (1–17)**   | e.g. SDG 11 — Sustainable Cities and Communities |
-| **Team Leader**        | Leader Name                                 |
-| **University**         | University Name(s)                          |
-| **Number of Members**  | e.g. 4                                      |
+| Field                 | Details                                          |
+| --------------------- | ------------------------------------------------ |
+| **Team Name**         | CTRL + Future                                    |
+| **Team Domain**       | Domain 2                                         |
+| **SDG Track (1–17)**  | e.g. SDG 11 — Sustainable Cities and Communities |
+| **Team Leader**       | Teh Sze Yu Jocelyn                               |
+| **University**        | Universiti Technologi Malaysia                   |
+| **Number of Members** | 5                                                |
 
 ## Links
 
 | Resource          | Link                                           |
 | ----------------- | ---------------------------------------------- |
-| GitHub Repository | https://github.com/your-username/your-project  |
+| GitHub Repository | https://github.com/gohyiqi0621/SDC-Hackathon   |
 | Replit Project    | https://replit.com/@your-username/your-project |
 | Live Demo         | https://your-project.replit.app                |
 | RunPod Endpoint   | https://api.runpod.ai/v2/your-endpoint-id      |
@@ -47,13 +46,13 @@ Explain how your project uses AI to solve the problem and what makes it valuable
 
 ### Tech Stack
 
-| Layer         | Technology                   |
-| ------------- | ---------------------------- |
-| Frontend      | e.g. HTML, React             |
-| Backend       | e.g. Python, Flask / FastAPI |
-| Database      | e.g. PostgreSQL, SQLite      |
-| AI / Compute  | RunPod (GPU)                 |
-| Hosting / Dev | Replit                       |
+| Layer         | Technology    |
+| ------------- | ------------- |
+| Frontend      | HTML, CSS, JS |
+| Backend       | Python, PHP   |
+| Database      | MySQL         |
+| AI / Compute  | RunPod (GPU)  |
+| Hosting / Dev | Replit        |
 
 ---
 
@@ -130,7 +129,7 @@ python -m unittest discover tests
 
 ---
 
-## How We Use Replit *(Required)*
+## How We Use Replit _(Required)_
 
 Describe how your team used Replit. For example:
 
@@ -140,7 +139,7 @@ Describe how your team used Replit. For example:
 
 📄 Proof of use: [`submission/REPLIT PROOF OF USE.pdf`](submission/REPLIT%20PROOF%20OF%20USE.pdf)
 
-## How We Use RunPod *(Required)*
+## How We Use RunPod _(Required)_
 
 Describe how your team used RunPod. For example:
 
@@ -195,6 +194,3 @@ curl -X POST https://api.runpod.ai/v2/$RUNPOD_ENDPOINT_ID/runsync \
 ## License
 
 This project is licensed under the [Apache License 2.0](LICENSE).
-=======
-# SDC-Hackathon
->>>>>>> 9cc1fe0aa6fbd1b603dd532856718fd64da7449c
