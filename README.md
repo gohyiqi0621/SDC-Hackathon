@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Project Name
 
 > A one-sentence description of what your project does and who it is for.
@@ -194,3 +195,6 @@ curl -X POST https://api.runpod.ai/v2/$RUNPOD_ENDPOINT_ID/runsync \
 ## License
 
 This project is licensed under the [Apache License 2.0](LICENSE).
+=======
+# SDC-Hackathon
+>>>>>>> 9cc1fe0aa6fbd1b603dd532856718fd64da7449c
