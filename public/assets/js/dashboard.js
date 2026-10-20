@@ -16,8 +16,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!root) return;
 
     // Messages use the app's toast (app.js); fall back to notify().
-    const notify = (message, type) =>
-        window.App ? window.App.toast(message, type || "info") : notify(message);
+    
+    const notify = (message, type) => {
+        if (window.App && typeof window.App.toast === "function") {
+            window.App.toast(message, type || "info");
+        } else {
+            console.log(`[${type || "info"}] ${message}`);
+        }
+    };
 
     // 1. DEMO EMAILS (shown until Gmail is connected)
     const DEMO_EMAILS = [
@@ -391,59 +397,243 @@ let emails = [];
     }
 
     // 5. SHOW SELECTED EMAIL
-    function showEmail(id) {
-        const email = emails.find(e => e.id === id);
-        if (!email) return;
+    
+// 5. SHOW SELECTED EMAIL + GMAIL BODY + SUMMARY API
 
-        selectedEmailId = id;
-        email.unread = false;
+const gmailMessageUrl = root.dataset.gmailMessage || "";
+const aiSummarizeUrl = root.dataset.aiSummarize || "";
 
-        document.getElementById("emailSubject").textContent =
-            email.subject;
+const csrfToken = document.querySelector(
+    'meta[name="csrf-token"]'
+)?.content || "";
 
+let selectionVersion = 0;
+
+// Display the summary in the existing dashboard card.
+function renderSummary(email) {
+    const points = Array.isArray(email.summary)
+        ? email.summary
+        : [];
+
+    document.getElementById("aiSummary").innerHTML = `
+        <strong>Key Points</strong>
+        <ul>
+            ${points.map(point =>
+                `<li>${escapeHTML(point)}</li>`
+            ).join("")}
+        </ul>
+        ${email.summaryMode === "placeholder"
+            ? '<small>Rule-based preview — AI provider not connected yet.</small>'
+            : ""}
+    `;
+}
+
+// Reusable JSON API request.
+async function requestJSON(url, options = {}) {
+    const response = await fetch(url, {
+        credentials: "same-origin",
+        ...options,
+        headers: {
+            "Accept": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            ...(options.headers || {})
+        }
+    });
+
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok || !result || !result.success) {
+        throw new Error(
+            result?.message ||
+            `Request failed (HTTP ${response.status}).`
+        );
+    }
+
+    return result.data || {};
+}
+
+// Load the real Gmail body and generate a temporary summary.
+async function loadGmailDetails(email, version) {
+    const summaryBox = document.getElementById("aiSummary");
+
+    try {
+        // Step 1: Fetch full email body from Gmail.
+        if (!email.fullBodyLoaded) {
+            const url = new URL(
+                gmailMessageUrl,
+                window.location.href
+            );
+
+            url.searchParams.set("id", email.id);
+
+            const data = await requestJSON(url.toString());
+
+            email.body = typeof data.body === "string"
+                ? data.body
+                : email.preview;
+
+            email.fullBodyLoaded = true;
+        }
+
+        // Avoid displaying results for a previously selected email.
+        if (
+            version !== selectionVersion ||
+            selectedEmailId !== email.id
+        ) {
+            return;
+        }
+
+        emailBody.textContent = email.body;
+
+        // Reuse an already generated summary.
+        if (email.summaryLoaded) {
+            renderSummary(email);
+            renderWorkflow();
+            return;
+        }
+
+        if (!aiSummarizeUrl) {
+            throw new Error(
+                "Summary endpoint is not configured."
+            );
+        }
+
+        // Step 2: Request summary from PHP backend.
+        summaryBox.textContent = "Preparing summary…";
+
+        const data = await requestJSON(aiSummarizeUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-Token": csrfToken
+            },
+            body: JSON.stringify({
+                subject: email.subject,
+                body: email.body
+            })
+        });
+
+        if (
+            version !== selectionVersion ||
+            selectedEmailId !== email.id
+        ) {
+            return;
+        }
+
+        // Step 3: Save the analysis result.
+        email.summary = Array.isArray(data.summary)
+            ? data.summary
+            : [];
+
+        email.category = typeof data.category === "string"
+            ? data.category
+            : email.category;
+
+        email.suggestedAction =
+            typeof data.suggestedAction === "string"
+                ? data.suggestedAction
+                : "";
+
+        email.needsReply = Boolean(data.needsReply);
+        email.meeting = email.category === "Meeting";
+        email.summaryMode = data.mode || "placeholder";
+        email.summaryLoaded = true;
+
+        // Step 4: Refresh dashboard components.
         document.getElementById("emailCategory").textContent =
             email.category;
 
-        document.getElementById("senderAvatar").textContent =
-            initials(email.sender);
-
-        document.getElementById("senderName").textContent =
-            email.sender;
-
-        document.getElementById("senderEmail").textContent =
-            `<${email.senderEmail}>`;
-
-        document.getElementById("emailTime").textContent =
-            email.time;
-
-        emailBody.textContent = email.body;
-        emailBody.style.whiteSpace = "pre-line";
-
-        document.getElementById("aiSummary").innerHTML = `
-            <strong>Key Points</strong>
-            <ul>
-                ${email.summary.map(point =>
-                    `<li>${escapeHTML(point)}</li>`
-                ).join("")}
-            </ul>
-        `;
-
-        const starIcon =
-            document.querySelector("#starEmailBtn i");
-
-        starIcon.className = email.starred
-            ? "fa-solid fa-star"
-            : "fa-regular fa-star";
-
-        starIcon.style.color = email.starred
-            ? "#f4b42e"
-            : "";
-
-        generateReply();
+        renderSummary(email);
         updateStats();
         renderEmails();
         renderWorkflow();
+        renderNotifications();
+
+    } catch (error) {
+        if (
+            version !== selectionVersion ||
+            selectedEmailId !== email.id
+        ) {
+            return;
+        }
+
+        console.error(
+            "Email details / summary failed:",
+            error
+        );
+
+        summaryBox.textContent =
+            `Unable to generate summary: ${error.message}`;
+
+        notify(error.message, "error");
     }
+}
+
+// Display the selected email.
+function showEmail(id) {
+    const email = emails.find(e => e.id === id);
+    if (!email) return;
+
+    const version = ++selectionVersion;
+
+    selectedEmailId = id;
+    email.unread = false;
+
+    document.getElementById("emailSubject").textContent =
+        email.subject;
+
+    document.getElementById("emailCategory").textContent =
+        email.category;
+
+    document.getElementById("senderAvatar").textContent =
+        initials(email.sender);
+
+    document.getElementById("senderName").textContent =
+        email.sender;
+
+    document.getElementById("senderEmail").textContent =
+        `<${email.senderEmail}>`;
+
+    document.getElementById("emailTime").textContent =
+        email.time;
+
+    emailBody.style.whiteSpace = "pre-line";
+    emailBody.textContent = email.body;
+
+    const isRealGmail =
+        Boolean(gmailMessageUrl) &&
+        !email.id.startsWith("demo-");
+
+    if (isRealGmail && !email.summaryLoaded) {
+        document.getElementById("aiSummary").textContent =
+            "Loading email and preparing summary…";
+    } else {
+        renderSummary(email);
+    }
+
+    const starIcon = document.querySelector(
+        "#starEmailBtn i"
+    );
+
+    starIcon.className = email.starred
+        ? "fa-solid fa-star"
+        : "fa-regular fa-star";
+
+    starIcon.style.color = email.starred
+        ? "#f4b42e"
+        : "";
+
+    generateReply();
+    updateStats();
+    renderEmails();
+    renderWorkflow();
+
+    if (isRealGmail && !email.summaryLoaded) {
+        loadGmailDetails(email, version);
+    }
+}
+
+
 
     // 6. SIMULATED AI REPLY
     function generateReply() {
@@ -747,6 +937,23 @@ Smart SME Team`
         const suggestedAction =
             document.getElementById("suggestedAction");
 
+        
+        if (email.suggestedAction) {
+            suggestedAction.textContent = email.suggestedAction;
+        } else if (email.category === "Finance") {
+            suggestedAction.textContent =
+                "Verify invoice payment status and create a follow-up task for the Finance Team.";
+        } else if (email.meeting) {
+            suggestedAction.textContent =
+                "Review the meeting request and create a follow-up task.";
+        } else if (email.needsReply) {
+            suggestedAction.textContent =
+                "Review the email and create a follow-up task.";
+        } else {
+            suggestedAction.textContent =
+                "No immediate action required.";
+        }
+
         if (email.category === "Finance") {
             suggestedAction.textContent =
                 "Verify invoice payment status and create a follow-up task for the Finance Team.";
@@ -869,7 +1076,8 @@ Smart SME Team`
     }
 
     function showList(list) {
-        emails = list;
+    ++selectionVersion;
+    emails = list;
         activeFilter = "all";
         document.querySelectorAll(".tab").forEach(tab =>
             tab.classList.toggle("active", tab.dataset.filter === "all"));
@@ -938,4 +1146,264 @@ Smart SME Team`
         showList(DEMO_EMAILS.map(email => ({ ...email })));
     }
 
+    const userId = root.dataset.userId || "guest";
+    const storageKey = "smartSME_dashboard_layout_v1_" + userId;
+
+    const cards = [
+        {
+            id: "planner",
+            title: "Team Workspace Planner",
+            selector: "#workspacePlanner",
+            fullWidth: true
+        },
+        {
+            id: "statistics",
+            title: "Email Statistics",
+            selector: "#dashboardRoot > .stats-grid",
+            fullWidth: true
+        },
+        {
+            id: "inbox",
+            title: "Inbox",
+            selector: "#dashboardRoot .inbox-panel",
+            fullWidth: false
+        },
+        {
+            id: "email-details",
+            title: "Email Details & AI Assistant",
+            selector: "#dashboardRoot .email-detail-panel",
+            fullWidth: false
+        }
+    ];
+
+    const toolbar = document.createElement("div");
+    toolbar.className = "custom-dashboard-toolbar";
+    toolbar.innerHTML = `
+        <div>
+            <h2>Customize Your Dashboard</h2>
+            <p>Drag the handle to rearrange your dashboard cards.</p>
+        </div>
+        <button type="button" id="resetDashboardLayout">
+            <i class="fa-solid fa-rotate-left"></i>
+            Reset Layout
+        </button>
+    `;
+
+    const grid = document.createElement("div");
+    grid.className = "custom-dashboard-grid";
+    grid.id = "customDashboardGrid";
+
+    // Insert the new layout before the existing planner.
+    const planner = document.getElementById("workspacePlanner");
+    if (!planner) return;
+
+    planner.before(toolbar, grid);
+
+    // Move the EXISTING elements, not copies.
+    // This preserves their IDs, state and event listeners.
+    cards.forEach(config => {
+        const original = root.querySelector(config.selector);
+        if (!original) return;
+
+        const wrapper = document.createElement("section");
+        wrapper.className = "dashboard-draggable-card";
+
+        if (config.fullWidth) {
+            wrapper.classList.add("full-width");
+        }
+
+        wrapper.dataset.cardId = config.id;
+
+        const header = document.createElement("div");
+        header.className = "dashboard-drag-header";
+
+        const title = document.createElement("span");
+        title.className = "dashboard-drag-title";
+        title.textContent = config.title;
+
+        const handle = document.createElement("button");
+        handle.type = "button";
+        handle.className = "dashboard-drag-handle";
+        handle.draggable = true;
+        handle.style.cursor = "grab";
+        handle.innerHTML = `
+            <i class="fa-solid fa-grip-vertical"></i>
+            Drag to move
+        `;
+        handle.setAttribute(
+            "aria-label",
+            "Drag to move " + config.title
+        );
+
+        header.append(title, handle);
+        
+
+wrapper.append(header, original);
+grid.appendChild(wrapper);
+
+    });
+
+    function getCardElements() {
+        return Array.from(
+            grid.querySelectorAll(
+                ":scope > .dashboard-draggable-card"
+            )
+        );
+    }
+
+    function saveLayout() {
+        const order = getCardElements().map(
+            card => card.dataset.cardId
+        );
+
+        try {
+            localStorage.setItem(
+                storageKey,
+                JSON.stringify(order)
+            );
+        } catch (error) {
+            console.warn("Could not save dashboard layout:", error);
+        }
+    }
+
+    function restoreLayout() {
+        let savedOrder;
+
+        try {
+            savedOrder = JSON.parse(
+                localStorage.getItem(storageKey) || "null"
+            );
+        } catch {
+            savedOrder = null;
+        }
+
+        if (!Array.isArray(savedOrder)) return;
+
+        savedOrder.forEach(id => {
+            const card = getCardElements().find(
+                item => item.dataset.cardId === id
+            );
+
+            if (card) {
+                grid.appendChild(card);
+            }
+        });
+    }
+
+
+    // ==========================================
+    // DASHBOARD DRAG & DROP - FULL SIZE
+    // ==========================================
+
+    let draggedCard = null;
+
+    grid.addEventListener("dragstart", event => {
+        const handle = event.target.closest(
+            ".dashboard-drag-handle"
+        );
+
+        if (!handle) {
+            event.preventDefault();
+            return;
+        }
+
+        const card = handle.closest(
+            ".dashboard-draggable-card"
+        );
+
+        if (!card) return;
+
+        draggedCard = card;
+
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData(
+            "text/plain",
+            card.dataset.cardId
+        );
+
+        card.classList.add("is-dragging");
+    });
+
+    grid.addEventListener("dragover", event => {
+        if (!draggedCard) return;
+
+        event.preventDefault();
+
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = "move";
+        }
+
+        const target = event.target.closest(
+            ".dashboard-draggable-card"
+        );
+
+        getCardElements().forEach(card => {
+            card.classList.toggle(
+                "drag-over",
+                card === target && card !== draggedCard
+            );
+        });
+    });
+
+    grid.addEventListener("drop", event => {
+        if (!draggedCard) return;
+
+        event.preventDefault();
+
+        const target = event.target.closest(
+            ".dashboard-draggable-card"
+        );
+
+        if (target && target !== draggedCard) {
+            const elements = getCardElements();
+
+            const fromIndex = elements.indexOf(draggedCard);
+            const toIndex = elements.indexOf(target);
+
+            if (fromIndex < toIndex) {
+                target.after(draggedCard);
+            } else {
+                target.before(draggedCard);
+            }
+
+            saveLayout();
+        }
+
+        cleanupDrag();
+    });
+
+    function cleanupDrag() {
+        getCardElements().forEach(card => {
+            card.classList.remove(
+                "is-dragging",
+                "drag-over"
+            );
+        });
+
+        draggedCard = null;
+    }
+
+    grid.addEventListener("dragend", cleanupDrag);
+
+
+    document.getElementById(
+        "resetDashboardLayout"
+    ).addEventListener("click", () => {
+        try {
+            localStorage.removeItem(storageKey);
+        } catch (error) {
+            console.warn(error);
+        }
+
+        cards.forEach(config => {
+            const card = getCardElements().find(
+                item => item.dataset.cardId === config.id
+            );
+
+            if (card) grid.appendChild(card);
+        });
+    });
+
+    restoreLayout();
 });
+

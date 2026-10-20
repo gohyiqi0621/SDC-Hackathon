@@ -18,7 +18,7 @@ use Src\Models\User;
 
 final class AuthService
 {
-    private const MAX_ATTEMPTS   = 5;
+    private const MAX_ATTEMPTS   = 60;
     private const WINDOW_SECONDS = 900;
 
     /** bcrypt hash of "password"; only used to equalize failed-login timing. */

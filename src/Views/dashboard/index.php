@@ -48,9 +48,12 @@ view('layouts/header', [
 
 </section>
 
+
 <div class="page-body" id="dashboardRoot"
      data-user-id="<?= (int) $user['id'] ?>"
-     data-gmail-inbox="<?= $gmailEmail ? e(url('gmail', ['action' => 'inbox'])) : '' ?>">
+     data-gmail-inbox="<?= $gmailEmail ? e(url('gmail', ['action' => 'inbox'])) : '' ?>"
+     data-gmail-message="<?= $gmailEmail ? e(url('gmail', ['action' => 'message'])) : '' ?>"
+     data-ai-summarize="<?= e(url('ai', ['action' => 'summarize'])) ?>">
 
     <!-- ========== GMAIL CONNECTION ========== -->
     <section class="brevo-strip gmail-strip" aria-label="Gmail connection">
@@ -98,24 +101,110 @@ view('layouts/header', [
         </div>
     </section>
 
-    <!-- ========== PASSWORD RESET EMAIL (BREVO) ========== -->
-    <section class="brevo-strip" aria-label="Password reset email delivery">
-        <div class="brevo-strip__info">
-            <strong>
-                <i class="fa-solid fa-paper-plane"></i>
-                Password reset email
-            </strong>
-            <span>
-                <?php if ($brevoReady): ?>
-                    Brevo is connected. Reset links are sent from
-                    <?= e(BREVO_SENDER_EMAIL) ?>.
-                <?php else: ?>
-                    Brevo is not configured yet. Add <code>BREVO_API_KEY</code> and
-                    <code>BREVO_SENDER_EMAIL</code> to the app's <code>.env</code> to
-                    enable password-reset email.
-                <?php endif; ?>
-            </span>
+    <!-- ========== TEAM WORKSPACE PLANNER ========== -->
+    <section class="workspace-planner" id="workspacePlanner" aria-label="Team tasks and calendar">
+        <div class="wp-heading">
+            <div><h2><i class="fa-solid fa-briefcase"></i> Team Workspace Planner</h2><p>Assign tasks, track deadlines and organize your team's schedule.</p></div>
+            <span class="wp-label">Workspace</span>
         </div>
+        <div class="wp-summary">
+            <div><span>Total tasks</span><strong id="wpTotal">0</strong></div>
+            <div><span>Pending</span><strong id="wpPending">0</strong></div>
+            <div><span>Completed</span><strong id="wpCompleted">0</strong></div>
+        </div>
+        <div class="wp-columns">
+            <section class="wp-card" aria-label="Team to-do list">
+                <div class="wp-card-heading"><h3><i class="fa-solid fa-list-check"></i> Team To-Do List</h3><button class="wp-primary" type="button" id="wpAddTask"><i class="fa-solid fa-plus"></i> Add Task</button></div>
+                <div class="wp-filters"><button type="button" class="wp-filter is-active" data-wp-filter="all">All</button><button type="button" class="wp-filter" data-wp-filter="pending">Pending</button><button type="button" class="wp-filter" data-wp-filter="done">Completed</button></div>
+                <div id="wpTaskList" class="wp-task-list" aria-live="polite"></div>
+            </section>
+            <section class="wp-card" aria-label="Team calendar">
+                <div class="wp-card-heading"><h3><i class="fa-regular fa-calendar-days"></i> Team Calendar</h3><button class="wp-primary" type="button" id="wpAddEvent"><i class="fa-solid fa-plus"></i> Event</button></div>
+                <div class="wp-monthbar"><button type="button" id="wpPrevMonth" aria-label="Previous month"><i class="fa-solid fa-chevron-left"></i></button><strong id="wpMonthTitle"></strong><button type="button" id="wpNextMonth" aria-label="Next month"><i class="fa-solid fa-chevron-right"></i></button></div>
+                <div class="wp-calendar" id="wpCalendar" aria-label="Calendar days"></div>
+                <div class="wp-agenda"><h4 id="wpAgendaTitle">Selected date</h4><div id="wpAgendaItems"></div></div>
+            </section>
+        </div>
+        <p class="wp-disclaimer"><i class="fa-solid fa-circle-info"></i> Tasks and events are saved in this browser for now. Shared worker accounts and automatic notifications require a database API.</p>
+    </section>
+    <div class="wp-modal-backdrop" id="wpModal" hidden>
+        <div class="wp-modal" role="dialog" aria-modal="true" aria-labelledby="wpModalTitle">
+            <div class="wp-modal-heading"><h3 id="wpModalTitle">New task</h3><button type="button" id="wpCloseModal" aria-label="Close">&times;</button></div>
+            <form id="wpForm">
+                <label for="wpTitle">Title</label><input id="wpTitle" name="title" maxlength="150" required placeholder="e.g. Follow up invoice" />
+                <div id="wpTaskFields">
+                    <label for="wpAssignee">Assign to (worker name)</label><input id="wpAssignee" name="assignee" maxlength="100" placeholder="e.g. Sarah" />
+                    <label for="wpPriority">Priority</label><select id="wpPriority" name="priority"><option>Medium</option><option>High</option><option>Low</option></select>
+                </div>
+                <label for="wpDate">Date / deadline</label><input id="wpDate" name="date" type="date" required />
+                <div class="wp-modal-actions"><button type="button" id="wpCancel" class="wp-cancel">Cancel</button><button type="submit" class="wp-primary">Save</button></div>
+            </form>
+        </div>
+    </div>
+    <style>
+      .workspace-planner{margin:22px 0;padding:22px;border:1px solid #e9e5fb;border-radius:17px;background:#faf9ff;color:#24254d}
+      .wp-heading,.wp-card-heading,.wp-monthbar,.wp-modal-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+      .wp-heading h2{font-size:19px;margin:0 0 6px;font-weight:750}.wp-heading h2 i,.wp-card-heading h3 i{color:#6c58ef;margin-right:7px}.wp-heading p{font-size:12px;color:#8185a0;margin:0}.wp-label{background:#ebe7ff;color:#6853dc;padding:6px 11px;border-radius:30px;font-size:11px;font-weight:700}
+      .wp-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:17px 0}.wp-summary>div,.wp-card{background:#fff;border:1px solid #eae8f5;border-radius:13px;padding:17px}.wp-summary span{font-size:12px;color:#8589a0;display:block}.wp-summary strong{font-size:25px;display:block;margin-top:4px;color:#25264c}
+      .wp-columns{display:grid;grid-template-columns:1fr 1fr;gap:14px}.wp-card-heading h3{margin:0;font-size:15px}.wp-primary{border:0;border-radius:9px;background:#6d59ef;color:#fff;padding:9px 12px;font-size:12px;font-weight:700;cursor:pointer}.wp-primary:hover{background:#5c49d5}
+      .wp-filters{display:flex;gap:5px;margin:16px 0 9px}.wp-filter{background:transparent;border:0;padding:7px 11px;border-radius:8px;font-size:12px;color:#8589a0;cursor:pointer}.wp-filter.is-active{background:#eeebff;color:#6b55e8;font-weight:700}
+      .wp-task-list{max-height:350px;overflow-y:auto}.wp-task{display:flex;align-items:flex-start;gap:10px;padding:13px 2px;border-bottom:1px solid #f0eef8}.wp-task input{margin-top:4px;accent-color:#6d59ef}.wp-task-content{flex:1;min-width:0}.wp-task-title{font-size:13px;font-weight:700;overflow-wrap:anywhere}.wp-task.is-done .wp-task-title{text-decoration:line-through;color:#9698a9}.wp-task-meta{font-size:11px;color:#8b8ea5;margin-top:5px;display:flex;flex-wrap:wrap;gap:7px}.wp-priority{border-radius:20px;padding:2px 7px;background:#f0edff;color:#6955dc}.wp-priority.high{background:#ffe9e9;color:#c54949}.wp-priority.low{background:#e6f7ed;color:#25845c}.wp-delete{border:0;background:transparent;color:#9a9ab0;cursor:pointer}.wp-empty{padding:22px 4px;color:#9295ab;font-size:12px;text-align:center}
+      .wp-monthbar{margin:18px 0 12px}.wp-monthbar strong{font-size:14px}.wp-monthbar button{background:#f5f2ff;border:0;border-radius:7px;padding:7px 10px;cursor:pointer;color:#6d59ef}.wp-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.wp-weekday{text-align:center;font-size:11px;color:#9a9cb0;padding:6px 0}.wp-day{border:0;background:#f9f8ff;min-height:36px;border-radius:7px;cursor:pointer;color:#414366;font-size:12px;position:relative}.wp-day:hover{background:#efebff}.wp-day.selected{background:#6d59ef;color:#fff}.wp-day.has-item:after{content:'';width:5px;height:5px;border-radius:50%;background:#f0a843;position:absolute;bottom:4px;left:calc(50% - 2.5px)}.wp-day.selected:after{background:#fff}.wp-calendar .wp-blank{min-height:36px}.wp-agenda{border-top:1px solid #eeeaf9;margin-top:16px;padding-top:12px}.wp-agenda h4{font-size:12px;margin:0 0 10px}.wp-agenda-item{padding:8px 10px;margin:6px 0;background:#f8f6ff;border-radius:8px;font-size:12px}.wp-agenda-item span{color:#878ba6;font-size:11px}.wp-disclaimer{font-size:11px;color:#9395ac;margin:13px 0 0}
+      .wp-modal-backdrop[hidden]{display:none!important}.wp-modal-backdrop{position:fixed;inset:0;background:#1d1d3a99;z-index:10000;display:flex;justify-content:center;align-items:center;padding:15px}.wp-modal{background:white;border-radius:15px;padding:22px;width:min(420px,100%);box-shadow:0 12px 40px #15153530}.wp-modal-heading h3{font-size:18px;margin:0}.wp-modal-heading button{background:none;border:0;font-size:24px;cursor:pointer}.wp-modal label{display:block;font-size:12px;color:#656981;font-weight:650;margin:13px 0 5px}.wp-modal input,.wp-modal select{display:block;width:100%;border:1px solid #e2e0ee;border-radius:8px;padding:10px;font-size:13px;color:#28294b;background:#fff}.wp-modal-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:19px}.wp-cancel{border:1px solid #e6e3f4;background:#fff;padding:9px 12px;border-radius:9px;cursor:pointer}
+      @media(max-width:850px){.wp-columns{grid-template-columns:1fr}}@media(max-width:550px){.workspace-planner{padding:13px}.wp-summary>div,.wp-card{padding:11px}.wp-heading h2{font-size:16px}.wp-summary strong{font-size:21px}}
+    </style>
+    <script>
+    (function () {
+      'use strict';
+      document.addEventListener('DOMContentLoaded', function () {
+        const root = document.getElementById('workspacePlanner');
+        if (!root) return;
+        const el = id => document.getElementById(id);
+        const userId = document.getElementById('dashboardRoot')?.dataset.userId || 'guest';
+        const storageKey = 'smart_sme_planner_' + userId;
+        const today = new Date();
+        const localISO = date => [date.getFullYear(), String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
+        const escapeHTML = text => String(text).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        let data;
+        try { const parsed = JSON.parse(localStorage.getItem(storageKey) || '{}'); data = {tasks:Array.isArray(parsed.tasks)?parsed.tasks:[],events:Array.isArray(parsed.events)?parsed.events:[]}; } catch (_) { data={tasks:[],events:[]}; }
+        let filter='all', month=new Date(today.getFullYear(),today.getMonth(),1), selected=localISO(today), modalType='task';
+        const save=()=>{try{localStorage.setItem(storageKey,JSON.stringify(data));}catch(e){console.warn('Planner local storage unavailable',e);}};
+        function renderTasks(){
+          el('wpTotal').textContent=data.tasks.length;el('wpPending').textContent=data.tasks.filter(t=>!t.done).length;el('wpCompleted').textContent=data.tasks.filter(t=>t.done).length;
+          const shown=data.tasks.filter(t=>filter==='all'||(filter==='done'?t.done:!t.done));
+          el('wpTaskList').innerHTML=shown.length?shown.map(t=>'<div class="wp-task '+(t.done?'is-done':'')+'"><input type="checkbox" data-task-toggle="'+escapeHTML(t.id)+'" aria-label="Mark task complete" '+(t.done?'checked':'')+'><div class="wp-task-content"><div class="wp-task-title">'+escapeHTML(t.title)+'</div><div class="wp-task-meta"><span><i class="fa-regular fa-user"></i> '+escapeHTML(t.assignee||'Unassigned')+'</span><span><i class="fa-regular fa-calendar"></i> '+escapeHTML(t.date)+'</span><span class="wp-priority '+escapeHTML(t.priority.toLowerCase())+'">'+escapeHTML(t.priority)+'</span></div></div><button class="wp-delete" type="button" data-task-delete="'+escapeHTML(t.id)+'" aria-label="Delete task"><i class="fa-solid fa-trash"></i></button></div>').join(''):'<div class="wp-empty">No tasks here yet. Click Add Task to get started.</div>';
+          el('wpTaskList').querySelectorAll('[data-task-toggle]').forEach(box=>box.addEventListener('change',()=>{const t=data.tasks.find(t=>t.id===box.dataset.taskToggle);if(t){t.done=box.checked;save();render();}}));
+          el('wpTaskList').querySelectorAll('[data-task-delete]').forEach(btn=>btn.addEventListener('click',()=>{data.tasks=data.tasks.filter(t=>t.id!==btn.dataset.taskDelete);save();render();}));
+        }
+        function renderCalendar(){
+          el('wpMonthTitle').textContent=month.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+          const year=month.getFullYear(),mon=month.getMonth(),offset=(new Date(year,mon,1).getDay()+6)%7,days=new Date(year,mon+1,0).getDate();
+          let html=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>'<div class="wp-weekday">'+d+'</div>').join('');
+          for(let i=0;i<offset;i++)html+='<div class="wp-blank"></div>';
+          for(let day=1;day<=days;day++){const date=year+'-'+String(mon+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');const has=data.events.some(e=>e.date===date)||data.tasks.some(t=>t.date===date&&!t.done);html+='<button type="button" class="wp-day '+(date===selected?'selected ':'')+(has?'has-item':'')+'" data-date="'+date+'" aria-label="'+date+'">'+day+'</button>';}
+          el('wpCalendar').innerHTML=html;
+          el('wpCalendar').querySelectorAll('[data-date]').forEach(b=>b.addEventListener('click',()=>{selected=b.dataset.date;renderCalendar();}));
+          el('wpAgendaTitle').textContent=new Date(selected+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+          const items=[...data.tasks.filter(t=>t.date===selected).map(t=>({title:t.title,kind:t.done?'Completed task':'Task',assignee:t.assignee})),...data.events.filter(e=>e.date===selected).map(e=>({title:e.title,kind:'Event',assignee:''}))];
+          el('wpAgendaItems').innerHTML=items.length?items.map(i=>'<div class="wp-agenda-item"><strong>'+escapeHTML(i.title)+'</strong><br><span>'+escapeHTML(i.kind)+(i.assignee?' · '+escapeHTML(i.assignee):'')+'</span></div>').join(''):'<div class="wp-empty">Nothing scheduled for this date.</div>';
+        }
+        function render(){renderTasks();renderCalendar();}
+        function openModal(type,prefill='') {modalType=type;el('wpModalTitle').textContent=type==='task'?'Create Team Task':'Add Calendar Event';el('wpTaskFields').hidden=type==='event';el('wpTitle').value=prefill;el('wpAssignee').value='';el('wpPriority').value='Medium';el('wpDate').value=selected;el('wpModal').hidden=false;el('wpTitle').focus();}
+        function closeModal(){el('wpModal').hidden=true;}
+        el('wpAddTask').addEventListener('click',()=>openModal('task'));
+        el('wpAddEvent').addEventListener('click',()=>openModal('event'));
+        el('wpCloseModal').addEventListener('click',closeModal);el('wpCancel').addEventListener('click',closeModal);
+        el('wpModal').addEventListener('click',e=>{if(e.target===el('wpModal'))closeModal();});
+        document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!el('wpModal').hidden)closeModal();});
+        el('wpForm').addEventListener('submit',e=>{e.preventDefault();const title=el('wpTitle').value.trim(),date=el('wpDate').value;if(!title||!date)return;const id='wp-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);if(modalType==='task')data.tasks.push({id,title,date,assignee:el('wpAssignee').value.trim(),priority:el('wpPriority').value,done:false});else data.events.push({id,title,date});selected=date;const parts=date.split('-');month=new Date(Number(parts[0]),Number(parts[1])-1,1);save();closeModal();render();});
+        root.querySelectorAll('[data-wp-filter]').forEach(b=>b.addEventListener('click',()=>{filter=b.dataset.wpFilter;root.querySelectorAll('[data-wp-filter]').forEach(x=>x.classList.toggle('is-active',x===b));renderTasks();}));
+        el('wpPrevMonth').addEventListener('click',()=>{month=new Date(month.getFullYear(),month.getMonth()-1,1);renderCalendar();});
+        el('wpNextMonth').addEventListener('click',()=>{month=new Date(month.getFullYear(),month.getMonth()+1,1);renderCalendar();});
+        const fromEmail=el('wpCreateFromEmail');if(fromEmail)fromEmail.addEventListener('click',()=>{const suggested=el('suggestedAction')?.textContent?.trim()||'';const subject=el('emailSubject')?.textContent?.trim()||'';openModal('task',suggested&&suggested!=='Select an email to view the suggested action.'?suggested.slice(0,150):('Follow up: '+subject).slice(0,150));});
+        render();
+      });
+    })();
+    </script>
 
         <?php if ($brevoReady): ?>
             <form method="post" action="<?= e(url('dashboard', ['action' => 'test_email'])) ?>">
@@ -458,6 +547,11 @@ Sze Yen
 
                 </div>
 
+            </div>
+
+            <!-- Create a planner task from the selected email (requires user confirmation). -->
+            <div class="wp-email-task-action" style="margin:12px 0;text-align:right">
+                <button type="button" class="secondary-btn" id="wpCreateFromEmail"><i class="fa-solid fa-list-check"></i> Add Email to Team To-Do</button>
             </div>
 
             <!-- ========== SUGGESTED FOLLOW-UP (HUMAN APPROVAL) ========== -->

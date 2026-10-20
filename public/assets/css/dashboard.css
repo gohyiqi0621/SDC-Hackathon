@@ -755,3 +755,256 @@
     color: var(--muted);
     font-size: 10px;
 }
+
+   .custom-dashboard-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 22px 0 14px;
+    }
+
+    .custom-dashboard-toolbar h2 {
+        margin: 0;
+        font-size: 18px;
+        color: #29284d;
+    }
+
+    .custom-dashboard-toolbar p {
+        margin: 5px 0 0;
+        font-size: 12px;
+        color: #888ba3;
+    }
+
+    #resetDashboardLayout {
+        border: 1px solid #ddd7fb;
+        background: #fff;
+        color: #6955dc;
+        border-radius: 9px;
+        padding: 10px 14px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    #resetDashboardLayout:hover {
+        background: #f1edff;
+    }
+
+    .custom-dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
+        align-items: start;
+        margin-bottom: 24px;
+    }
+
+    .dashboard-draggable-card {
+        min-width: 0;
+        background: #fff;
+        border: 1px solid #e9e5f5;
+        border-radius: 16px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .dashboard-draggable-card.full-width {
+        grid-column: span 2;
+    }
+
+    .dashboard-drag-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 15px;
+        background: #f8f6ff;
+        border-bottom: 1px solid #ece8fb;
+    }
+
+    .dashboard-drag-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: #68638c;
+    }
+
+    .dashboard-drag-handle {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        border: 0;
+        background: transparent;
+        color: #7966dc;
+        font-size: 12px;
+        cursor: grab;
+        padding: 5px 8px;
+        user-select: none;
+    }
+
+    .dashboard-drag-handle:active {
+        cursor: grabbing;
+    }
+
+    .dashboard-draggable-card.is-dragging {
+        opacity: 0.4;
+    }
+
+    .dashboard-draggable-card.drag-over {
+        outline: 3px dashed #8976ee;
+        outline-offset: -4px;
+    }
+
+    /* Allow the existing components to fill their new cards. */
+    .dashboard-draggable-card > .workspace-planner,
+    .dashboard-draggable-card > .stats-grid,
+    .dashboard-draggable-card > .inbox-panel,
+    .dashboard-draggable-card > .email-detail-panel {
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        margin: 0;
+    }
+
+    .dashboard-draggable-card > .workspace-planner {
+        border: 0;
+    }
+
+    .dashboard-draggable-card > .inbox-panel,
+    .dashboard-draggable-card > .email-detail-panel {
+        height: auto;
+    }
+
+    .dashboard-draggable-card > .stats-grid {
+        padding: 16px;
+    }
+
+    /* Original main-content becomes empty after moving its panels. */
+    #dashboardRoot > .main-content:empty {
+        display: none;
+    }
+
+    @media (max-width: 900px) {
+        .custom-dashboard-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .dashboard-draggable-card.full-width {
+            grid-column: span 1;
+        }
+    }
+
+    .custom-dashboard-grid {
+    transition: gap 0.25s ease;
+}
+
+/* Activate compact layout while dragging */
+.custom-dashboard-grid.is-editing {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+/* Make every card a mini preview */
+.custom-dashboard-grid.is-editing
+.dashboard-draggable-card {
+    grid-column: span 1 !important;
+    height: 155px;
+    min-height: 155px;
+    overflow: hidden;
+    transition: height 0.25s ease;
+}
+
+/* Compact card header */
+.custom-dashboard-grid.is-editing
+.dashboard-drag-header {
+    padding: 9px 11px;
+}
+
+/* Hide full card content while rearranging */
+
+/* Hide normal card content during dragging */
+.custom-dashboard-grid.is-editing
+.dashboard-draggable-card > :not(.dashboard-drag-header):not(.dashboard-mini-preview) {
+    display: none !important;
+}
+
+/* Show mini preview during dragging */
+.custom-dashboard-grid.is-editing
+.dashboard-mini-preview {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    height: 105px;
+    color: #7966dc;
+}
+
+
+/* Mini card preview */
+.dashboard-mini-preview {
+    display: none;
+}
+
+.custom-dashboard-grid.is-editing
+.dashboard-mini-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    height: 105px;
+    color: #7966dc;
+}
+
+.dashboard-mini-preview i {
+    font-size: 28px;
+}
+
+.dashboard-mini-preview span {
+    font-size: 12px;
+    font-weight: 600;
+    color: #676887;
+}
+
+@media (max-width: 700px) {
+    .custom-dashboard-grid.is-editing {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Keep dashboard cards at full size during dragging */
+.custom-dashboard-grid.is-editing
+.dashboard-draggable-card > :not(.dashboard-drag-header) {
+    display: block !important;
+}
+
+.dashboard-mini-preview {
+    display: none !important;
+}
+
+.dashboard-draggable-card.is-dragging {
+    opacity: 0.5;
+}
+/* Dashboard drag and drop */
+.dashboard-drag-handle {
+    cursor: grab !important;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.dashboard-drag-handle:active {
+    cursor: grabbing !important;
+}
+
+.dashboard-draggable-card.is-dragging {
+    opacity: 0.6;
+}
+
+/* Do not shrink dashboard cards */
+.dashboard-mini-preview {
+    display: none !important;
+}
+
+.custom-dashboard-grid.is-editing
+.dashboard-draggable-card > :not(.dashboard-drag-header) {
+    display: revert !important;
+}

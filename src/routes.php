@@ -23,6 +23,7 @@ use Src\Controllers\ProfileController;
 use Src\Middleware\AuthMiddleware;
 use Src\Middleware\GuestMiddleware;
 use Src\Support\Router;
+use Src\Controllers\AIController;
 
 return static function (Router $router): void {
 
@@ -42,13 +43,23 @@ return static function (Router $router): void {
 
     /* ------------------------------------------------------- dashboard --- */
     $router->get('dashboard', [DashboardController::class, 'index'], $auth);
-    $router->post('dashboard/test_email', [DashboardController::class, 'testEmail'], $auth);
+    
+// AI: generate email summary
+$router->post(
+    'ai/summarize',
+    [AIController::class, 'summarize'],
+    $auth
+);
+
 
     // Gmail inbox on the dashboard (read-only OAuth connection)
     $router->get('gmail/connect', [GmailController::class, 'connect'], $auth);
     $router->get('gmail/callback', [GmailController::class, 'callback'], $auth);
     $router->get('gmail/inbox', [GmailController::class, 'inbox'], $auth);
     $router->post('gmail/disconnect', [GmailController::class, 'disconnect'], $auth);
+    $router->post('dashboard/test_email', [DashboardController::class, 'testEmail'], $auth);
+    $router->get('gmail/message',[GmailController::class, 'message'],$auth);
+
 
     /* ------------------------------------------------------- financial --- */
     $router->get('financial/invoice', [FinancialController::class, 'invoice'], $auth);
@@ -117,4 +128,6 @@ return static function (Router $router): void {
     $router->get('email', static fn () => redirect(url('dashboard')));
     $router->get('chatbot/customer', static fn () => redirect(url('customer', ['action' => 'chat'])));
     $router->get('chatbot/staff', static fn () => redirect(url('staff', ['action' => 'chat'])));
+    
+
 };
