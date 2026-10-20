@@ -2,9 +2,12 @@
 /**
  * dashboard/index.php - the home screen: the Smart SME AI email dashboard.
  *
- * Expects: $user, $brevoReady. The inbox, AI summary and reply are frontend
- * mock data driven by assets/js/dashboard.js; the Brevo strip is real and
- * sends a test message through the same mailer as password-reset email.
+ * Expects: $user, $brevoReady, $gmailReady, $gmailTable, $gmailEmail.
+ *
+ * The inbox shows the user's real Gmail when connected (loaded as JSON from
+ * /gmail/inbox by assets/js/dashboard.js), otherwise demo emails. The AI
+ * summary, reply draft and suggested follow-up are generated in the browser.
+ * The Brevo strip sends a test message through the password-reset mailer.
  */
 $firstName = trim(explode(' ', trim((string) $user['name']))[0] ?? '') ?: (string) $user['name'];
 $hour      = (int) date('G');
@@ -45,7 +48,55 @@ view('layouts/header', [
 
 </section>
 
-<div class="page-body">
+<div class="page-body" id="dashboardRoot"
+     data-user-id="<?= (int) $user['id'] ?>"
+     data-gmail-inbox="<?= $gmailEmail ? e(url('gmail', ['action' => 'inbox'])) : '' ?>">
+
+    <!-- ========== GMAIL CONNECTION ========== -->
+    <section class="brevo-strip gmail-strip" aria-label="Gmail connection">
+        <div class="brevo-strip__info">
+            <strong>
+                <i class="fa-brands fa-google"></i>
+                Gmail inbox
+                <?php if ($gmailEmail): ?>
+                    <span class="badge badge--success"><i class="fa-solid fa-circle-check"></i> Connected</span>
+                <?php else: ?>
+                    <span class="badge badge--muted">Demo emails</span>
+                <?php endif; ?>
+            </strong>
+            <span id="gmailStatus">
+                <?php if ($gmailEmail): ?>
+                    Showing the latest emails from <?= e($gmailEmail) ?> (read-only).
+                <?php elseif ($gmailReady): ?>
+                    Connect your Gmail to see your real inbox here. Access is read-only.
+                <?php elseif (!($gmailTable ?? true)): ?>
+                    The Gmail table is not in the database yet. Run
+                    <code>php bin/migrate.php</code> (or migration <code>003</code> in Adminer).
+                <?php else: ?>
+                    Gmail is not set up yet. Add <code>GMAIL_CLIENT_ID</code> and
+                    <code>GMAIL_CLIENT_SECRET</code> to the app's <code>.env</code>.
+                <?php endif; ?>
+            </span>
+        </div>
+
+        <div class="strip-actions">
+            <?php if ($gmailEmail): ?>
+                <button class="secondary-btn" type="button" id="gmailSyncBtn">
+                    <i class="fa-solid fa-rotate"></i> Sync
+                </button>
+                <form method="post" action="<?= e(url('gmail', ['action' => 'disconnect'])) ?>"
+                      data-confirm="Disconnect <?= e($gmailEmail) ?>? The dashboard will show demo emails again."
+                      data-confirm-title="Disconnect Gmail?" data-confirm-ok="Disconnect">
+                    <?= csrf_field() ?>
+                    <button class="secondary-btn" type="submit"><i class="fa-solid fa-link-slash"></i> Disconnect</button>
+                </form>
+            <?php elseif ($gmailReady): ?>
+                <a class="primary-btn" href="<?= e(url('gmail', ['action' => 'connect'])) ?>">
+                    <i class="fa-brands fa-google"></i> Connect Gmail
+                </a>
+            <?php endif; ?>
+        </div>
+    </section>
 
     <!-- ========== PASSWORD RESET EMAIL (BREVO) ========== -->
     <section class="brevo-strip" aria-label="Password reset email delivery">
@@ -148,7 +199,7 @@ view('layouts/header', [
 
 
     <!-- ========== MAIN CONTENT ========== -->
-    <main class="main-content">
+    <div class="main-content">
 
 
         <!-- ========== LEFT: INBOX ========== -->
@@ -409,9 +460,53 @@ Sze Yen
 
             </div>
 
+            <!-- ========== SUGGESTED FOLLOW-UP (HUMAN APPROVAL) ========== -->
+            <section class="compact-followup">
+                <div class="followup-heading">
+                    <h3><i class="fa-solid fa-list-check"></i> Suggested Follow-up</h3>
+                    <button id="historyBtn" type="button">
+                        <i class="fa-solid fa-clock-rotate-left"></i> History
+                    </button>
+                </div>
+
+                <p id="suggestedAction">Select an email to view the suggested action.</p>
+
+                <div class="followup-footer">
+                    <span class="badge" id="approvalStatus">Pending Approval</span>
+
+                    <div class="workflow-buttons">
+                        <button class="primary-btn" id="approveTaskBtn" type="button">
+                            <i class="fa-solid fa-check"></i> Approve
+                        </button>
+                        <button class="secondary-btn" id="rejectTaskBtn" type="button">
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+            </section>
+
         </section>
 
-    </main>
+    </div>
+
+
+    <!-- ========== FOLLOW-UP HISTORY ========== -->
+    <div id="historyModal" class="history-modal" hidden>
+        <div class="history-dialog" role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+            <div class="history-header">
+                <h3 id="historyTitle">Follow-up History</h3>
+                <button id="closeHistoryBtn" type="button" aria-label="Close history">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <h4>Created Tasks</h4>
+            <div id="createdTasks"></div>
+
+            <h4>Activity Log</h4>
+            <div id="activityLog"></div>
+        </div>
+    </div>
 
 
     <!-- ========== NOTIFICATION PANEL ========== -->

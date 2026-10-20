@@ -1,21 +1,28 @@
-
 /* =====================================
    SMART SME - DASHBOARD (AI EMAIL INBOX)
-   dashboard.js
-   Frontend demo using mock data.
-   Loaded only on the dashboard page.
+   dashboard.js - loaded only on the dashboard page.
+
+   - Inbox: the user's real Gmail when connected (JSON from /gmail/inbox),
+     otherwise demo emails.
+   - AI summary, reply draft and suggested follow-up are generated in the
+     browser for now.
+   - Approved / dismissed follow-ups and the activity log are kept in this
+     browser (localStorage), separately for each signed-in user.
 ===================================== */
 
 document.addEventListener("DOMContentLoaded", () => {
 
-    // Messages use the app's toast (app.js); fall back to alert().
-    const notify = (message, type) =>
-        window.App ? window.App.toast(message, type || "info") : alert(message);
+    const root = document.getElementById("dashboardRoot");
+    if (!root) return;
 
-    // 1. SAMPLE EMAIL DATA
-    const emails = [
+    // Messages use the app's toast (app.js); fall back to notify().
+    const notify = (message, type) =>
+        window.App ? window.App.toast(message, type || "info") : notify(message);
+
+    // 1. DEMO EMAILS (shown until Gmail is connected)
+    const DEMO_EMAILS = [
         {
-            id: 1,
+            id: "demo-1",
             sender: "Klook",
             senderEmail: "partnership@klook.com",
             subject: "Partnership Proposal",
@@ -46,7 +53,7 @@ Klook`,
             meeting: true
         },
         {
-            id: 2,
+            id: "demo-2",
             sender: "ABC Supplier",
             senderEmail: "accounts@abcsupplier.com",
             subject: "Urgent Payment Reminder",
@@ -73,7 +80,7 @@ ABC Supplier`,
             meeting: false
         },
         {
-            id: 3,
+            id: "demo-3",
             sender: "HR Department",
             senderEmail: "hr@company.com",
             subject: "Staff Training Schedule",
@@ -99,7 +106,7 @@ HR Department`,
             meeting: false
         },
         {
-            id: 4,
+            id: "demo-4",
             sender: "Tech Solutions",
             senderEmail: "support@techsolutions.com",
             subject: "Project Meeting Request",
@@ -125,7 +132,7 @@ Tech Solutions`,
             meeting: true
         },
         {
-            id: 5,
+            id: "demo-5",
             sender: "Shopee Business",
             senderEmail: "business@shopee.com",
             subject: "October Sales Report",
@@ -152,11 +159,101 @@ Shopee Business`,
         }
     ];
 
+
+let emails = [];
     // 2. APPLICATION STATE
-    let selectedEmailId = 1;
+    let selectedEmailId = null;
     let activeFilter = "all";
     let searchQuery = "";
     let newestFirst = true;
+
+    // DOMAIN 2 - WORKFLOW STATE
+
+    const STORAGE_KEY = "smartSMEEmailWorkflow:" + (root.dataset.userId || "guest");
+
+    function loadWorkflow() {
+        try {
+            return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
+                tasks: [],
+                activityLog: []
+            };
+        } catch {
+            return {
+                tasks: [],
+                activityLog: []
+            };
+        }
+    }
+
+    const workflow = loadWorkflow();
+
+    function saveWorkflow() {
+        localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(workflow)
+        );
+    }
+
+    function addActivity(emailId, action, details) {
+        workflow.activityLog.unshift({
+            id: Date.now(),
+            emailId: emailId,
+            action: action,
+            details: details,
+            timestamp: new Date().toLocaleString()
+        });
+
+        saveWorkflow();
+    }
+
+    function approveEmailTask(emailId) {
+        const email = emails.find(e => e.id === emailId);
+        if (!email) return;
+
+        // Prevent duplicate tasks
+        const existingTask = workflow.tasks.find(
+            task => task.emailId === emailId
+        );
+
+        if (existingTask) {
+            notify("A task already exists for this email.", "error");
+            return;
+        }
+
+        const task = {
+            id: Date.now(),
+            emailId: email.id,
+            title: `Follow up: ${email.subject}`,
+            assignedTo: email.category === "Finance"
+                ? "Finance Team"
+                : "Operations Team",
+            status: "Pending",
+            createdAt: new Date().toLocaleString()
+        };
+
+        workflow.tasks.push(task);
+
+        addActivity(
+            email.id,
+            "APPROVED",
+            `Task created: ${task.title}`
+        );
+
+        notify("Approved! Follow-up task created.", "success");
+    }
+
+    function rejectEmailTask(emailId) {
+        const email = emails.find(e => e.id === emailId);
+        if (!email) return;
+
+        addActivity(
+            email.id,
+            "DISMISSED",
+            `Suggested task dismissed: ${email.subject}`
+        );
+
+        notify("Suggested task dismissed. No task created.");
+    }
 
     const emailList = document.getElementById("emailList");
     const emailBody = document.getElementById("emailBody");
@@ -345,6 +442,7 @@ Shopee Business`,
         generateReply();
         updateStats();
         renderEmails();
+        renderWorkflow();
     }
 
     // 6. SIMULATED AI REPLY
@@ -395,7 +493,7 @@ Smart SME Team`
         const star = event.target.closest("[data-star-id]");
 
         if (star) {
-            const id = Number(star.dataset.starId);
+            const id = star.dataset.starId;
             const email = emails.find(e => e.id === id);
 
             if (email) {
@@ -412,7 +510,7 @@ Smart SME Team`
         const item = event.target.closest("[data-id]");
 
         if (item) {
-            showEmail(Number(item.dataset.id));
+            showEmail(item.dataset.id);
         }
     });
 
@@ -589,8 +687,255 @@ Smart SME Team`
             notificationPanel.hidden = true;
         });
 
+    // DOMAIN 2 - WORKFLOW UI
+
+    function renderHistory() {
+        const tasksContainer =
+            document.getElementById("createdTasks");
+
+        tasksContainer.innerHTML = workflow.tasks.length
+            ? workflow.tasks.map(task => `
+                <div class="task-item">
+                    <strong>${escapeHTML(task.title)}</strong>
+                    <p>Assigned to: ${escapeHTML(task.assignedTo)}</p>
+                    <p>Status: ${escapeHTML(task.status)}</p>
+                </div>
+            `).join("")
+            : "No tasks created yet.";
+
+        const logContainer =
+            document.getElementById("activityLog");
+
+        logContainer.innerHTML = workflow.activityLog.length
+            ? workflow.activityLog.map(log => `
+                <div class="log-item">
+                    <strong>${escapeHTML(log.action)}</strong>
+                    <p>${escapeHTML(log.details)}</p>
+                    <small>${escapeHTML(log.timestamp)}</small>
+                </div>
+            `).join("")
+            : "No activity recorded yet.";
+    }
+
+    function renderWorkflow() {
+        const email = selectedEmail();
+        renderHistory();
+
+        const approveBtn = document.getElementById("approveTaskBtn");
+        const rejectBtn = document.getElementById("rejectTaskBtn");
+
+        if (!email) {
+            document.getElementById("suggestedAction").textContent =
+                "Select an email to view the suggested action.";
+            document.getElementById("approvalStatus").textContent = "—";
+            approveBtn.disabled = true;
+            rejectBtn.disabled = true;
+            return;
+        }
+
+        rejectBtn.disabled = false;
+
+        const existingTask = workflow.tasks.find(
+            task => task.emailId === email.id
+        );
+
+        const latestRejection = workflow.activityLog.find(
+            log => log.emailId === email.id &&
+                log.action === "DISMISSED"
+        );
+
+        const suggestedAction =
+            document.getElementById("suggestedAction");
+
+        if (email.category === "Finance") {
+            suggestedAction.textContent =
+                "Verify invoice payment status and create a follow-up task for the Finance Team.";
+        } else if (email.meeting) {
+            suggestedAction.textContent =
+                "Review the meeting request and create a follow-up task.";
+        } else if (email.needsReply) {
+            suggestedAction.textContent =
+                "Review the email and create a follow-up task.";
+        } else {
+            suggestedAction.textContent =
+                "No immediate action required.";
+        }
+
+        const status = document.getElementById("approvalStatus");
+
+        if (existingTask) {
+            status.textContent = "Approved";
+        } else if (latestRejection) {
+            status.textContent = "Dismissed";
+        } else {
+            status.textContent = "Pending Approval";
+        }
+
+        approveBtn.disabled = Boolean(existingTask);
+
+
+    }
+
+        // APPROVE BUTTON
+        document.getElementById("approveTaskBtn")
+        .addEventListener("click", () => {
+            approveEmailTask(selectedEmailId);
+            renderWorkflow();
+        });
+
+        // REJECT BUTTON
+        document.getElementById("rejectTaskBtn")
+        .addEventListener("click", () => {
+            rejectEmailTask(selectedEmailId);
+            renderWorkflow();
+        });
+
+        // HISTORY POPUP
+
+    const historyModal =
+        document.getElementById("historyModal");
+
+    document.getElementById("historyBtn")
+        .addEventListener("click", () => {
+            renderWorkflow();
+            historyModal.hidden = false;
+        });
+
+    document.getElementById("closeHistoryBtn")
+        .addEventListener("click", () => {
+            historyModal.hidden = true;
+        });
+
+    historyModal.addEventListener("click", event => {
+        if (event.target === historyModal) {
+            historyModal.hidden = true;
+        }
+    });
+
     // 22. INITIALIZE DASHBOARD
-    showEmail(1);
-    renderNotifications();
+    // 22. GMAIL INBOX
+
+    const gmailInboxUrl = root.dataset.gmailInbox || "";
+    const syncButton = document.getElementById("gmailSyncBtn");
+
+    const senderName = (from) =>
+        (from.replace(/<[^>]*>/, "").replace(/"/g, "").trim()) || from;
+
+    const formatTime = (unix) => {
+        if (!unix) return "";
+        const date = new Date(unix * 1000);
+        const now = new Date();
+        if (date.toDateString() === now.toDateString()) {
+            return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        }
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+        return date.toLocaleDateString([], { month: "short", day: "numeric" });
+    };
+
+    // Simple keyword rules so Gmail emails get a category and a suggestion.
+    const categorise = (text, isSpam) => {
+        if (isSpam) return "Spam";
+        if (/invoice|payment|bill|receipt|quotation|refund|pay\b/i.test(text)) return "Finance";
+        if (/meeting|schedule|appointment|call|zoom|teams/i.test(text)) return "Meeting";
+        if (/order|delivery|shipping|tracking/i.test(text)) return "Orders";
+        if (/partnership|collaborat|proposal/i.test(text)) return "Partnership";
+        return "General";
+    };
+
+    function fromGmail(mail) {
+        const text = `${mail.subject} ${mail.preview}`;
+        const category = categorise(text, mail.isSpam);
+        const sender = senderName(mail.sender || "Unknown sender");
+
+        return {
+            id: mail.id,
+            sender: sender,
+            senderEmail: (mail.sender || "").match(/<([^>]+)>/)?.[1] || mail.sender || "",
+            subject: mail.subject || "(No Subject)",
+            preview: mail.preview || "",
+            body: mail.preview || "",
+            summary: [mail.preview || "No preview available."],
+            category: category,
+            time: formatTime(mail.timestamp),
+            unread: Boolean(mail.unread),
+            important: Boolean(mail.important),
+            starred: Boolean(mail.starred),
+            needsReply: /\?/.test(text) && !mail.isSpam,
+            meeting: category === "Meeting",
+            isSpam: Boolean(mail.isSpam)
+        };
+    }
+
+    function showList(list) {
+        emails = list;
+        activeFilter = "all";
+        document.querySelectorAll(".tab").forEach(tab =>
+            tab.classList.toggle("active", tab.dataset.filter === "all"));
+
+        if (emails.length > 0) {
+            showEmail(emails[0].id);
+        } else {
+            selectedEmailId = null;
+            document.getElementById("emailSubject").textContent = "No email selected";
+            document.getElementById("emailCategory").textContent = "Inbox";
+            document.getElementById("senderAvatar").textContent = "";
+            document.getElementById("senderName").textContent = "";
+            document.getElementById("senderEmail").textContent = "";
+            document.getElementById("emailTime").textContent = "";
+            emailBody.textContent = "Your inbox is empty.";
+            document.getElementById("aiSummary").textContent = "";
+            replyDraft.value = "";
+            updateStats();
+            renderEmails();
+            renderWorkflow();
+        }
+
+        renderNotifications();
+    }
+
+    async function syncGmailEmails() {
+        if (syncButton) {
+            syncButton.disabled = true;
+            syncButton.classList.add("is-loading");
+        }
+        emailList.innerHTML = '<p class="inbox-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading your Gmail…</p>';
+
+        try {
+            const response = await fetch(gmailInboxUrl, {
+                credentials: "same-origin",
+                headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" }
+            });
+            const data = await response.json().catch(() => null);
+
+            if (!data || !data.success) {
+                throw new Error((data && data.message) || "Gmail sync failed.");
+            }
+
+            showList((data.data.emails || []).map(fromGmail));
+            notify(`Gmail synced: ${emails.length} emails.`, "success");
+        } catch (error) {
+            console.error("Gmail sync failed:", error);
+            notify(error.message + " Showing demo emails.", "error");
+            showList(DEMO_EMAILS.map(email => ({ ...email })));
+        } finally {
+            if (syncButton) {
+                syncButton.disabled = false;
+                syncButton.classList.remove("is-loading");
+            }
+        }
+    }
+
+    if (syncButton) {
+        syncButton.addEventListener("click", syncGmailEmails);
+    }
+
+    // 23. INITIALIZE DASHBOARD
+    if (gmailInboxUrl) {
+        syncGmailEmails();
+    } else {
+        showList(DEMO_EMAILS.map(email => ({ ...email })));
+    }
 
 });

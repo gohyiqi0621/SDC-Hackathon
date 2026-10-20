@@ -16,6 +16,7 @@ use Src\Controllers\CategoryController;
 use Src\Controllers\ChatbotController;
 use Src\Controllers\DashboardController;
 use Src\Controllers\FinancialController;
+use Src\Controllers\GmailController;
 use Src\Controllers\ProductController;
 use Src\Controllers\ProfileController;
 use Src\Middleware\AuthMiddleware;
@@ -41,6 +42,12 @@ return static function (Router $router): void {
     /* ------------------------------------------------------- dashboard --- */
     $router->get('dashboard', [DashboardController::class, 'index'], $auth);
     $router->post('dashboard/test_email', [DashboardController::class, 'testEmail'], $auth);
+
+    // Gmail inbox on the dashboard (read-only OAuth connection)
+    $router->get('gmail/connect', [GmailController::class, 'connect'], $auth);
+    $router->get('gmail/callback', [GmailController::class, 'callback'], $auth);
+    $router->get('gmail/inbox', [GmailController::class, 'inbox'], $auth);
+    $router->post('gmail/disconnect', [GmailController::class, 'disconnect'], $auth);
 
     /* ------------------------------------------------------- financial --- */
     $router->get('financial/invoice', [FinancialController::class, 'invoice'], $auth);

@@ -131,6 +131,14 @@ define('BREVO_SENDER_NAME', (string) env('BREVO_SENDER_NAME', APP_NAME));
 define('BREVO_API_URL', (string) env('BREVO_API_URL', 'https://api.brevo.com/v3/smtp/email'));
 define('MAIL_CA_BUNDLE', (string) env('MAIL_CA_BUNDLE', ''));
 
+/* ---------------------------------------------------------------- gmail --- */
+// Google OAuth client (Google Cloud Console > APIs & Services > Credentials).
+// The redirect URI must be listed there exactly as below.
+define('GMAIL_CLIENT_ID', (string) env('GMAIL_CLIENT_ID', ''));
+define('GMAIL_CLIENT_SECRET', (string) env('GMAIL_CLIENT_SECRET', ''));
+define('GMAIL_REDIRECT_URI', (string) (env('GMAIL_REDIRECT_URI', '') ?: APP_URL . '/gmail/callback'));
+define('GMAIL_MAX_RESULTS', max(1, min(50, (int) env('GMAIL_MAX_RESULTS', '20'))));
+
 /* -------------------------------------------------------------- session --- */
 define('SESSION_NAME', (string) env('SESSION_NAME', 'sme_session'));
 define('SESSION_IDLE_MINUTES', max(1, (int) env('SESSION_IDLE_MINUTES', '30')));

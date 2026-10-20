@@ -19,6 +19,12 @@
     # Block it in case a stale copy is left behind.
     RewriteRule ^email(/|$) - [F,L]
 
+    # Files from the other project pulled in by git (MySQL app, admin pages,
+    # setup script). They are not used by this app; keep them off the web.
+    RewriteRule ^(app|ai-service|migrations)(/|$) - [F,L]
+    RewriteRule ^(config|db|helpers|setup)\.php$ - [F,L]
+    RewriteRule ^(database\.sql|Dockerfile|\.dockerignore|.*\.md)$ - [F,L]
+
     # Environment files and Git metadata.
     RewriteRule ^\.env - [F,L]
     RewriteRule ^\.git - [F,L]
