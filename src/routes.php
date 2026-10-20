@@ -10,6 +10,7 @@
  */
 declare(strict_types=1);
 
+use Src\Controllers\AiSettingsController;
 use Src\Controllers\AuthController;
 use Src\Controllers\CategoryController;
 use Src\Controllers\ChatbotController;
@@ -63,6 +64,25 @@ return static function (Router $router): void {
     $router->post('categories/store', [CategoryController::class, 'store'], $auth);
     $router->post('categories/update', [CategoryController::class, 'update'], $auth);
     $router->post('categories/delete', [CategoryController::class, 'delete'], $auth);
+
+    /* ------------------------------ AI Settings & Integration (JSON) --- */
+    // Used by assets/js/ai-settings-api.js on customer/settings. The user is
+    // always taken from the session; POSTs are CSRF-checked by the Router.
+    $router->get('ai_settings/company_profile', [AiSettingsController::class, 'companyProfile'], $auth);
+    $router->post('ai_settings/company_profile_save', [AiSettingsController::class, 'companyProfileSave'], $auth);
+    $router->get('ai_settings/assistant', [AiSettingsController::class, 'assistant'], $auth);
+    $router->post('ai_settings/assistant_save', [AiSettingsController::class, 'assistantSave'], $auth);
+    $router->get('ai_settings/telegram', [AiSettingsController::class, 'telegram'], $auth);
+    $router->post('ai_settings/telegram_test', [AiSettingsController::class, 'telegramTest'], $auth);
+    $router->post('ai_settings/telegram_connect', [AiSettingsController::class, 'telegramConnect'], $auth);
+    $router->post('ai_settings/telegram_disconnect', [AiSettingsController::class, 'telegramDisconnect'], $auth);
+    $router->get('ai_settings/google_calendar', [AiSettingsController::class, 'googleCalendar'], $auth);
+    $router->get('ai_settings/google_calendar_oauth_start', [AiSettingsController::class, 'googleCalendarOauthStart'], $auth);
+    $router->get('ai_settings/google_calendar_oauth_callback', [AiSettingsController::class, 'googleCalendarOauthCallback'], $auth);
+    $router->get('ai_settings/google_calendar_calendars', [AiSettingsController::class, 'googleCalendarCalendars'], $auth);
+    $router->post('ai_settings/google_calendar_save', [AiSettingsController::class, 'googleCalendarSave'], $auth);
+    $router->post('ai_settings/google_calendar_test', [AiSettingsController::class, 'googleCalendarTest'], $auth);
+    $router->post('ai_settings/google_calendar_disconnect', [AiSettingsController::class, 'googleCalendarDisconnect'], $auth);
 
     /* ----------------------------------------------- AI chatbot: staff --- */
     $router->get('staff/settings', [ChatbotController::class, 'staffSettings'], $auth);

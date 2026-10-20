@@ -23,11 +23,11 @@ try {
     fwrite(STDOUT, 'Connected to ' . DB_NAME . ' on ' . DB_HOST . ':' . DB_PORT . PHP_EOL);
     fwrite(STDOUT, $version . PHP_EOL);
 
-    foreach (['users', 'password_resets', 'product_categories', 'products'] as $table) {
+    foreach (['users', 'password_resets', 'product_categories', 'products', 'company_profiles', 'ai_assistant_settings', 'telegram_integrations', 'google_calendar_integrations'] as $table) {
         $stmt = $pdo->prepare("SELECT to_regclass('public." . $table . "')");
         $stmt->execute();
         $exists = $stmt->fetchColumn() !== null;
-        fwrite(STDOUT, str_pad($table, 20) . ($exists ? 'ok' : 'MISSING - run php bin/migrate.php') . PHP_EOL);
+        fwrite(STDOUT, str_pad($table, 30) . ($exists ? 'ok' : 'MISSING - run php bin/migrate.php') . PHP_EOL);
     }
 
     $stmt = $pdo->query('SELECT COUNT(*) FROM users');

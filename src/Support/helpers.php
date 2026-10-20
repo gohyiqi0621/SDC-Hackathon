@@ -357,7 +357,7 @@ function page_title_for(string $key): string
         'financial/claims'    => 'Claims',
         'financial/settlement'=> 'Settlement',
         'financial/upload'    => 'Upload Invoice',
-        'customer/settings'   => 'Customer Setting & Integration',
+        'customer/settings'   => 'AI Settings & Integration',
         'customer/chat'       => 'Customer Chat Interface',
         'staff/settings'      => 'Staff Setting & Integration',
         'staff/chat'          => 'Staff Chat Interface',
