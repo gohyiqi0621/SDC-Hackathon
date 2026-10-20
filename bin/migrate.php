@@ -1,12 +1,16 @@
 <?php
 /**
- * bin/migrate.php - apply database/schema.sql to the PostgreSQL database.
+ * bin/migrate.php - create / update the PostgreSQL tables.
  *
- * Usage:
- *     php bin/migrate.php
+ * Usage (from the project folder):
+ *     C:\xampp\php\php.exe bin\migrate.php
  *
- * The schema is idempotent (CREATE ... IF NOT EXISTS), so running it again
- * does not drop or duplicate anything. It is safe on an empty database.
+ * Runs, in order:
+ *   1. database/schema.sql              users + password_resets
+ *   2. database/migrations/NNN_*.sql    numbered migrations, lowest first
+ *
+ * Every file is idempotent (CREATE ... IF NOT EXISTS), so running this again
+ * never drops, resets or duplicates anything - including the users table.
  */
 declare(strict_types=1);
 
@@ -19,36 +23,43 @@ require_once dirname(__DIR__) . '/src/bootstrap.php';
 
 use Src\Support\Database;
 
-$schemaFile = APP_ROOT . '/database/schema.sql';
+$files = [APP_ROOT . '/database/schema.sql'];
 
-if (!is_file($schemaFile)) {
-    fwrite(STDERR, "Cannot find database/schema.sql.\n");
-    exit(1);
-}
-
-$sql = (string) file_get_contents($schemaFile);
+$migrations = glob(APP_ROOT . '/database/migrations/[0-9][0-9][0-9]_*.sql') ?: [];
+sort($migrations, SORT_STRING);
+$files = array_merge($files, $migrations);
 
 try {
     $pdo = Database::connection();
-    $pdo->exec($sql);
 
-    $tables = [];
-    foreach (['users', 'password_resets'] as $table) {
-        $stmt = $pdo->prepare("SELECT to_regclass('public." . $table . "')");
-        $stmt->execute();
-        $tables[$table] = $stmt->fetchColumn() !== null;
+    fwrite(STDOUT, 'Database: ' . DB_NAME . ' on ' . DB_HOST . ':' . DB_PORT . PHP_EOL);
+
+    foreach ($files as $file) {
+        if (!is_file($file)) {
+            fwrite(STDERR, 'Missing file: ' . $file . PHP_EOL);
+            exit(1);
+        }
+
+        $pdo->exec((string) file_get_contents($file));
+        fwrite(STDOUT, '  applied  ' . str_replace(APP_ROOT . '/', '', $file) . PHP_EOL);
     }
 
-    fwrite(STDOUT, "Schema applied to " . DB_NAME . " on " . DB_HOST . ':' . DB_PORT . PHP_EOL);
+    $missing = false;
+    foreach (['users', 'password_resets', 'product_categories', 'products'] as $table) {
+        $stmt = $pdo->prepare('SELECT to_regclass(?)');
+        $stmt->execute(['public.' . $table]);
+        $exists = $stmt->fetchColumn() !== null;
+        $missing = $missing || !$exists;
 
-    foreach ($tables as $table => $exists) {
-        fwrite(STDOUT, '  - ' . $table . ': ' . ($exists ? 'ok' : 'MISSING') . PHP_EOL);
+        fwrite(STDOUT, '  table    ' . str_pad($table, 20) . ($exists ? 'ok' : 'MISSING') . PHP_EOL);
     }
 
-    if (in_array(false, $tables, true)) {
-        exit(1);
-    }
+    exit($missing ? 1 : 0);
 } catch (Throwable $e) {
+    if (isset($pdo) && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+
     fwrite(STDERR, 'Migration failed: ' . $e->getMessage() . PHP_EOL);
     exit(1);
 }

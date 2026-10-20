@@ -3,7 +3,7 @@
  * partials/sidebar.php - the left navigation, built from nav_items().
  *
  * Expects: $user. Groups (Financial, AI Chatbot) open automatically when one
- * of their pages is active. Logout is a POST form so a link cannot sign out.
+ * of their pages is active. AI Chatbot is split into Customer and Staff. Logout is a POST form so a link cannot sign out.
  */
 $current = page_key();
 $prevSection = null;
@@ -31,7 +31,7 @@ $prevSection = null;
                 </a>
 
             <?php elseif ($item['kind'] === 'group'): ?>
-                <?php $open = nav_is_active($item['key'], $current); ?>
+                <?php $open = nav_is_active($item, $current); ?>
                 <div class="nav-group<?= $open ? ' open has-active' : '' ?>">
                     <button class="nav-link" type="button" data-nav-group aria-expanded="<?= $open ? 'true' : 'false' ?>">
                         <i class="<?= e($item['icon']) ?>"></i>
@@ -40,8 +40,13 @@ $prevSection = null;
                     </button>
                     <div class="nav-sub">
                         <?php foreach ($item['children'] as $child): ?>
-                            <a class="nav-link<?= $current === $child['key'] ? ' active' : '' ?>"
-                               href="<?= e($child['url']) ?>"<?= $current === $child['key'] ? ' aria-current="page"' : '' ?>>
+                            <?php if (isset($child['heading'])): ?>
+                                <p class="nav-sub-label"><?= e($child['heading']) ?></p>
+                                <?php continue; ?>
+                            <?php endif; ?>
+                            <?php $active = nav_is_active($child, $current); ?>
+                            <a class="nav-link<?= $active ? ' active' : '' ?>"
+                               href="<?= e($child['url']) ?>"<?= $active ? ' aria-current="page"' : '' ?>>
                                 <i class="<?= e($child['icon']) ?>"></i>
                                 <span><?= e($child['label']) ?></span>
                             </a>

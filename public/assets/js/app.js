@@ -9,6 +9,9 @@
    5. AJAX forms        <form data-ajax> (falls back to a normal post)
    6. Upload picker     [data-file-input] + [data-file-label]
    7. Chat demo         [data-chat] composer (no backend yet)
+   8. Confirm dialog    <form data-confirm="Message" data-confirm-title data-confirm-ok>
+   9. Filter forms      <form data-auto-submit> submits when a select changes
+  10. Image picker      [data-image-picker] preview before upload
 ===================================== */
 
 (function () {
@@ -266,5 +269,83 @@
         chat.querySelectorAll('[data-suggest]').forEach(function (chip) {
             chip.addEventListener('click', function () { send(chip.textContent); });
         });
+    });
+
+    /* ---------- 8. Confirm dialog ---------- */
+
+    var dialog = document.getElementById('confirmDialog');
+
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-confirm')) { return; }
+        if (form.dataset.confirmed === '1') { return; }
+
+        var message = form.getAttribute('data-confirm');
+
+        // No <dialog> support: fall back to the browser's own prompt.
+        if (!dialog || typeof dialog.showModal !== 'function') {
+            if (!window.confirm(message)) { e.preventDefault(); }
+            return;
+        }
+
+        e.preventDefault();
+        dialog.querySelector('[data-confirm-title]').textContent = form.getAttribute('data-confirm-title') || 'Are you sure?';
+        dialog.querySelector('[data-confirm-message]').textContent = message;
+        dialog.querySelector('[data-confirm-button]').textContent = form.getAttribute('data-confirm-ok') || 'Confirm';
+        dialog.returnValue = '';
+        dialog.showModal();
+
+        dialog.addEventListener('close', function onClose() {
+            dialog.removeEventListener('close', onClose);
+            if (dialog.returnValue !== 'confirm') { return; }
+
+            form.dataset.confirmed = '1';
+            setLoading(form.querySelector('button[type="submit"]'), true);
+            form.submit();
+        });
+    }, true);
+
+    /* ---------- 9. Filter forms ---------- */
+
+    document.querySelectorAll('form[data-auto-submit]').forEach(function (form) {
+        form.querySelectorAll('select').forEach(function (select) {
+            select.addEventListener('change', function () { form.submit(); });
+        });
+    });
+
+    /* ---------- 10. Image picker ---------- */
+
+    document.querySelectorAll('[data-image-picker]').forEach(function (picker) {
+        var input = picker.querySelector('[data-image-input]');
+        var preview = picker.querySelector('[data-image-preview]');
+        var placeholder = picker.querySelector('[data-image-placeholder]');
+        var remove = picker.querySelector('[data-image-remove]');
+        var original = preview.getAttribute('src');
+
+        function show(src) {
+            preview.hidden = !src;
+            placeholder.hidden = !!src;
+            if (src) { preview.src = src; }
+        }
+
+        input.addEventListener('change', function () {
+            var file = input.files && input.files[0];
+            if (!file) { show(original); return; }
+            if (remove) { remove.checked = false; }
+            var reader = new FileReader();
+            reader.onload = function () { show(reader.result); };
+            reader.readAsDataURL(file);
+        });
+
+        if (remove) {
+            remove.addEventListener('change', function () {
+                if (remove.checked) {
+                    input.value = '';
+                    show('');
+                } else {
+                    show(original);
+                }
+            });
+        }
     });
 })();

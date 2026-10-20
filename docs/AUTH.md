@@ -55,7 +55,9 @@ src/
 │   ├── ProfileController.php
 │   ├── DashboardController.php
 │   ├── FinancialController.php
-│   └── ChatbotController.php
+│   ├── ChatbotController.php
+│   ├── ProductController.php
+│   └── CategoryController.php
 ├── Middleware/
 │   ├── Middleware.php
 │   ├── AuthMiddleware.php
@@ -63,11 +65,14 @@ src/
 │   └── CsrfMiddleware.php
 ├── Models/
 │   ├── User.php
-│   └── PasswordReset.php
+│   ├── PasswordReset.php
+│   ├── Category.php
+│   └── Product.php
 ├── Services/
 │   ├── AuthService.php
 │   ├── PasswordResetService.php
-│   └── BrevoMailer.php
+│   ├── BrevoMailer.php
+│   └── ProductService.php
 ├── Support/
 │   ├── Database.php
 │   ├── Router.php
@@ -77,7 +82,8 @@ src/
     ├── auth/                  # register, login, forgot, reset
     ├── dashboard/             # Smart SME AI email dashboard (home)
     ├── financial/             # invoice, claims, settlement, upload
-    ├── chatbot/               # customer, staff
+    ├── chatbot/               # settings + chat (Customer and Staff)
+    ├── products/              # product list, form, categories
     ├── profile/
     ├── emails/                # password-reset + test email bodies
     ├── layouts/               # head, app + auth shells
@@ -88,7 +94,8 @@ public/
 ├── .htaccess                  # clean URLs
 └── assets/                    # css/app.css, css/dashboard.css, js/app.js, js/dashboard.js, logo
 database/
-└── schema.sql                 # PostgreSQL: users + password_resets
+├── schema.sql                 # PostgreSQL: users + password_resets
+└── migrations/                # 001 product_categories, 002 products
 bin/
 ├── migrate.php
 ├── create-user.php

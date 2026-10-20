@@ -19,7 +19,7 @@ if exist "public\fonts" rmdir /s /q "public\fonts"
 echo Removing old views and controllers...
 if exist "src\Views\email" rmdir /s /q "src\Views\email"
 del /q "src\Views\partials\icons.php" "src\Views\layouts\flashes.php" 2>nul
-del /q "src\Views\financial\_nav.php" "src\Views\chatbot\customer.php" "src\Views\chatbot\staff.php" 2>nul
+del /q "src\Views\financial\_nav.php" "src\Views\chatbot\customer.php" "src\Views\chatbot\staff.php" "src\Views\chatbot\index.php" 2>nul
 del /q "src\Controllers\EmailController.php" 2>nul
 
 echo Done.

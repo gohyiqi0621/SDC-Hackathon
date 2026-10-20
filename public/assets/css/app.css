@@ -843,6 +843,12 @@ code {
     box-shadow: 0 0 0 3px rgba(98, 85, 245, 0.12);
 }
 
+.field input[type="radio"],
+.field input[type="checkbox"] {
+    width: auto;
+    padding: 0;
+}
+
 .field input:disabled {
     background: #f6f7fc;
     color: var(--muted);
@@ -1512,5 +1518,523 @@ code {
 
     .auth-card {
         padding: 22px;
+    }
+}
+
+/* ========================================
+   10. SIDEBAR SUB-HEADINGS
+======================================== */
+
+.nav-sub-label {
+    margin: 8px 10px 2px;
+    color: #9aa0bd;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+}
+
+.nav-sub-label:first-child {
+    margin-top: 4px;
+}
+
+/* ========================================
+   11. FORMS: EXTRA PIECES
+======================================== */
+
+.field textarea {
+    resize: vertical;
+    min-height: 44px;
+    line-height: 1.6;
+}
+
+.field select {
+    appearance: none;
+    padding-right: 34px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23737b9b' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 13px center;
+}
+
+.field select.is-invalid,
+.field textarea.is-invalid {
+    border-color: var(--danger);
+}
+
+fieldset.field {
+    border: none;
+}
+
+fieldset.field legend {
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 14px;
+}
+
+.stack {
+    display: grid;
+    gap: 18px;
+    align-content: start;
+}
+
+.form-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 4px;
+    border: 1px solid #e3e4f7;
+    border-radius: 11px;
+    background: #f7f7fd;
+}
+
+.segmented label {
+    position: relative;
+}
+
+.segmented input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.segmented span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 9px;
+    border-radius: 8px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.segmented input:checked + span {
+    background: white;
+    color: #5c4def;
+    box-shadow: 0 2px 8px rgba(49, 60, 123, 0.08), inset 0 0 0 1px #d8d1ff;
+}
+
+.segmented input:focus-visible + span {
+    outline: 2px solid #9186ff;
+}
+
+.checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--text-soft);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+/* ---------- Image picker ---------- */
+
+.image-picker {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.image-preview {
+    width: 96px;
+    height: 96px;
+    flex-shrink: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: #fafaff;
+}
+
+.image-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.image-placeholder {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    place-items: center;
+    color: #b9bdd6;
+    font-size: 28px;
+}
+
+.image-actions {
+    display: grid;
+    gap: 10px;
+    justify-items: start;
+}
+
+/* ========================================
+   12. LIST PAGES (TOOLBAR, TABLE, PAGING)
+======================================== */
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 0 22px 16px;
+}
+
+.toolbar select,
+.toolbar-search input {
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid #e3e4f7;
+    border-radius: 10px;
+    background: white;
+    outline: none;
+}
+
+.toolbar select {
+    appearance: none;
+    padding-right: 32px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23737b9b' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+}
+
+.toolbar select:focus,
+.toolbar-search input:focus {
+    border-color: #9186ff;
+}
+
+.toolbar-search {
+    position: relative;
+    flex: 1 1 220px;
+}
+
+.toolbar-search i {
+    position: absolute;
+    left: 13px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9aa0bd;
+}
+
+.toolbar-search input {
+    width: 100%;
+    padding-left: 36px;
+}
+
+.toolbar .secondary-btn {
+    height: 40px;
+}
+
+.toolbar-reset {
+    font-size: 12px;
+}
+
+.data-table tbody tr:hover {
+    background: #fbfbff;
+}
+
+.data-table tr.is-selected {
+    background: var(--primary-light);
+}
+
+.data-table .num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.data-table .actions {
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+}
+
+.data-table .actions form {
+    display: inline;
+}
+
+.cell-sub {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.muted {
+    color: #a3a8c3;
+}
+
+.product-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 220px;
+}
+
+.product-cell strong {
+    display: block;
+}
+
+.product-cell small {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.product-thumb {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    object-fit: cover;
+    border: 1px solid var(--border);
+}
+
+.product-thumb--empty {
+    display: grid;
+    place-items: center;
+    background: #fafaff;
+    color: #b9bdd6;
+}
+
+.price-old {
+    color: var(--muted);
+    text-decoration: line-through;
+}
+
+.price-promo {
+    color: var(--danger);
+}
+
+a.badge:hover {
+    text-decoration: none;
+    background: #e4ddff;
+}
+
+.icon-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    color: #5b6285;
+}
+
+.icon-btn:hover {
+    background: #f1f1ff;
+    color: var(--primary);
+    text-decoration: none;
+    opacity: 1;
+}
+
+.icon-btn--danger:hover {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 16px 22px 20px;
+}
+
+.pagination a,
+.pagination span {
+    min-width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    padding: 0 8px;
+    border-radius: 9px;
+    color: #5b6285;
+    font-size: 12px;
+}
+
+.pagination a {
+    border: 1px solid var(--border);
+    background: white;
+}
+
+.pagination a:hover {
+    text-decoration: none;
+    border-color: #d8d1ff;
+}
+
+.pagination a.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+    font-weight: 700;
+}
+
+.settings-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 4px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fafaff;
+}
+
+.settings-link strong,
+.settings-link small {
+    display: block;
+}
+
+.settings-link small {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.settings-link .secondary-btn {
+    margin-left: auto;
+}
+
+/* ========================================
+   13. CONFIRM DIALOG
+======================================== */
+
+.confirm-dialog {
+    width: min(400px, calc(100vw - 32px));
+    margin: auto;
+    padding: 26px;
+    border: 1px solid #e5e2ff;
+    border-radius: 18px;
+    background: white;
+    color: var(--text);
+    box-shadow: 0 25px 60px rgba(23, 27, 69, 0.25);
+    text-align: center;
+}
+
+.confirm-dialog::backdrop {
+    background: rgba(23, 27, 69, 0.35);
+}
+
+.confirm-icon {
+    width: 52px;
+    height: 52px;
+    display: grid;
+    place-items: center;
+    margin: 0 auto 14px;
+    border-radius: 50%;
+    background: var(--danger-bg);
+    color: var(--danger);
+    font-size: 20px;
+}
+
+.confirm-dialog h3 {
+    font-size: 17px;
+    font-weight: 800;
+}
+
+.confirm-dialog p {
+    margin: 8px 0 20px;
+    color: var(--text-soft);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
+.confirm-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.danger-btn {
+    background: var(--danger);
+    color: white;
+}
+
+.danger-btn:hover {
+    background: #d93a55;
+    opacity: 1;
+}
+
+/* ========================================
+   14. RESPONSIVE: LIST PAGES & FORMS
+======================================== */
+
+@media (max-width: 760px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .toolbar select {
+        flex: 1 1 140px;
+    }
+
+    /* Tables become stacked cards on small screens. */
+    .product-table thead,
+    .category-table thead {
+        display: none;
+    }
+
+    .product-table tr,
+    .category-table tr {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 12px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .product-table td,
+    .category-table td {
+        padding: 0;
+        border: none;
+        text-align: left !important;
+    }
+
+    .product-table td[data-label]:not(:first-child)::before,
+    .category-table td[data-label]:not(:first-child)::before {
+        content: attr(data-label);
+        display: block;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+
+    .product-table td:first-child,
+    .category-table td:first-child,
+    .product-table td.actions,
+    .category-table td.actions {
+        grid-column: 1 / -1;
+    }
+
+    .product-table td.actions,
+    .category-table td.actions {
+        width: auto;
+        text-align: right !important;
+    }
+
+    .form-footer {
+        flex-direction: column-reverse;
+    }
+
+    .form-footer > * {
+        width: 100%;
     }
 }

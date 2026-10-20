@@ -20,3 +20,6 @@ composer.lock
 .DS_Store
 .vscode/
 .idea/
+
+# User-uploaded product images
+public/uploads/products/

@@ -224,6 +224,16 @@ function initials_of(?array $user): string
     return mb_strtoupper($letters);
 }
 
+/** "MYR 1,234.50" from a NUMERIC string. Empty for null. */
+function format_money(mixed $amount, string $currency = 'MYR'): string
+{
+    if ($amount === null || $amount === '') {
+        return '';
+    }
+
+    return trim($currency) . ' ' . number_format((float) $amount, 2);
+}
+
 /** Display a stored timestamp in the app's timezone. */
 function fmt_datetime(?string $value, string $format = 'j M Y, H:i'): string
 {
@@ -276,9 +286,16 @@ function nav_items(): array
             'label'    => 'AI Chatbot',
             'icon'     => 'fa-solid fa-robot',
             'group'    => 'Workspace',
+            // Pages that keep this group open and highlighted.
+            'match'    => ['customer', 'staff', 'products', 'categories'],
             'children' => [
-                ['key' => 'chatbot/customer', 'label' => 'Customer', 'icon' => 'fa-solid fa-user',       'url' => url('chatbot', ['action' => 'customer'])],
-                ['key' => 'chatbot/staff',    'label' => 'Staff',    'icon' => 'fa-solid fa-user-tie',   'url' => url('chatbot', ['action' => 'staff'])],
+                ['heading' => 'Customer'],
+                ['key' => 'customer/settings', 'label' => 'Setting & Integration', 'icon' => 'fa-solid fa-sliders',       'url' => url('customer', ['action' => 'settings'])],
+                ['key' => 'products',          'label' => 'Product & Service',     'icon' => 'fa-solid fa-box-open',      'url' => url('products'), 'match' => ['products', 'categories']],
+                ['key' => 'customer/chat',     'label' => 'Chat Interface',        'icon' => 'fa-regular fa-comments',    'url' => url('customer', ['action' => 'chat'])],
+                ['heading' => 'Staff'],
+                ['key' => 'staff/settings',    'label' => 'Setting & Integration', 'icon' => 'fa-solid fa-sliders',       'url' => url('staff', ['action' => 'settings'])],
+                ['key' => 'staff/chat',        'label' => 'Chat Interface',        'icon' => 'fa-regular fa-comments',    'url' => url('staff', ['action' => 'chat'])],
             ],
         ],
         [
@@ -310,12 +327,24 @@ function page_key(): string
     return $action !== '' && $action !== 'index' ? $page . '/' . $action : $page;
 }
 
-/** True when $key is the active route or a parent of the active route. */
-function nav_is_active(string $key, ?string $current = null): bool
+/**
+ * True when $key (or any of $item['match']) is the active route or a parent
+ * of it: 'products' matches 'products' and 'products/edit'.
+ *
+ * @param string|array<string, mixed> $item a route key or a nav item
+ */
+function nav_is_active(string|array $item, ?string $current = null): bool
 {
     $current = $current ?? page_key();
+    $keys    = is_array($item) ? ($item['match'] ?? [$item['key']]) : [$item];
 
-    return $current === $key || str_starts_with($current, $key . '/');
+    foreach ($keys as $key) {
+        if ($current === $key || str_starts_with($current, $key . '/')) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /** Human label for the current page, for the top bar and breadcrumb. */
@@ -328,8 +357,14 @@ function page_title_for(string $key): string
         'financial/claims'    => 'Claims',
         'financial/settlement'=> 'Settlement',
         'financial/upload'    => 'Upload Invoice',
-        'chatbot/customer'    => 'Customer Chatbot',
-        'chatbot/staff'       => 'Staff Chatbot',
+        'customer/settings'   => 'Customer Setting & Integration',
+        'customer/chat'       => 'Customer Chat Interface',
+        'staff/settings'      => 'Staff Setting & Integration',
+        'staff/chat'          => 'Staff Chat Interface',
+        'products'            => 'Product & Service',
+        'products/create'     => 'Add Product / Service',
+        'products/edit'       => 'Edit Product / Service',
+        'categories'          => 'Categories',
         'auth/login'          => 'Sign in',
         'auth/forgot'         => 'Forgot password',
         'auth/reset'          => 'Reset password',

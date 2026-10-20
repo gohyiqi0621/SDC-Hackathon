@@ -62,13 +62,15 @@ Explain how your project uses AI to solve the problem and what makes it valuable
 .
 ├── bin/                         # CLI: migrate, create-user, check
 ├── database/
-│   └── schema.sql               # PostgreSQL schema (users + password resets)
+│   ├── schema.sql               # PostgreSQL schema (users + password resets)
+│   └── migrations/              # numbered migrations (001_, 002_, ...)
 ├── docs/
 │   └── AUTH.md                  # authentication & profile documentation
 ├── public/                      # web root - the only folder Apache serves
 │   ├── index.php                # front controller (loads src/)
 │   ├── .htaccess                # clean URLs
 │   ├── favicon.ico
+│   ├── uploads/                 # product images (scripts blocked by .htaccess)
 │   └── assets/
 │       ├── css/app.css          # shared design (from the email dashboard)
 │       ├── css/dashboard.css    # inbox / AI email widgets
@@ -80,10 +82,10 @@ Explain how your project uses AI to solve the problem and what makes it valuable
 ├── src/                         # all application source code
 │   ├── bootstrap.php            # env, autoloader, session, config
 │   ├── routes.php               # every URL -> controller + middleware
-│   ├── Controllers/             # Auth, Dashboard, Financial, Chatbot, Profile
+│   ├── Controllers/             # Auth, Dashboard, Financial, Chatbot, Product, Category, Profile
 │   ├── Middleware/              # Auth, Guest, Csrf
-│   ├── Models/                  # User, PasswordReset
-│   ├── Services/                # AuthService, PasswordResetService, BrevoMailer
+│   ├── Models/                  # User, PasswordReset, Category, Product
+│   ├── Services/                # AuthService, PasswordResetService, BrevoMailer, ProductService
 │   ├── Support/                 # Database, Router, View, helpers
 │   ├── Views/
 │   │   ├── layouts/             # head, header/footer, app + auth shells
@@ -91,7 +93,8 @@ Explain how your project uses AI to solve the problem and what makes it valuable
 │   │   ├── auth/                # register, login, forgot, reset
 │   │   ├── dashboard/           # email dashboard (home screen)
 │   │   ├── financial/           # invoice, claims, settlement, upload
-│   │   ├── chatbot/             # customer + staff assistant
+│   │   ├── chatbot/             # settings + chat (Customer and Staff)
+│   │   ├── products/            # product list, form, categories
 │   │   ├── profile/
 │   │   ├── emails/              # password-reset + test email bodies
 │   │   └── errors/
@@ -147,6 +150,41 @@ There is **no admin portal and no admin authentication** anywhere in it.
   Invoice) · AI Chatbot (Customer, Staff) · Profile · Logout**.
 
 Full details: [`docs/AUTH.md`](docs/AUTH.md).
+
+## Product & Service (AI Chatbot → Customer)
+
+Each signed-in user manages their own products and services at
+`/products` (categories at `/categories`):
+
+- List with image, name, SKU, category, price, promo price and status;
+  search by name/SKU, filter by category and status, sort by name, price or
+  date, 10 per page.
+- Add / edit with name, SKU, category, description, free-text
+  characteristics, image (JPG/PNG/WebP/GIF, 2 MB), price, promotional price,
+  currency (default MYR) and Active/Inactive status.
+- Remove with a confirmation dialog. Categories can be added, edited and
+  deleted, but a category that still has products cannot be deleted.
+- Every query is scoped to the signed-in user; the database also enforces
+  that a product's category belongs to the same user.
+
+Sidebar: **AI Chatbot → Customer** (Setting & Integration, Product & Service,
+Chat Interface) and **Staff** (Setting & Integration, Chat Interface).
+
+### Apply the database migrations
+
+```bat
+cd C:\xampp\htdocs\SDC-Hackathon
+C:\xampp\php\php.exe bin\migrate.php
+```
+
+or with `psql` (adjust the PostgreSQL version folder):
+
+```bat
+"C:\Program Files\PostgreSQL\16\bin\psql.exe" -h 127.0.0.1 -U yiqi -d sme_assistant -f database\migrations\001_create_product_categories.sql
+"C:\Program Files\PostgreSQL\16\bin\psql.exe" -h 127.0.0.1 -U yiqi -d sme_assistant -f database\migrations\002_create_products.sql
+```
+
+Both files are safe to run again and never touch the `users` table.
 
 ### Local setup (XAMPP + PostgreSQL)
 
