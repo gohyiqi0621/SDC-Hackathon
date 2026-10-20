@@ -45,7 +45,7 @@ try {
     }
 
     $missing = false;
-    foreach (['users', 'password_resets', 'product_categories', 'products'] as $table) {
+    foreach (['users', 'password_resets', 'product_categories', 'products', 'gmail_connections'] as $table) {
         $stmt = $pdo->prepare('SELECT to_regclass(?)');
         $stmt->execute(['public.' . $table]);
         $exists = $stmt->fetchColumn() !== null;

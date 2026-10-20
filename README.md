@@ -82,16 +82,16 @@ Explain how your project uses AI to solve the problem and what makes it valuable
 ├── src/                         # all application source code
 │   ├── bootstrap.php            # env, autoloader, session, config
 │   ├── routes.php               # every URL -> controller + middleware
-│   ├── Controllers/             # Auth, Dashboard, Financial, Chatbot, Product, Category, Profile
+│   ├── Controllers/             # Auth, Dashboard, Gmail, Financial, Chatbot, Product, Category, Profile
 │   ├── Middleware/              # Auth, Guest, Csrf
-│   ├── Models/                  # User, PasswordReset, Category, Product
-│   ├── Services/                # AuthService, PasswordResetService, BrevoMailer, ProductService
-│   ├── Support/                 # Database, Router, View, helpers
+│   ├── Models/                  # User, PasswordReset, Category, Product, GmailConnection
+│   ├── Services/                # AuthService, PasswordResetService, BrevoMailer, ProductService, GmailService
+│   ├── Support/                 # Database, Router, View, HttpClient, helpers
 │   ├── Views/
 │   │   ├── layouts/             # head, header/footer, app + auth shells
 │   │   ├── partials/            # sidebar, topbar, flashes
 │   │   ├── auth/                # register, login, forgot, reset
-│   │   ├── dashboard/           # email dashboard (home screen)
+│   │   ├── dashboard/           # email dashboard: Gmail inbox, AI summary, follow-ups
 │   │   ├── financial/           # invoice, claims, settlement, upload
 │   │   ├── chatbot/             # settings + chat (Customer and Staff)
 │   │   ├── products/            # product list, form, categories
@@ -150,6 +150,36 @@ There is **no admin portal and no admin authentication** anywhere in it.
   Invoice) · AI Chatbot (Customer, Staff) · Profile · Logout**.
 
 Full details: [`docs/AUTH.md`](docs/AUTH.md).
+
+## Dashboard email: Gmail, AI summary and follow-ups
+
+The dashboard is the Smart SME AI email dashboard:
+
+- **Gmail inbox (read-only).** Click **Connect Gmail** on the dashboard and
+  sign in with Google. The latest inbox and spam emails then load into the
+  inbox, with categories (Finance, Meeting, Orders, …) picked from keywords.
+  **Sync** reloads, **Disconnect** forgets and revokes the access. Without a
+  connection the dashboard shows demo emails.
+- **AI summary and reply draft** for the selected email (generated in the
+  browser for now).
+- **Suggested follow-up** with **Approve** (creates a follow-up task) and
+  **Dismiss**, plus a **History** popup listing created tasks and the
+  activity log. These are kept in the browser, separately per user.
+
+Gmail is implemented with plain HTTPS calls (`src/Services/GmailService.php`),
+so no Composer package is needed. Tokens are stored per user in the
+`gmail_connections` table (migration `003`).
+
+### Set up Gmail
+
+1. In `.env`, set `GMAIL_CLIENT_ID` and `GMAIL_CLIENT_SECRET` from Google
+   Cloud Console → APIs & Services → Credentials → your OAuth client (Web).
+2. In the same OAuth client, add this to **Authorized redirect URIs**:
+   `http://localhost/SDC-Hackathon/public/gmail/callback`
+   (it must match `GMAIL_REDIRECT_URI` in `.env` exactly).
+3. Make sure the **Gmail API** is enabled for the project, and while the
+   app is in "Testing", add your Google account under **Test users**.
+4. Run `C:\xampp\php\php.exe bin\migrate.php` to create `gmail_connections`.
 
 ## Product & Service (AI Chatbot → Customer)
 

@@ -54,6 +54,7 @@ src/
 │   ├── AuthController.php
 │   ├── ProfileController.php
 │   ├── DashboardController.php
+│   ├── GmailController.php
 │   ├── FinancialController.php
 │   ├── ChatbotController.php
 │   ├── ProductController.php
@@ -67,16 +68,19 @@ src/
 │   ├── User.php
 │   ├── PasswordReset.php
 │   ├── Category.php
-│   └── Product.php
+│   ├── Product.php
+│   └── GmailConnection.php
 ├── Services/
 │   ├── AuthService.php
 │   ├── PasswordResetService.php
 │   ├── BrevoMailer.php
-│   └── ProductService.php
+│   ├── ProductService.php
+│   └── GmailService.php
 ├── Support/
 │   ├── Database.php
 │   ├── Router.php
 │   ├── View.php
+│   ├── HttpClient.php
 │   └── helpers.php
 └── Views/
     ├── auth/                  # register, login, forgot, reset
@@ -95,7 +99,7 @@ public/
 └── assets/                    # css/app.css, css/dashboard.css, js/app.js, js/dashboard.js, logo
 database/
 ├── schema.sql                 # PostgreSQL: users + password_resets
-└── migrations/                # 001 product_categories, 002 products
+└── migrations/                # 001 product_categories, 002 products, 003 gmail_connections
 bin/
 ├── migrate.php
 ├── create-user.php

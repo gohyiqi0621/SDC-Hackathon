@@ -2,23 +2,34 @@
 /**
  * DashboardController.php - the home screen (the Smart SME AI email dashboard).
  *
- * The inbox is frontend mock data for now. The Brevo strip is real: it shows
- * whether password-reset email is configured and can send a test message.
+ * The inbox shows the user's real Gmail when connected (GmailController feeds
+ * it as JSON), otherwise demo emails. The Brevo strip shows whether
+ * password-reset email is configured and can send a test message.
  */
 declare(strict_types=1);
 
 namespace Src\Controllers;
 
+use Src\Models\GmailConnection;
 use Src\Services\BrevoMailer;
+use Src\Services\GmailService;
 
 final class DashboardController
 {
     /** GET /?page=dashboard */
     public function index(): void
     {
+        $user        = require_login();
+        $connections = new GmailConnection();
+        $tableReady  = $connections->tableExists();
+        $connection  = $tableReady ? $connections->find((int) $user['id']) : null;
+
         view('dashboard/index', [
-            'user'       => require_login(),
-            'brevoReady' => (new BrevoMailer())->isConfigured(),
+            'user'        => $user,
+            'brevoReady'  => (new BrevoMailer())->isConfigured(),
+            'gmailReady'  => (new GmailService())->isConfigured() && $tableReady,
+            'gmailTable'  => $tableReady,
+            'gmailEmail'  => $connection['google_email'] ?? null,
         ]);
     }
 

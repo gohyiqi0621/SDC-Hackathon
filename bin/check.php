@@ -23,7 +23,7 @@ try {
     fwrite(STDOUT, 'Connected to ' . DB_NAME . ' on ' . DB_HOST . ':' . DB_PORT . PHP_EOL);
     fwrite(STDOUT, $version . PHP_EOL);
 
-    foreach (['users', 'password_resets', 'product_categories', 'products'] as $table) {
+    foreach (['users', 'password_resets', 'product_categories', 'products', 'gmail_connections'] as $table) {
         $stmt = $pdo->prepare("SELECT to_regclass('public." . $table . "')");
         $stmt->execute();
         $exists = $stmt->fetchColumn() !== null;
