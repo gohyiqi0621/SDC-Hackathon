@@ -17,6 +17,9 @@ $styles    = $styles ?? [];
     <meta name="description" content="<?= e(APP_NAME) ?> - finance and AI assistant portal.">
     <link rel="icon" href="<?= e(asset('favicon.ico')) ?>" sizes="any">
 
+    <!-- Restore a collapsed sidebar before first paint, so it never flickers open. -->
+    <script>try { if (localStorage.getItem('sidebar') === 'collapsed') { document.documentElement.classList.add('sidebar-collapsed'); } } catch (e) {}</script>
+
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 

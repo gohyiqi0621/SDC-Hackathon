@@ -13,6 +13,7 @@ declare(strict_types=1);
 use Src\Controllers\AuthController;
 use Src\Controllers\CategoryController;
 use Src\Controllers\ChatbotController;
+use Src\Controllers\ClaimController;
 use Src\Controllers\DashboardController;
 use Src\Controllers\FinancialController;
 use Src\Controllers\GmailController;
@@ -50,9 +51,21 @@ return static function (Router $router): void {
 
     /* ------------------------------------------------------- financial --- */
     $router->get('financial/invoice', [FinancialController::class, 'invoice'], $auth);
-    $router->get('financial/claims', [FinancialController::class, 'claims'], $auth);
-    $router->get('financial/settlement', [FinancialController::class, 'settlement'], $auth);
     $router->get('financial/upload', [FinancialController::class, 'upload'], $auth);
+    $router->post('financial/store', [FinancialController::class, 'store'], $auth);
+    $router->get('financial/edit', [FinancialController::class, 'edit'], $auth);
+    $router->post('financial/update', [FinancialController::class, 'update'], $auth);
+    $router->post('financial/delete', [FinancialController::class, 'delete'], $auth);
+    $router->get('financial/file', [FinancialController::class, 'file'], $auth);
+    $router->get('financial/claims', [ClaimController::class, 'index'], $auth);
+    $router->get('financial/claim_new', [ClaimController::class, 'create'], $auth);
+    $router->post('financial/claim_store', [ClaimController::class, 'store'], $auth);
+    $router->get('financial/claim_edit', [ClaimController::class, 'edit'], $auth);
+    $router->post('financial/claim_update', [ClaimController::class, 'update'], $auth);
+    $router->post('financial/claim_status', [ClaimController::class, 'status'], $auth);
+    $router->post('financial/claim_delete', [ClaimController::class, 'delete'], $auth);
+    $router->get('financial/claim_file', [ClaimController::class, 'file'], $auth);
+    $router->get('financial/settlement', [FinancialController::class, 'settlement'], $auth);
 
     /* -------------------------------------------- AI chatbot: customer --- */
     $router->get('customer/settings', [ChatbotController::class, 'customerSettings'], $auth);

@@ -8,9 +8,9 @@
  */
 $financialLinks = [
     ['key' => 'financial/invoice',    'label' => 'Invoice',        'icon' => 'invoice', 'url' => url('financial', ['action' => 'invoice'])],
+    ['key' => 'financial/upload',     'label' => 'Upload Invoice', 'icon' => 'upload',  'url' => url('financial', ['action' => 'upload'])],
     ['key' => 'financial/claims',     'label' => 'Claims',         'icon' => 'claim',   'url' => url('financial', ['action' => 'claims'])],
     ['key' => 'financial/settlement', 'label' => 'Settlement',     'icon' => 'settle',  'url' => url('financial', ['action' => 'settlement'])],
-    ['key' => 'financial/upload',     'label' => 'Upload Invoice', 'icon' => 'upload',  'url' => url('financial', ['action' => 'upload'])],
 ];
 $financialCurrent = page_key();
 ?>

@@ -10,10 +10,23 @@ $prevSection = null;
 ?>
 <aside class="sidebar" id="sidebar" aria-label="Main navigation">
 
-    <a class="brand" href="<?= e(url('dashboard')) ?>">
-        <img src="<?= e(asset('assets/logo.webp')) ?>" alt="" width="34" height="34">
-        <span><?= e(APP_NAME) ?></span>
-    </a>
+    <div class="sidebar-head">
+        <a class="brand" href="<?= e(url('dashboard')) ?>">
+            <img src="<?= e(asset('assets/logo.webp')) ?>" alt="" width="34" height="34">
+            <span><?= e(APP_NAME) ?></span>
+        </a>
+        <button class="sidebar-collapse" type="button" data-sidebar-collapse
+                aria-controls="sidebar" aria-expanded="true" aria-label="Close sidebar" title="Close sidebar">
+            <!-- Panel icon; on hover it shows which way the sidebar will move. -->
+            <svg class="panel-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="5"/>
+                <path d="M9 3.5v17"/>
+                <path class="panel-icon__close" d="M15.5 9.5 13 12l2.5 2.5"/>
+                <path class="panel-icon__open" d="M13 9.5 15.5 12 13 14.5"/>
+            </svg>
+        </button>
+    </div>
 
     <nav class="sidebar-nav">
         <?php foreach (nav_items() as $item): ?>
