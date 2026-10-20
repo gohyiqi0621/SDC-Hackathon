@@ -1,0 +1,26 @@
+# public/.htaccess - clean URLs + basic hardening.
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Real files and folders (css, js, index.php) are served as-is.
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # /financial/invoice -> ?page=financial&action=invoice
+    RewriteRule ^([a-zA-Z0-9_]+)/([a-zA-Z0-9_]+)/?$ index.php?page=$1&action=$2 [QSA,L]
+
+    # /dashboard -> ?page=dashboard
+    RewriteRule ^([a-zA-Z0-9_]+)/?$ index.php?page=$1 [QSA,L]
+</IfModule>
+
+# Block dotfiles (.env and friends) if they ever end up inside public/.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_mime.c>
+    AddType application/manifest+json .webmanifest
+</IfModule>

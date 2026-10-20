@@ -46,13 +46,13 @@ Explain how your project uses AI to solve the problem and what makes it valuable
 
 ### Tech Stack
 
-| Layer         | Technology    |
-| ------------- | ------------- |
-| Frontend      | HTML, CSS, JS |
-| Backend       | Python, PHP   |
-| Database      | MySQL         |
-| AI / Compute  | RunPod (GPU)  |
-| Hosting / Dev | Replit        |
+| Layer         | Technology                    |
+| ------------- | ----------------------------- |
+| Frontend      | HTML, CSS, JS                 |
+| Backend       | PHP 8.2 (portal), Python (RunPod) |
+| Database      | PostgreSQL                    |
+| AI / Compute  | RunPod (GPU)                  |
+| Hosting / Dev | XAMPP, Replit                 |
 
 ---
 
@@ -60,23 +60,51 @@ Explain how your project uses AI to solve the problem and what makes it valuable
 
 ```
 .
-├── docs/                    # Screenshots, diagrams
+├── bin/                         # CLI: migrate, create-user, check
+├── database/
+│   └── schema.sql               # PostgreSQL schema (users + password resets)
+├── docs/
+│   └── AUTH.md                  # authentication & profile documentation
+├── public/                      # web root - the only folder Apache serves
+│   ├── index.php                # front controller (loads src/)
+│   ├── .htaccess                # clean URLs
+│   ├── favicon.ico
+│   └── assets/
+│       ├── css/app.css          # shared design (from the email dashboard)
+│       ├── css/dashboard.css    # inbox / AI email widgets
+│       ├── js/app.js            # sidebar, menus, AJAX forms, toasts, chat demo
+│       ├── js/dashboard.js      # inbox demo data + interactions
+│       └── logo.webp
 ├── runpod/
-│   └── handler.py           # RunPod serverless handler (GPU workload)
-├── src/
-│   ├── main.py              # Application entry point
-│   └── utils.py             # Helper functions
-├── submission/              # Required submission documents
-│   ├── REPLIT PROOF OF USE.pdf
-│   ├── RUNPOD PROOF OF USE.pdf
-│   └── Submission Template SDC Hackathon.pdf
+│   └── handler.py               # RunPod serverless handler (GPU workload)
+├── src/                         # all application source code
+│   ├── bootstrap.php            # env, autoloader, session, config
+│   ├── routes.php               # every URL -> controller + middleware
+│   ├── Controllers/             # Auth, Dashboard, Financial, Chatbot, Profile
+│   ├── Middleware/              # Auth, Guest, Csrf
+│   ├── Models/                  # User, PasswordReset
+│   ├── Services/                # AuthService, PasswordResetService, BrevoMailer
+│   ├── Support/                 # Database, Router, View, helpers
+│   ├── Views/
+│   │   ├── layouts/             # head, header/footer, app + auth shells
+│   │   ├── partials/            # sidebar, topbar, flashes
+│   │   ├── auth/                # register, login, forgot, reset
+│   │   ├── dashboard/           # email dashboard (home screen)
+│   │   ├── financial/           # invoice, claims, settlement, upload
+│   │   ├── chatbot/             # customer + staff assistant
+│   │   ├── profile/
+│   │   ├── emails/              # password-reset + test email bodies
+│   │   └── errors/
+│   ├── main.py                  # Python entry point (preserved)
+│   └── utils.py                 # helper functions (preserved)
+├── storage/                     # logs and uploads (git-ignored content)
+├── submission/                  # required submission documents
 ├── tests/
-│   └── test_utils.py        # Unit tests
-├── .env.example             # Example environment variables
-├── .gitignore
-├── .replit                  # Replit run configuration
+│   └── test_utils.py            # unit tests
+├── .env.example
+├── .htaccess                    # blocks src/, .env etc. from the web
 ├── LICENSE
-├── requirements.txt         # Python dependencies
+├── requirements.txt
 └── README.md
 ```
 
@@ -90,7 +118,87 @@ User ──► Replit (App / API) ──► RunPod Endpoint (GPU model)
 
 ---
 
-## How to Run
+## Authentication & Profile Portal
+
+The project now includes a **user-only** web portal (PHP 8.2 + PostgreSQL).
+It has registration, login, logout, forgot password, reset password and profile management.
+There is **no admin portal and no admin authentication** anywhere in it.
+
+### What is included
+
+- Sign in redirects straight to the dashboard; visiting the login page while
+  signed in redirects to the dashboard too.
+- Passwords are hashed with `password_hash`; every query is a prepared
+  statement against PostgreSQL.
+- Sessions use HTTP-only, `SameSite=Lax` cookies with ID regeneration and
+  idle/absolute timeouts.
+- Every POST is protected by CSRF; logout is POST-only.
+- Password reset uses a 32-byte random token, stored as a SHA-256 hash,
+  expiring after 60 minutes and consumed exactly once inside a transaction.
+- The profile page lets the signed-in user update their name and password.
+- Anyone can create an account at `/auth/register`; after registering they are
+  signed in and sent to the dashboard.
+- The **dashboard is the Smart SME AI email dashboard** (inbox, AI summary,
+  AI reply draft, smart notifications), and every page — sign in, Financial,
+  AI Chatbot, Profile — uses the same design.
+- Brevo sends password-reset email (bodies in `src/Views/emails/`). The
+  dashboard shows whether Brevo is connected and can send a test email.
+- Sidebar: **Dashboard · Financial (Invoice, Claims, Settlement, Upload
+  Invoice) · AI Chatbot (Customer, Staff) · Profile · Logout**.
+
+Full details: [`docs/AUTH.md`](docs/AUTH.md).
+
+### Local setup (XAMPP + PostgreSQL)
+
+1. Start **Apache** and **PostgreSQL** in the XAMPP Control Panel.
+2. Copy `.env.example` to `.env` and set the `DB_*` values (the included `.env`
+   already points at `sme_assistant` on `127.0.0.1:5432`).
+3. Create the tables (idempotent — it never drops data):
+
+   ```bash
+   C:\xampp\php\php.exe bin\migrate.php
+   ```
+
+   Or import the schema with psql:
+
+   ```bash
+   psql -U yiqi -h 127.0.0.1 -d sme_assistant -f database/schema.sql
+   ```
+
+4. Create an account (there is no public registration):
+
+   ```bash
+   C:\xampp\php\php.exe bin\create-user.php "Your Name" you@example.com
+   ```
+
+   The generated password is printed once.
+
+5. Open <http://localhost/SDC-Hackathon/public/>.
+
+6. For password-reset email, add the Brevo credentials to `.env`:
+
+   ```dotenv
+   BREVO_API_KEY=xkeysib-...
+   BREVO_SENDER_EMAIL=verified-sender@example.com
+   BREVO_SENDER_NAME="Smart SME"
+   ```
+
+   `BREVO_SENDER_EMAIL` must be a verified sender in Brevo. The dashboard
+   shows the connection status and can send a test message.
+
+### Health checks
+
+```bash
+C:\xampp\php\php.exe bin\check.php     # database connection + tables
+C:\xampp\php\php.exe -l src\Controllers\AuthController.php
+```
+
+---
+
+## Run the Python / RunPod Scaffold
+
+The original Python entry point (`src/main.py`), `src/utils.py`, tests and the
+RunPod handler are preserved.
 
 ### Option 1 — Run on Replit (Recommended)
 

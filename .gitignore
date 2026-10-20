@@ -7,6 +7,15 @@ venv/
 # Environment
 .env
 
+# Runtime storage
+storage/logs/*.log
+storage/uploads/*
+!storage/uploads/.gitkeep
+
+# PHP
+vendor/
+composer.lock
+
 # OS / Editor
 .DS_Store
 .vscode/

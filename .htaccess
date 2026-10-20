@@ -1,0 +1,28 @@
+# SDC-Hackathon/.htaccess
+#
+# XAMPP serves htdocs/ as the web root, so anything outside public/ is reachable
+# by URL unless it is blocked here. Only public/ is meant to be requested
+# directly; all application source lives in src/.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # A bare project URL serves the front controller. Every link and asset in
+    # the app is absolute (built from APP_URL), so this works without a redirect
+    # and without hard-coding the folder name.
+    RewriteRule ^$ public/index.php [QSA,L]
+
+    # Application source, schema, storage, tests and the Python RunPod handler.
+    RewriteRule ^(src|database|storage|tests|bin|runpod|docs)(/|$) - [F,L]
+
+    # The old top-level email/ folder was merged into the dashboard (src/).
+    # Block it in case a stale copy is left behind.
+    RewriteRule ^email(/|$) - [F,L]
+
+    # Environment files and Git metadata.
+    RewriteRule ^\.env - [F,L]
+    RewriteRule ^\.git - [F,L]
+</IfModule>
+
+# Never serve a directory listing if mod_rewrite is unavailable.
+Options -Indexes

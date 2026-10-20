@@ -1,11 +1,11 @@
-
 <?php
-// Temporary worker information
-// Later, this will come from the login session.
-$workerName = "Sze Yen";
-$workerRole = "Worker";
+/**
+ * email/index.php - the Smart SME AI email dashboard (moved from the old
+ * top-level email/ folder). Rendered by EmailController behind AuthMiddleware.
+ *
+ * Expects: $workerName, $workerRole, $brevoReady
+ */
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -15,8 +15,10 @@ $workerRole = "Worker";
 
     <title>Smart SME | AI Email Dashboard</title>
 
+    <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
+
     <!-- CSS -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="<?= e(asset_versioned('assets/css/email.css')) ?>">
 
     <!-- Icons -->
     <link rel="stylesheet"
@@ -44,6 +46,11 @@ $workerRole = "Worker";
 
         <div class="topbar-right">
 
+            <a class="app-back" href="<?= e(url('dashboard')) ?>">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span>Dashboard</span>
+            </a>
+
             <button class="notification-btn"
                     id="notificationBtn"
                     aria-label="Notifications">
@@ -67,6 +74,24 @@ $workerRole = "Worker";
         </div>
 
     </header>
+
+    <?php $emailFlashes = flashes(); ?>
+    <?php if ($emailFlashes !== []): ?>
+        <div class="email-flashes" aria-live="polite">
+            <?php foreach ($emailFlashes as $flash): ?>
+                <?php $flashType = in_array($flash['type'] ?? 'info', ['success', 'error', 'warning', 'info'], true) ? $flash['type'] : 'info'; ?>
+                <div class="email-flash email-flash--<?= htmlspecialchars($flashType) ?>" role="<?= $flashType === 'error' ? 'alert' : 'status' ?>">
+                    <i class="fa-solid <?= $flashType === 'success' ? 'fa-circle-check' : ($flashType === 'error' ? 'fa-circle-exclamation' : 'fa-circle-info') ?>"></i>
+                    <div>
+                        <?php if (!empty($flash['title'])): ?>
+                            <strong><?= htmlspecialchars($flash['title']) ?></strong>
+                        <?php endif; ?>
+                        <span><?= htmlspecialchars($flash['message']) ?></span>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
 
 
     <!-- ========== WELCOME BANNER ========== -->
@@ -99,6 +124,37 @@ $workerRole = "Worker";
 
         </div>
 
+    </section>
+
+
+    <!-- ========== PASSWORD RESET EMAIL (BREVO) ========== -->
+    <section class="brevo-strip" aria-label="Password reset email delivery">
+        <div class="brevo-strip__info">
+            <strong>
+                <i class="fa-solid fa-paper-plane"></i>
+                Password reset email
+            </strong>
+            <span>
+                <?php if ($brevoReady): ?>
+                    Brevo is connected. Reset links are sent from
+                    <?php echo htmlspecialchars(BREVO_SENDER_EMAIL); ?>.
+                <?php else: ?>
+                    Brevo is not configured yet. Add <code>BREVO_API_KEY</code> and
+                    <code>BREVO_SENDER_EMAIL</code> to the app's <code>.env</code> to
+                    enable password-reset email.
+                <?php endif; ?>
+            </span>
+        </div>
+
+        <?php if ($brevoReady): ?>
+            <form method="post" action="<?= e(url('email', ['action' => 'test'])) ?>">
+                <?= csrf_field() ?>
+                <button class="brevo-strip__btn" type="submit">
+                    <i class="fa-regular fa-envelope"></i>
+                    Send test email
+                </button>
+            </form>
+        <?php endif; ?>
     </section>
 
 
@@ -462,7 +518,7 @@ Sze Yen
 
 
 <!-- JavaScript -->
-<script src="script.js"></script>
+<script src="<?= e(asset_versioned('assets/js/email.js')) ?>"></script>
 
 </body>
 </html>
