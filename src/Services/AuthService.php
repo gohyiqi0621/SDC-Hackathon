@@ -22,7 +22,8 @@ final class AuthService
     private const WINDOW_SECONDS = 900;
 
     /** bcrypt hash of "password"; only used to equalize failed-login timing. */
-    private const DUMMY_HASH = 
+    private const DUMMY_HASH = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.';
+
     private static ?array $cachedUser = null;
     private static bool $loaded = false;
 
