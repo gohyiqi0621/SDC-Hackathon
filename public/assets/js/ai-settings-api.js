@@ -187,6 +187,9 @@
         tone_description: '',
         system_instructions: '',
         is_enabled: true,
+        ai_model: 'claude-haiku-5-5',
+        temperature: 0.7,
+        has_api_key: false,
         updated_at: null
     };
 
@@ -275,8 +278,10 @@
     // Live contract:
     //   GET  assistantGet  -> { ai_settings: {assistant_name, personality,
     //                           tone_description, system_instructions,
-    //                           is_enabled, updated_at} | null }
-    //   POST assistantSave (same fields, is_enabled "1"/"0") -> { ai_settings: {...} }
+    //                           is_enabled, ai_model, temperature,
+    //                           has_api_key, updated_at} | null }
+    //   POST assistantSave (same fields, is_enabled "1"/"0", api_key only when
+    //                       typed) -> { ai_settings: {...} } (never the key)
 
     var assistant = {
         get: function () {
@@ -288,7 +293,10 @@
             return liveOrDemo('assistant', function () {
                 return request('POST', 'assistantSave', values);
             }, function () {
-                var row = Object.assign({}, MOCK_ASSISTANT, values, { updated_at: nowIso() });
+                // The secret key is never kept in browser storage, even in demo mode.
+                var safe = Object.assign({}, values);
+                delete safe.api_key;
+                var row = Object.assign({}, MOCK_ASSISTANT, safe, { has_api_key: false, updated_at: nowIso() });
                 var stored = writeStore('assistant', row);
                 return { ai_settings: row, demo: true, stored: stored };
             });

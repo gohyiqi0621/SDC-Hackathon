@@ -3,7 +3,8 @@
  * ai_settings/_company_information_form.php - CompanyInformationForm.
  *
  * Table: company_profiles (company_name, company_logo_url, company_background,
- * company_description, business_category). Field names match the columns so
+ * business_category). company_description is no longer edited here; an existing
+ * value is kept as it is. Field names match the columns so
  * the server can map them directly. The logo is sent as the `company_logo`
  * file; `remove_logo=1` clears the stored one.
  *
@@ -72,18 +73,6 @@ $logoMaxMb = 2;
                             <?php endforeach; ?>
                         </select>
                         <p class="field-error" id="err-business_category" data-error-for="business_category"></p>
-                    </div>
-
-                    <div class="field">
-                        <div class="field-label-row">
-                            <label for="company_description">Company introduction / description *</label>
-                            <span class="char-count" data-counter-for="company_description" aria-hidden="true"></span>
-                        </div>
-                        <textarea id="company_description" name="company_description" rows="5" maxlength="2000" required
-                                  placeholder="What you sell or do, who it is for, and what makes you different. This is how the assistant introduces you."
-                                  aria-describedby="hint-company_description err-company_description"></textarea>
-                        <p class="field-hint" id="hint-company_description">Customers may see this almost word for word. Keep it friendly and factual.</p>
-                        <p class="field-error" id="err-company_description" data-error-for="company_description"></p>
                     </div>
 
                     <div class="field">

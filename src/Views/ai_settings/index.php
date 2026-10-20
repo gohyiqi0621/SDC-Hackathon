@@ -14,7 +14,7 @@
  * through assets/js/ai-settings-api.js. $endpoints comes from
  * ChatbotController::aiSettingsEndpoints(), so every URL lives in one place.
  *
- * Expects: $user, $userId, $endpoints, $businessCategories, $timezones,
+ * Expects: $user, $userId, $endpoints, $businessCategories, $timezones, $aiModels,
  *          $chatUrl.
  */
 $tabs = [
@@ -75,7 +75,7 @@ view('layouts/header', [
     </section>
 
     <section class="ai-panel" role="tabpanel" id="ai-panel-assistant" aria-labelledby="ai-tab-assistant" tabindex="0" data-panel="assistant" hidden>
-        <?php view('ai_settings/_ai_assistant_settings_form'); ?>
+        <?php view('ai_settings/_ai_assistant_settings_form', ['aiModels' => $aiModels]); ?>
     </section>
 
     <section class="ai-panel" role="tabpanel" id="ai-panel-telegram" aria-labelledby="ai-tab-telegram" tabindex="0" data-panel="telegram" hidden>

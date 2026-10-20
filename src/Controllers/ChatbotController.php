@@ -54,6 +54,7 @@ final class ChatbotController
             'endpoints'          => self::aiSettingsEndpoints(),
             'businessCategories' => self::BUSINESS_CATEGORIES,
             'timezones'          => \DateTimeZone::listIdentifiers(),
+            'aiModels'           => AiSettingsController::AI_MODELS,
             'chatUrl'            => url('customer', ['action' => 'chat']),
         ]);
     }

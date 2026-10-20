@@ -623,7 +623,6 @@
             return {
                 company_name: [Rules.required('Company name'), Rules.minLength(2, 'Company name'), Rules.maxLength(150, 'Company name')],
                 business_category: [Rules.required('Business category'), Rules.oneOf(selectOptions(category), 'Choose a category from the list.')],
-                company_description: [Rules.required('Company description'), Rules.minLength(20, 'Company description'), Rules.maxLength(2000, 'Company description')],
                 company_background: [Rules.maxLength(3000, 'Company background')]
             };
         }
@@ -633,7 +632,6 @@
             ctrl.load({
                 company_name: p.company_name || '',
                 business_category: p.business_category || '',
-                company_description: p.company_description || '',
                 company_background: p.company_background || '',
                 remove_logo: false
             });
@@ -664,7 +662,7 @@
             }
 
             var body = new FormData();
-            ['company_name', 'business_category', 'company_description', 'company_background'].forEach(function (key) {
+            ['company_name', 'business_category', 'company_background'].forEach(function (key) {
                 body.append(key, trimmed(values[key]));
             });
             if (pendingFile) { body.append('company_logo', pendingFile, pendingFile.name); }
@@ -692,8 +690,7 @@
 
         return {
             load: load,
-            companyName: function () { return trimmed($('#company_name', form).value); },
-            description: function () { return trimmed($('#company_description', form).value); }
+            companyName: function () { return trimmed($('#company_name', form).value); }
         };
     })();
 
@@ -708,25 +705,29 @@
         var toneRequired = $('[data-tone-required]', form);
         var switchInput = $('#is_enabled', form);
         var switchLabel = $('[data-switch-label]', form);
+        var modelSelect = $('#ai_model', form);
+        var apiKey = $('#api_key', form);
+        var apiKeyProvider = $('[data-api-key-provider]', form);
+        var apiKeyHint = $('[data-api-key-hint]', form);
+        var temperature = $('#temperature', form);
+        var temperatureValue = $('[data-temperature-value]', form);
 
         var MAX_INSTRUCTIONS = 20000;
+        var DEFAULT_MODEL = modelSelect.options.length ? modelSelect.options[0].value : '';
+        var KEY_PREFIX = { Anthropic: 'sk-ant-', DeepSeek: 'sk-' };
+
+        /** What the server last said: whether a key is saved, and for which provider. */
+        var keyState = { saved: false, provider: null };
         var PERSONALITIES = ['friendly', 'professional', 'warm', 'persuasive', 'custom'];
 
         /** Order and headings used inside the single system_instructions field. */
         var SOP = [
-            { key: 'general', label: 'General AI behavior' },
             { key: 'service', label: 'Customer Service SOP' },
             { key: 'booking', label: 'Booking SOP' },
             { key: 'sales',   label: 'Salesman SOP' }
         ];
 
         var TEMPLATES = {
-            general: [
-                '- Reply in the language the customer uses (English, Bahasa Melayu or Chinese).',
-                '- Only answer using our company information and product list. If unsure, say so and offer to connect a staff member.',
-                '- Never share other customers\' details, internal prices or staff phone numbers.',
-                '- Hand over to a human when the customer is upset, asks for a manager, or the question is about payment problems.'
-            ].join('\n'),
             service: [
                 '1. Apologise once and thank the customer for their patience.',
                 '2. Ask for the order number and the phone number used for the order.',
@@ -760,17 +761,22 @@
             }).filter(Boolean).join('\n\n');
         }
 
-        /** Splits stored text back into the four boxes. Text before any known heading goes to General. */
+        /**
+         * Splits stored text back into the SOP boxes. Text that is not under a
+         * known SOP heading (e.g. the old "General AI behavior" section) is
+         * not shown, so it is dropped the next time the settings are saved.
+         */
         function parse(text) {
-            var parts = { general: [], service: [], booking: [], sales: [] };
-            var current = 'general';
+            var parts = { service: [], booking: [], sales: [] };
+            var current = null;
             String(text || '').replace(/\r\n?/g, '\n').split('\n').forEach(function (line) {
                 var heading = /^#{2,3}\s*(.+?)\s*$/.exec(line);
                 if (heading) {
                     var match = SOP.filter(function (s) { return s.label.toLowerCase() === heading[1].toLowerCase(); })[0];
                     if (match) { current = match.key; return; }
+                    if (heading[1].toLowerCase() === 'general ai behavior') { current = null; return; }
                 }
-                parts[current].push(line);
+                if (current) { parts[current].push(line); }
             });
             var result = {};
             Object.keys(parts).forEach(function (key) { result[key] = parts[key].join('\n').trim(); });
@@ -833,6 +839,38 @@
             switchLabel.textContent = switchInput.checked ? 'Enabled' : 'Disabled';
         }
 
+        function providerOf(modelId) {
+            var option = $all('option', modelSelect).filter(function (o) { return o.value === modelId; })[0];
+            return option ? option.getAttribute('data-provider') : null;
+        }
+
+        function clearKey() {
+            apiKey.value = '';
+            apiKey.type = 'password';
+            var toggle = $('[data-toggle-password="api_key"]', form);
+            if (toggle) {
+                toggle.setAttribute('aria-label', 'Show key');
+                var icon = $('i', toggle);
+                if (icon) { icon.className = 'fa-regular fa-eye'; }
+            }
+        }
+
+        /** Label, placeholder and hint follow the chosen model's provider and whether a key is saved. */
+        function updateModelFields() {
+            var provider = providerOf(modelSelect.value) || 'Anthropic';
+            var keyStillValid = keyState.saved && keyState.provider === provider;
+            apiKeyProvider.textContent = '(' + provider + ')';
+            apiKey.placeholder = keyStillValid
+                ? 'Saved securely. Leave blank to keep the current key'
+                : (KEY_PREFIX[provider] || '') + '...';
+            apiKeyHint.textContent = keyStillValid
+                ? 'A ' + provider + ' key is saved (encrypted). Enter a new one only to replace it.'
+                : (keyState.saved
+                    ? 'The saved key is for ' + keyState.provider + '. Enter your ' + provider + ' secret key for this model.'
+                    : 'Your ' + provider + ' API key. Hidden by default, sent to the server once and stored encrypted. It is never shown again.');
+            temperatureValue.textContent = Number(temperature.value).toFixed(1);
+        }
+
         var ctrl = new FormController(form, {
             tab: 'assistant',
             onReset: function (values) {
@@ -841,7 +879,13 @@
             onChange: function () {
                 updateToneRequirement();
                 updateSwitchLabel();
+                updateModelFields();
             }
+        });
+
+        // The slider value is shown live while dragging.
+        temperature.addEventListener('input', function () {
+            temperatureValue.textContent = Number(temperature.value).toFixed(1);
         });
 
 
@@ -858,23 +902,49 @@
                     },
                     Rules.maxLength(500, 'Tone description')
                 ],
-                system_instructions: [Rules.maxLength(MAX_INSTRUCTIONS, 'System instructions')]
+                system_instructions: [Rules.maxLength(MAX_INSTRUCTIONS, 'System instructions')],
+                ai_model: [Rules.required('AI model'), Rules.oneOf(selectOptions(modelSelect), 'Choose an AI model from the list.')],
+                temperature: [function (value) {
+                    var n = Number(value);
+                    return value === '' || isNaN(n) || n < 0 || n > 1 ? 'Temperature must be from 0 to 1.' : null;
+                }],
+                api_key: [function (value, all) {
+                    var key = trimmed(value);
+                    var provider = providerOf(all.ai_model);
+                    if (key === '') {
+                        return keyState.saved && provider && keyState.provider && provider !== keyState.provider
+                            ? 'You switched to a ' + provider + ' model. Enter the ' + provider + ' secret key.' : null;
+                    }
+                    if (key.length < 20 || /\s/.test(key)) { return 'That does not look like a secret key. Copy it again from the provider.'; }
+                    if (provider && KEY_PREFIX[provider] && key.indexOf(KEY_PREFIX[provider]) !== 0) {
+                        return provider + ' keys start with "' + KEY_PREFIX[provider] + '". Check you copied the key for ' + provider + '.';
+                    }
+                    return null;
+                }]
             };
         }
 
         function fill(settings, demo) {
             var s = settings || {};
+            var model = providerOf(s.ai_model) ? s.ai_model : DEFAULT_MODEL;
+            var temp = typeof s.temperature === 'number' && s.temperature >= 0 && s.temperature <= 1 ? s.temperature : 0.7;
+            keyState = { saved: !!s.has_api_key, provider: s.has_api_key ? providerOf(model) : null };
+            clearKey();
             fillEditors(s.system_instructions || '');
             ctrl.load({
                 assistant_name: s.assistant_name || '',
                 personality: PERSONALITIES.indexOf(s.personality) === -1 ? 'friendly' : s.personality,
                 tone_description: s.tone_description || '',
                 is_enabled: s.is_enabled === undefined || s.is_enabled === null ? true : s.is_enabled,
-                system_instructions: output.value
+                system_instructions: output.value,
+                ai_model: model,
+                temperature: String(Math.round(temp * 10) / 10),
+                api_key: ''
             });
             ctrl.setSavedMeta(savedMetaText(s.updated_at, demo));
             updateToneRequirement();
             updateSwitchLabel();
+            updateModelFields();
         }
 
         function load() {
@@ -899,13 +969,19 @@
             }
 
             ctrl.setBusy(true);
-            Api.assistant.save({
+            var payload = {
                 assistant_name: trimmed(values.assistant_name),
                 personality: values.personality,
                 tone_description: trimmed(values.tone_description),
                 system_instructions: values.system_instructions,
-                is_enabled: !!values.is_enabled
-            }).then(function (data) {
+                is_enabled: !!values.is_enabled,
+                ai_model: values.ai_model,
+                temperature: values.temperature
+            };
+            // Only sent when typed; otherwise the server keeps the saved key.
+            if (trimmed(values.api_key) !== '') { payload.api_key = trimmed(values.api_key); }
+
+            Api.assistant.save(payload).then(function (data) {
                 ctrl.busy = false;
                 fill(data.ai_settings, !!data.demo);
                 toast(data.demo

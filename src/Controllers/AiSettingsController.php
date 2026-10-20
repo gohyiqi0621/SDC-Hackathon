@@ -43,6 +43,23 @@ final class AiSettingsController
     private const LOGO_TYPES     = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
 
     private const PERSONALITIES  = ['friendly', 'professional', 'warm', 'persuasive', 'custom'];
+
+    /**
+     * Models the assistant can run on: id => [label, provider]. The id is what
+     * the provider's API expects. Add a row here to offer another model.
+     */
+    public const AI_MODELS = [
+        'claude-haiku-5-5'  => ['Claude Haiku 5.5',  'Anthropic'],
+        'claude-sonnet-5-5' => ['Claude Sonnet 5.5', 'Anthropic'],
+        'claude-opus-5-5'   => ['Claude Opus 5.5',   'Anthropic'],
+        'deepseek-v4-flash' => ['DeepSeek V4 Flash', 'DeepSeek'],
+        'deepseek-v4-pro'   => ['DeepSeek V4 Pro',   'DeepSeek'],
+    ];
+    public const DEFAULT_AI_MODEL    = 'claude-haiku-5-5';
+    public const DEFAULT_TEMPERATURE = 0.7;
+
+    /** What each provider's secret keys start with (a quick sanity check, not a real test). */
+    private const KEY_PREFIXES = ['Anthropic' => 'sk-ant-', 'DeepSeek' => 'sk-'];
     private const DURATIONS      = [15, 30, 45, 60, 90];
     private const MAX_INSTRUCTIONS = 20000;
 
@@ -67,7 +84,7 @@ final class AiSettingsController
     public function companyProfileSave(): void
     {
         $this->run(function (int $userId): void {
-            $input  = $this->strings($_POST, ['company_name', 'business_category', 'company_description', 'company_background']);
+            $input  = $this->strings($_POST, ['company_name', 'business_category', 'company_background']);
             $errors = [];
 
             if ($input['company_name'] === '' ) {
@@ -78,14 +95,6 @@ final class AiSettingsController
 
             if (!in_array($input['business_category'], ChatbotController::BUSINESS_CATEGORIES, true)) {
                 $errors['business_category'] = $input['business_category'] === '' ? 'Business category is required.' : 'Choose a category from the list.';
-            }
-
-            if ($input['company_description'] === '') {
-                $errors['company_description'] = 'Company description is required.';
-            } elseif (mb_strlen($input['company_description']) < 20) {
-                $errors['company_description'] = 'Company description needs at least 20 characters.';
-            } elseif (mb_strlen($input['company_description']) > 2000) {
-                $errors['company_description'] = 'Company description must be 2000 characters or fewer.';
             }
 
             if (mb_strlen($input['company_background']) > 3000) {
@@ -119,7 +128,6 @@ final class AiSettingsController
                 $row = $model->save($userId, [
                     'company_name'        => $input['company_name'],
                     'business_category'   => $input['business_category'],
-                    'company_description' => $input['company_description'],
                     'company_background'  => $input['company_background'] !== '' ? $input['company_background'] : null,
                     'company_logo_url'    => $logo,
                 ]);
@@ -171,6 +179,35 @@ final class AiSettingsController
                 $errors['tone_description'] = 'Tone description must be 500 characters or fewer.';
             }
 
+            $model    = new AiAssistantSetting();
+            $existing = $model->find($userId);
+
+            $aiModel = trim((string) ($_POST['ai_model'] ?? ''));
+            if (!isset(self::AI_MODELS[$aiModel])) {
+                $errors['ai_model'] = 'Choose an AI model from the list.';
+            }
+
+            $temperatureRaw = trim((string) ($_POST['temperature'] ?? ''));
+            if (!is_numeric($temperatureRaw) || (float) $temperatureRaw < 0 || (float) $temperatureRaw > 1) {
+                $errors['temperature'] = 'Temperature must be a number from 0 to 1.';
+            }
+
+            // Secret key: optional when one is already saved for the same provider.
+            $apiKey   = trim((string) ($_POST['api_key'] ?? ''));
+            $provider = self::AI_MODELS[$aiModel][1] ?? null;
+            $oldModel = (string) ($existing['ai_model'] ?? '');
+            $oldProvider = self::AI_MODELS[$oldModel][1] ?? null;
+
+            if ($apiKey !== '') {
+                if (strlen($apiKey) < 20 || strlen($apiKey) > 300 || preg_match('/\s/', $apiKey)) {
+                    $errors['api_key'] = 'That does not look like a secret key. Copy it again from the provider.';
+                } elseif ($provider !== null && !str_starts_with($apiKey, self::KEY_PREFIXES[$provider])) {
+                    $errors['api_key'] = $provider . ' keys start with "' . self::KEY_PREFIXES[$provider] . '". Check you copied the key for ' . $provider . '.';
+                }
+            } elseif (!empty($existing['api_key_encrypted']) && $provider !== null && $oldProvider !== null && $provider !== $oldProvider) {
+                $errors['api_key'] = 'You switched to a ' . $provider . ' model. Enter the ' . $provider . ' secret key.';
+            }
+
             if (mb_strlen($instructions) > self::MAX_INSTRUCTIONS) {
                 $errors['system_instructions'] = 'System instructions must be ' . number_format(self::MAX_INSTRUCTIONS) . ' characters or fewer.';
             }
@@ -179,13 +216,20 @@ final class AiSettingsController
                 $this->invalid($errors);
             }
 
-            $row = (new AiAssistantSetting())->save($userId, [
+            $values = [
                 'assistant_name'      => $input['assistant_name'],
                 'personality'         => $input['personality'],
                 'tone_description'    => $input['tone_description'] !== '' ? $input['tone_description'] : null,
                 'system_instructions' => trim($instructions) !== '' ? $instructions : null,
                 'is_enabled'          => $this->bool($_POST['is_enabled'] ?? '0'),
-            ]);
+                'ai_model'            => $aiModel,
+                'temperature'         => number_format((float) $temperatureRaw, 2, '.', ''),
+            ];
+            if ($apiKey !== '') {
+                $values['api_key_encrypted'] = Crypto::encrypt($apiKey);   // otherwise the saved key is kept
+            }
+
+            $row = $model->save($userId, $values);
 
             json_response(true, ['ai_settings' => $this->presentAssistant($row)], 'AI assistant settings saved.');
         });
@@ -505,7 +549,7 @@ final class AiSettingsController
             error_log('[ai_settings] ' . $e->getMessage());
             $state = (string) $e->getCode();
             $message = match ($state) {
-                '42P01' => 'The AI settings tables do not exist yet. Run: C:\\xampp\\php\\php.exe bin\\migrate.php',
+                '42P01', '42703' => 'The database is missing the latest AI settings tables or columns. Run: C:\\xampp\\php\\php.exe bin\\migrate.php',
                 '42501' => 'The database user has no permission on the AI settings tables. Make the DB_USER in .env the owner of these tables.',
                 default => 'A database error stopped this request.' . (APP_DEBUG ? ' ' . $e->getMessage() : ''),
             };
@@ -580,6 +624,9 @@ final class AiSettingsController
             'tone_description'    => (string) ($row['tone_description'] ?? ''),
             'system_instructions' => (string) ($row['system_instructions'] ?? ''),
             'is_enabled'          => $this->bool($row['is_enabled']),
+            'ai_model'            => isset(self::AI_MODELS[(string) ($row['ai_model'] ?? '')]) ? (string) $row['ai_model'] : self::DEFAULT_AI_MODEL,
+            'temperature'         => isset($row['temperature']) ? (float) $row['temperature'] : self::DEFAULT_TEMPERATURE,
+            'has_api_key'         => !empty($row['api_key_encrypted']),   // the key itself never leaves the server
             'updated_at'          => $this->iso($row['updated_at'] ?? null),
         ];
     }
