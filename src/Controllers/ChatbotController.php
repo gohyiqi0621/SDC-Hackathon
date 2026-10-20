@@ -5,9 +5,9 @@
  *   Customer: Setting & Integration, Product & Service (ProductController), Chat Interface
  *   Staff:    Setting & Integration, Chat Interface
  *
- * Both audiences share the same two views (chatbot/settings.php and
- * chatbot/chat.php); this controller only supplies the wording.
- * The AI service and channel integrations are the next integration step.
+ * Customer settings use the AI Settings & Integration page (ai_settings/*).
+ * Staff settings and both chat screens share chatbot/settings.php and
+ * chatbot/chat.php; this controller only supplies the wording.
  */
 declare(strict_types=1);
 
@@ -18,27 +18,82 @@ use Src\Services\BrevoMailer;
 
 final class ChatbotController
 {
-    /** GET /?page=customer&action=settings */
+    /** Options for company_profiles.business_category (the value is stored as-is). */
+    public const BUSINESS_CATEGORIES = [
+        'Food & Beverage',
+        'Retail & E-commerce',
+        'Beauty & Wellness',
+        'Health & Clinic',
+        'Education & Training',
+        'Professional Services',
+        'Home Services',
+        'Automotive',
+        'Travel & Hospitality',
+        'Property & Real Estate',
+        'Technology & IT',
+        'Events & Entertainment',
+        'Other',
+    ];
+
+    /**
+     * GET /?page=customer&action=settings
+     *
+     * AI Settings & Integration: company information, AI assistant, Telegram
+     * and Google Calendar. The page itself only renders the shell; each section
+     * loads and saves through the JSON endpoints in aiSettingsEndpoints().
+     * The signed-in user is always taken from the session on the server - the
+     * browser never sends a user id for authorization.
+     */
     public function customerSettings(): void
     {
         $user = require_login();
 
-        view('chatbot/settings', [
-            'user'         => $user,
-            'title'        => 'Customer Setting & Integration',
-            'audience'     => 'Customer',
-            'sub'          => 'Set up how the customer assistant talks and where customers can reach it.',
-            'assistant'    => ['name' => APP_NAME . ' Assistant', 'greeting' => 'Hi! How can I help you today?'],
-            'productCount' => (new Product())->countForUser((int) $user['id']),
-            'integrations' => [
-                ['fa-solid fa-globe',         'Website chat widget', 'Add the assistant to your website.',            false],
-                ['fa-brands fa-whatsapp',     'WhatsApp Business',   'Answer customers on WhatsApp.',                 false],
-                ['fa-brands fa-telegram',     'Telegram',            'Answer customers on Telegram.',                 false],
-                ['fa-brands fa-facebook-messenger', 'Messenger',     'Answer customers on Facebook Messenger.',       false],
-                ['fa-regular fa-envelope',    'Email (Brevo)',       'Send emails such as password resets.',          (new BrevoMailer())->isConfigured() ?: 'setup'],
-            ],
-            'chatUrl'      => url('customer', ['action' => 'chat']),
+        view('ai_settings/index', [
+            'user'               => $user,
+            'userId'             => (int) $user['id'],
+            'endpoints'          => self::aiSettingsEndpoints(),
+            'businessCategories' => self::BUSINESS_CATEGORIES,
+            'timezones'          => \DateTimeZone::listIdentifiers(),
+            'aiModels'           => AiSettingsController::AI_MODELS,
+            'chatUrl'            => url('customer', ['action' => 'chat']),
         ]);
+    }
+
+    /**
+     * The JSON endpoints the AI Settings page calls, in one place.
+     *
+     * The proposed REST paths (/api/smes/:userId/...) do not fit this app's
+     * Router (GET/POST only, addressed as ?page=&action=), so the same
+     * operations are mapped onto that convention. PUT becomes POST. They are
+     * registered in routes.php and handled by AiSettingsController. If one is
+     * ever missing (404), the page falls back to a clearly labelled demo mode.
+     *
+     * @return array<string, string>
+     */
+    private static function aiSettingsEndpoints(): array
+    {
+        $to = static fn (string $action): string => url('ai_settings', ['action' => $action]);
+
+        return [
+            // Company information (company_profiles)
+            'companyGet'          => $to('company_profile'),            // GET
+            'companySave'         => $to('company_profile_save'),       // POST multipart
+            // AI assistant (ai_assistant_settings)
+            'assistantGet'        => $to('assistant'),                  // GET
+            'assistantSave'       => $to('assistant_save'),             // POST
+            // Telegram (telegram_integrations)
+            'telegramGet'         => $to('telegram'),                   // GET
+            'telegramConnect'     => $to('telegram_connect'),           // POST
+            'telegramTest'        => $to('telegram_test'),              // POST
+            'telegramDisconnect'  => $to('telegram_disconnect'),        // POST
+            // Google Calendar (google_calendar_integrations)
+            'calendarGet'         => $to('google_calendar'),            // GET
+            'calendarOauthStart'  => $to('google_calendar_oauth_start'),// GET -> {auth_url}
+            'calendarCalendars'   => $to('google_calendar_calendars'),  // GET
+            'calendarSave'        => $to('google_calendar_save'),       // POST
+            'calendarTest'        => $to('google_calendar_test'),       // POST
+            'calendarDisconnect'  => $to('google_calendar_disconnect'), // POST
+        ];
     }
 
     /** GET /?page=customer&action=chat */

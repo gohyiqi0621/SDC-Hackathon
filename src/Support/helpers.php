@@ -360,7 +360,7 @@ function page_title_for(string $key): string
         'financial/edit'      => 'Edit Invoice',
         'financial/claim_new' => 'New Claim',
         'financial/claim_edit'=> 'Edit Claim',
-        'customer/settings'   => 'Customer Setting & Integration',
+        'customer/settings'   => 'AI Settings & Integration',
         'customer/chat'       => 'Customer Chat Interface',
         'staff/settings'      => 'Staff Setting & Integration',
         'staff/chat'          => 'Staff Chat Interface',

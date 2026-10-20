@@ -8,6 +8,7 @@
  * Runs, in order:
  *   1. database/schema.sql              users + password_resets
  *   2. database/migrations/NNN_*.sql    numbered migrations, lowest first
+ *      (003 adds the AI Settings & Integration tables)
  *
  * Every file is idempotent (CREATE ... IF NOT EXISTS), so running this again
  * never drops, resets or duplicates anything - including the users table.
@@ -45,13 +46,13 @@ try {
     }
 
     $missing = false;
-    foreach (['users', 'password_resets', 'product_categories', 'products', 'gmail_connections', 'invoices', 'claims'] as $table) {
+    foreach (['users', 'password_resets', 'product_categories', 'products', 'company_profiles', 'ai_assistant_settings', 'telegram_integrations', 'google_calendar_integrations', 'gmail_connections', 'invoices', 'claims'] as $table) {
         $stmt = $pdo->prepare('SELECT to_regclass(?)');
         $stmt->execute(['public.' . $table]);
         $exists = $stmt->fetchColumn() !== null;
         $missing = $missing || !$exists;
 
-        fwrite(STDOUT, '  table    ' . str_pad($table, 20) . ($exists ? 'ok' : 'MISSING') . PHP_EOL);
+        fwrite(STDOUT, '  table    ' . str_pad($table, 30) . ($exists ? 'ok' : 'MISSING') . PHP_EOL);
     }
 
     exit($missing ? 1 : 0);
