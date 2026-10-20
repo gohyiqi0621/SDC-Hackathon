@@ -1,17 +1,28 @@
-# sdc-project/.htaccess
-# XAMPP serves htdocs/ as the web root, so everything outside public/ is
-# reachable by URL unless we block it. These rules close that hole.
+# SDC-Hackathon/.htaccess
+#
+# XAMPP serves htdocs/ as the web root, so anything outside public/ is reachable
+# by URL unless it is blocked here. Only public/ is meant to be requested
+# directly; all application source lives in src/.
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Application code and the Python service are never served directly.
-    RewriteRule ^(app|ai-service)/ - [F,L]
+    # A bare project URL serves the front controller. Every link and asset in
+    # the app is absolute (built from APP_URL), so this works without a redirect
+    # and without hard-coding the folder name.
+    RewriteRule ^$ public/index.php [QSA,L]
 
-    # Root PHP files and SQL dumps are includes, not endpoints.
-    # setup.php is CLI-only (it writes .env), so it is blocked twice: here and
-    # by its own PHP_SAPI check.
-    RewriteRule ^(config\.php|db\.php|helpers\.php|setup\.php|database\.sql)$ - [F,L]
+    # Application source, schema, storage, tests and the Python RunPod handler.
+    RewriteRule ^(src|database|storage|tests|bin|runpod|docs)(/|$) - [F,L]
 
-    # .env, .env.example, .env.local ...
+    # The old top-level email/ folder was merged into the dashboard (src/).
+    # Block it in case a stale copy is left behind.
+    RewriteRule ^email(/|$) - [F,L]
+
+    # Environment files and Git metadata.
     RewriteRule ^\.env - [F,L]
+    RewriteRule ^\.git - [F,L]
 </IfModule>
+
+# Never serve a directory listing if mod_rewrite is unavailable.
+Options -Indexes

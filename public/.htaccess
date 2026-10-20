@@ -1,54 +1,26 @@
-# public/.htaccess - clean URLs + basic hardening
+# public/.htaccess - clean URLs + basic hardening.
 Options -Indexes
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    # NO RewriteBase here on purpose. It used to be the hardcoded
-    # "/sdc-project/public/", which is only true under XAMPP: on Railway the
-    # Dockerfile sets APACHE_DOCUMENT_ROOT=/var/www/html/public, so this folder
-    # IS the site root and every rewritten URL came back 404. Leaving RewriteBase
-    # out lets Apache derive it from the directory this file sits in, which is
-    # correct in both places.
 
     # Real files and folders (css, js, index.php) are served as-is.
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule ^ - [L]
 
-    # /auth/google-callback -> ?page=auth&action=googleCallback
-    # Google requires a clean, query-free redirect URI, so the OAuth callback
-    # gets its own hyphenated path rather than the generic two-segment rule.
-    # QSA is essential: without it the rewrite REPLACES the query string and
-    # Google's ?code=...&state=... would be discarded (the callback then sees
-    # no code and the state check fails).
-    RewriteRule ^auth/google-callback/?$ index.php?page=auth&action=googleCallback [QSA,L]
-
-    # /items/edit/5  ->  ?page=items&action=edit&id=5
-    RewriteRule ^([a-zA-Z0-9_]+)/([a-zA-Z0-9_]+)/([0-9]+)/?$ index.php?page=$1&action=$2&id=$3 [QSA,L]
-
-    # /items/edit    ->  ?page=items&action=edit
+    # /financial/invoice -> ?page=financial&action=invoice
     RewriteRule ^([a-zA-Z0-9_]+)/([a-zA-Z0-9_]+)/?$ index.php?page=$1&action=$2 [QSA,L]
 
-    # /dashboard     ->  ?page=dashboard
+    # /dashboard -> ?page=dashboard
     RewriteRule ^([a-zA-Z0-9_]+)/?$ index.php?page=$1 [QSA,L]
 </IfModule>
 
-# Block dotfiles (.env and friends) if they ever end up inside public/
+# Block dotfiles (.env and friends) if they ever end up inside public/.
 <FilesMatch "^\.">
     Require all denied
 </FilesMatch>
 
-# The OneSignal SDK probes /default-icon (extensionless) for a default
-# notification icon and logs a 404 when it is missing. The file is a real PNG,
-# but with no extension Apache would send it as octet-stream, which the browser
-# refuses to use as an image - so pin the type.
-<Files "default-icon">
-    ForceType image/png
-</Files>
-
-# The web app manifest (PWA installability). Apache's stock mime.types has no
-# entry for .webmanifest, so without this it is served as octet-stream and the
-# browser refuses to treat it as a manifest.
 <IfModule mod_mime.c>
     AddType application/manifest+json .webmanifest
 </IfModule>

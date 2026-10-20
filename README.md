@@ -1,299 +1,342 @@
-# SDC Hackathon Project
+# Project Name
 
-> One-line description of what your project does and which SDG it addresses.
-
-**Live demo:** https://YOUR-APP.up.railway.app
-**Tech stack:** PHP, PDO, MySQL, XAMPP (local), VS Code, GitHub, Railway (deployment)
-**AI service used:** (e.g. Gemini / GPT, integrated through an API key)
+> A one-sentence description of what your project does and who it is for.
 
 ---
 
-## 1. First-time setup (each teammate does this once)
+## Team Information
 
-### Install
-- [XAMPP](https://www.apachefriends.org/) (Apache + MySQL)
-- [VS Code](https://code.visualstudio.com/)
-- [Git](https://git-scm.com/downloads) (VS Code uses it in the background; skip if you already have it. Check with `git --version`.)
+| Field                 | Details                                          |
+| --------------------- | ------------------------------------------------ |
+| **Team Name**         | CTRL + Future                                    |
+| **Team Domain**       | Domain 2                                         |
+| **SDG Track (1–17)**  | e.g. SDG 11 — Sustainable Cities and Communities |
+| **Team Leader**       | Teh Sze Yu Jocelyn                               |
+| **University**        | Universiti Technologi Malaysia                   |
+| **Number of Members** | 5                                                |
 
-### Clone the project
-**In VS Code:**
-1. Press `Ctrl+Shift+P` (Mac: `Cmd+Shift+P`) and type **Git: Clone**.
-2. Paste the repository URL: `https://github.com/gohyiqi0621/SDC-Hackathon.git`
-3. Choose your XAMPP `htdocs` folder (for example `C:\xampp\htdocs`) as the location.
-4. Click **Open** when VS Code asks.
+## Links
 
-**Or in a terminal** (inside `htdocs`):
+| Resource          | Link                                           |
+| ----------------- | ---------------------------------------------- |
+| GitHub Repository | https://github.com/gohyiqi0621/SDC-Hackathon   |
+| Replit Project    | https://replit.com/@your-username/your-project |
+| Live Demo         | https://your-project.replit.app                |
+| RunPod Endpoint   | https://api.runpod.ai/v2/your-endpoint-id      |
+| Slide Deck        | https://example.com/slides                     |
+| Demo Video        | https://example.com/demo-video                 |
+
+---
+
+## Overview
+
+### Problem
+
+Describe the real-world problem you are solving in 2–4 sentences. Who is affected, and why does it matter?
+
+### Solution
+
+Explain how your project uses AI to solve the problem and what makes it valuable.
+
+### Key Features
+
+- **Feature 1** — Short description.
+- **Feature 2** — Short description.
+- **Feature 3** — Short description.
+
+### Tech Stack
+
+| Layer         | Technology                    |
+| ------------- | ----------------------------- |
+| Frontend      | HTML, CSS, JS                 |
+| Backend       | PHP 8.2 (portal), Python (RunPod) |
+| Database      | PostgreSQL                    |
+| AI / Compute  | RunPod (GPU)                  |
+| Hosting / Dev | XAMPP, Replit                 |
+
+---
+
+## Project Structure
+
 ```
-git clone https://github.com/gohyiqi0621/SDC-Hackathon.git
+.
+├── bin/                         # CLI: migrate, create-user, check
+├── database/
+│   ├── schema.sql               # PostgreSQL schema (users + password resets)
+│   └── migrations/              # numbered migrations (001_, 002_, ...)
+├── docs/
+│   └── AUTH.md                  # authentication & profile documentation
+├── public/                      # web root - the only folder Apache serves
+│   ├── index.php                # front controller (loads src/)
+│   ├── .htaccess                # clean URLs
+│   ├── favicon.ico
+│   ├── uploads/                 # product images (scripts blocked by .htaccess)
+│   └── assets/
+│       ├── css/app.css          # shared design (from the email dashboard)
+│       ├── css/dashboard.css    # inbox / AI email widgets
+│       ├── js/app.js            # sidebar, menus, AJAX forms, toasts, chat demo
+│       ├── js/dashboard.js      # inbox demo data + interactions
+│       └── logo.webp
+├── runpod/
+│   └── handler.py               # RunPod serverless handler (GPU workload)
+├── src/                         # all application source code
+│   ├── bootstrap.php            # env, autoloader, session, config
+│   ├── routes.php               # every URL -> controller + middleware
+│   ├── Controllers/             # Auth, Dashboard, Financial, Chatbot, Product, Category, Profile
+│   ├── Middleware/              # Auth, Guest, Csrf
+│   ├── Models/                  # User, PasswordReset, Category, Product
+│   ├── Services/                # AuthService, PasswordResetService, BrevoMailer, ProductService
+│   ├── Support/                 # Database, Router, View, helpers
+│   ├── Views/
+│   │   ├── layouts/             # head, header/footer, app + auth shells
+│   │   ├── partials/            # sidebar, topbar, flashes
+│   │   ├── auth/                # register, login, forgot, reset
+│   │   ├── dashboard/           # email dashboard (home screen)
+│   │   ├── financial/           # invoice, claims, settlement, upload
+│   │   ├── chatbot/             # settings + chat (Customer and Staff)
+│   │   ├── products/            # product list, form, categories
+│   │   ├── profile/
+│   │   ├── emails/              # password-reset + test email bodies
+│   │   └── errors/
+│   ├── main.py                  # Python entry point (preserved)
+│   └── utils.py                 # helper functions (preserved)
+├── storage/                     # logs and uploads (git-ignored content)
+├── submission/                  # required submission documents
+├── tests/
+│   └── test_utils.py            # unit tests
+├── .env.example
+├── .htaccess                    # blocks src/, .env etc. from the web
+├── LICENSE
+├── requirements.txt
+└── README.md
 ```
 
-The folder is created as `htdocs/SDC-Hackathon`. The commands below use
-`cd SDC-Hackathon`; adjust if you cloned it under another name.
-
-### Run the setup script (this is the step people miss)
-
-**A fresh clone has no `.env` file.** That is deliberate: `.env` holds the database
-password and the encryption key, so it is listed in `.gitignore` and never reaches
-GitHub. Without it the app stops with:
-
-> Missing .env file or DB_HOST variable.
-
-Create it with one command, from the project root:
+### Architecture
 
 ```
+User ──► Replit (App / API) ──► RunPod Endpoint (GPU model)
+                │
+                └──► Response returned to user
+```
+
+---
+
+## Authentication & Profile Portal
+
+The project now includes a **user-only** web portal (PHP 8.2 + PostgreSQL).
+It has registration, login, logout, forgot password, reset password and profile management.
+There is **no admin portal and no admin authentication** anywhere in it.
+
+### What is included
+
+- Sign in redirects straight to the dashboard; visiting the login page while
+  signed in redirects to the dashboard too.
+- Passwords are hashed with `password_hash`; every query is a prepared
+  statement against PostgreSQL.
+- Sessions use HTTP-only, `SameSite=Lax` cookies with ID regeneration and
+  idle/absolute timeouts.
+- Every POST is protected by CSRF; logout is POST-only.
+- Password reset uses a 32-byte random token, stored as a SHA-256 hash,
+  expiring after 60 minutes and consumed exactly once inside a transaction.
+- The profile page lets the signed-in user update their name and password.
+- Anyone can create an account at `/auth/register`; after registering they are
+  signed in and sent to the dashboard.
+- The **dashboard is the Smart SME AI email dashboard** (inbox, AI summary,
+  AI reply draft, smart notifications), and every page — sign in, Financial,
+  AI Chatbot, Profile — uses the same design.
+- Brevo sends password-reset email (bodies in `src/Views/emails/`). The
+  dashboard shows whether Brevo is connected and can send a test email.
+- Sidebar: **Dashboard · Financial (Invoice, Claims, Settlement, Upload
+  Invoice) · AI Chatbot (Customer, Staff) · Profile · Logout**.
+
+Full details: [`docs/AUTH.md`](docs/AUTH.md).
+
+## Product & Service (AI Chatbot → Customer)
+
+Each signed-in user manages their own products and services at
+`/products` (categories at `/categories`):
+
+- List with image, name, SKU, category, price, promo price and status;
+  search by name/SKU, filter by category and status, sort by name, price or
+  date, 10 per page.
+- Add / edit with name, SKU, category, description, free-text
+  characteristics, image (JPG/PNG/WebP/GIF, 2 MB), price, promotional price,
+  currency (default MYR) and Active/Inactive status.
+- Remove with a confirmation dialog. Categories can be added, edited and
+  deleted, but a category that still has products cannot be deleted.
+- Every query is scoped to the signed-in user; the database also enforces
+  that a product's category belongs to the same user.
+
+Sidebar: **AI Chatbot → Customer** (Setting & Integration, Product & Service,
+Chat Interface) and **Staff** (Setting & Integration, Chat Interface).
+
+### Apply the database migrations
+
+```bat
 cd C:\xampp\htdocs\SDC-Hackathon
-php setup.php
+C:\xampp\php\php.exe bin\migrate.php
 ```
 
-It asks for your MySQL details (press Enter for the XAMPP defaults), writes
-`.env`, generates `APP_KEY`, and then tells you whether it can reach the database.
-Re-running it is safe — it never overwrites an existing `.env` unless you add
-`--force`.
+or with `psql` (adjust the PostgreSQL version folder):
 
-### Import the database
-1. Start **Apache** and **MySQL** in the XAMPP Control Panel.
-2. Import `database.sql` — it creates the `sdc_app` database and every table:
-
-```
-C:\xampp\mysql\bin\mysql.exe -u root < database.sql
+```bat
+"C:\Program Files\PostgreSQL\16\bin\psql.exe" -h 127.0.0.1 -U yiqi -d sme_assistant -f database\migrations\001_create_product_categories.sql
+"C:\Program Files\PostgreSQL\16\bin\psql.exe" -h 127.0.0.1 -U yiqi -d sme_assistant -f database\migrations\002_create_products.sql
 ```
 
-   No MySQL on your PATH? Paste `database.sql` into phpMyAdmin → **SQL** instead.
-   `database.sql` is destructive: it drops and recreates the tables.
+Both files are safe to run again and never touch the `users` table.
 
-### Open the app
-```
-http://localhost/SDC-Hackathon/public
-```
+### Local setup (XAMPP + PostgreSQL)
 
-Note the **`/public`** — the site is served from that folder, not the project root.
-Going to `http://localhost/SDC-Hackathon/` gives a directory listing or a 403.
+1. Start **Apache** and **PostgreSQL** in the XAMPP Control Panel.
+2. Copy `.env.example` to `.env` and set the `DB_*` values (the included `.env`
+   already points at `sme_assistant` on `127.0.0.1:5432`).
+3. Create the tables (idempotent — it never drops data):
 
-### API keys
-No keys are in the repository, and none go in `.env`. They live in the database:
-register the first account, promote it once with
-
-```
-UPDATE users SET role = 'admin' WHERE email = 'you@example.com';
-```
-
-then sign in and open **Key** to paste the Google, OneSignal, Agnes and Brevo
-credentials. AI Chat additionally needs the Python service (`cd ai-service` and
-`python app.py`); everything else works without it.
-
----
-
-## 2. Daily Git workflow (VS Code)
-
-### Quick routine
-1. Open the project path inside `htdocs` (for example `C:\xampp\htdocs\REPO-NAME`) in a terminal and run:
+   ```bash
+   C:\xampp\php\php.exe bin\migrate.php
    ```
-   code .
+
+   Or import the schema with psql:
+
+   ```bash
+   psql -U yiqi -h 127.0.0.1 -d sme_assistant -f database/schema.sql
    ```
-2. In VS Code, click the **refresh / sync icon at the bottom-left status bar** to pull the latest code.
-3. Edit the code.
-4. Open **Source Control** (`Ctrl+Shift+G`).
-5. **Stage** your files (click **+** next to each file).
-6. Write a message and **Commit**.
-7. Click **Sync Changes** to push.
 
-The detailed version of the same steps is below.
+4. Create an account (there is no public registration):
 
-### Detailed steps
+   ```bash
+   C:\xampp\php\php.exe bin\create-user.php "Your Name" you@example.com
+   ```
 
-Click the **Source Control** icon in the left sidebar (the branch symbol), or press `Ctrl+Shift+G`.
+   The generated password is printed once.
 
-### Step 1: Pull before you start
-Get your teammates' latest changes first.
-- Click the **...** menu in Source Control > **Pull**.
-- Or in the terminal: `git pull origin main`
+5. Open <http://localhost/SDC-Hackathon/public/>.
 
-### Step 2: Do your work
-Edit code as usual.
+6. For password-reset email, add the Brevo credentials to `.env`:
 
-### Step 3: Check what changed
-Changed files appear in the Source Control panel. Click a file to see exactly what changed.
+   ```dotenv
+   BREVO_API_KEY=xkeysib-...
+   BREVO_SENDER_EMAIL=verified-sender@example.com
+   BREVO_SENDER_NAME="Smart SME"
+   ```
 
-### Step 4: Stage your changes
-- Click the **+** next to a file, or the **+** next to "Changes" to stage everything.
-- Or in the terminal: `git add .`
+   `BREVO_SENDER_EMAIL` must be a verified sender in Brevo. The dashboard
+   shows the connection status and can send a test message.
 
-### Step 5: Commit with a clear message
-- Type a message in the box (for example `Add login page validation`) and click **Commit**.
-- Or in the terminal: `git commit -m "Add login page validation"`
+### Health checks
 
-### Step 6: Pull again, then push
-- **...** menu > **Pull**, then click **Sync Changes** or **Push**.
-- Or in the terminal:
+```bash
+C:\xampp\php\php.exe bin\check.php     # database connection + tables
+C:\xampp\php\php.exe -l src\Controllers\AuthController.php
 ```
-git pull origin main
-git push origin main
-```
-
-### Golden rules
-- Pull **before** you start and **before** you push.
-- Commit small and often, with clear messages.
-- Tell the team when you change shared files (database files, config, `index.php`).
-- Never commit passwords, API keys, or real user data. This includes SQL files: do not put the real API key inside any migration, seed, or dump file.
 
 ---
 
-## 3. Resolving merge conflicts
+## Run the Python / RunPod Scaffold
 
-A conflict happens when you and a teammate edit the **same lines** of the same file. Git stops and asks you to choose.
+The original Python entry point (`src/main.py`), `src/utils.py`, tests and the
+RunPod handler are preserved.
 
-### Step 1: Pull and see the conflict
-Pull as normal. Git will say `CONFLICT (content): Merge conflict in somefile.php`.
-In VS Code, conflicted files appear under **Merge Changes** in Source Control.
+### Option 1 — Run on Replit (Recommended)
 
-### Step 2: Open the conflicted file
-You will see markers like this:
-```
-your version of the code
-```
+1. Open the [Replit Project](https://replit.com/@your-username/your-project), or import this repository via **Create Repl → Import from GitHub**.
+2. Open the **Secrets** tab (🔒) and add the variables listed in `.env.example`:
+   - `RUNPOD_API_KEY`
+   - `RUNPOD_ENDPOINT_ID`
+3. Click **Run**. Replit uses the `.replit` file to start `python src/main.py`.
 
-### Step 3: Fix it
-VS Code shows buttons above the conflict:
-- **Accept Current Change** keeps your version.
-- **Accept Incoming Change** keeps your teammate's version.
-- **Accept Both Changes** keeps both.
-- Or edit by hand, then **delete the three marker lines** (`<<<<<<<`, `=======`, `>>>>>>>`). The file must be valid code again.
+### Option 2 — Run Locally
 
-### Step 4: Mark as resolved and commit
-- Stage the file (click **+**), then write a message like `Resolve merge conflict in somefile.php` and click **Commit**.
-- Or in the terminal:
-```
-git add somefile.php
-git commit -m "Resolve merge conflict in somefile.php"
-```
+```bash
+# 1. Clone the repository
+git clone https://github.com/your-username/your-project.git
+cd your-project
 
-### Step 5: Test, then push
-Check that the app still works, then push.
+# 2. Create and activate a virtual environment
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
 
-### Escape hatch
-If you get stuck in the middle of a merge and want to start over:
-```
-git merge --abort
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Configure environment variables
+cp .env.example .env            # then fill in your values
+
+# 5. Run the app
+python src/main.py
 ```
 
-### Avoiding conflicts
-- Pull often.
-- Agree who edits which file.
-- Don't reformat whole files (it changes every line).
+### Run Tests
+
+```bash
+python -m unittest discover tests
+```
 
 ---
 
-## 4. Database
+## How We Use Replit _(Required)_
 
-Each database is separate: your XAMPP database, each teammate's XAMPP database, and the Railway database do **not** sync automatically. Git only shares the SQL files, not the data.
+Describe how your team used Replit. For example:
 
-### Folder and file format
-`database.sql` at the repository root is the **single source of truth** — it creates the
-database and every table, so a fresh clone only needs that one file. Changes made *after*
-it go in `migrations/`, one folder per teammate:
+- **Development:** Collaborative coding in a shared Repl using Multiplayer.
+- **Hosting:** The app is deployed with Replit Deployments at the Live Demo link above.
+- **Secrets:** API keys are stored in Replit Secrets, never in the code.
 
+📄 Proof of use: [`submission/REPLIT PROOF OF USE.pdf`](submission/REPLIT%20PROOF%20OF%20USE.pdf)
+
+## How We Use RunPod _(Required)_
+
+Describe how your team used RunPod. For example:
+
+- **Workload:** Model inference (e.g. text generation, image processing) runs on a RunPod GPU.
+- **Setup:** `runpod/handler.py` is deployed as a **RunPod Serverless Endpoint**.
+- **Integration:** The Replit app sends requests to the endpoint using `RUNPOD_API_KEY` and `RUNPOD_ENDPOINT_ID`.
+
+Example request:
+
+```bash
+curl -X POST https://api.runpod.ai/v2/$RUNPOD_ENDPOINT_ID/runsync \
+  -H "Authorization: Bearer $RUNPOD_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"input": {"prompt": "Hello"}}'
 ```
-migrations/
-  jocelyn/
-    migration_20261015_143000.sql
-  gohyiqi/
-    migration_20261018_164500.sql
-```
 
-The date and time in the name (`YYYYMMDD_HHMMSS`) shows the order the files were made, and
-separate folders stop two people from creating the same file name. Record a file you have run:
-
-```sql
-INSERT INTO schema_migrations (filename) VALUES ('gohyiqi/migration_20261018_164500.sql');
-```
-
-### When you change a table
-1. Write the change as a **new SQL file** in your own folder, for example `database/migrations/jocelyn/migration_20261015_143000.sql`.
-2. Run it on your own XAMPP database (phpMyAdmin > Import or SQL tab).
-3. Commit and push the file.
-4. Tell the team the file name.
-5. Teammates pull, then run the new file on their own database.
-6. The same file is also run on the **Railway database** (see section 5).
-
-### Rules
-- Run files in date/time order, oldest first.
-- Never change a table only in phpMyAdmin. Always write the SQL file too.
-- Never edit a migration file that has already been run. Add a new one.
-- Avoid `DROP TABLE` / `DROP COLUMN` unless you really mean to delete data.
-- Don't commit a database dump that contains real user data or the API key.
+📄 Proof of use: [`submission/RUNPOD PROOF OF USE.pdf`](submission/RUNPOD%20PROOF%20OF%20USE.pdf)
 
 ---
 
-## 5. Using Railway
+## Challenges & Learnings
 
-Railway hosts the live website and the central MySQL database.
+- What challenges did you face, and how did you overcome them?
+- What did your team learn?
 
-### How the app connects to the database
-`config.php` reads the connection settings from `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` and
-`DB_PASS`. Locally those come from your `.env`; on Railway they are supplied as environment
-variables pointing at the MySQL service (`DB_HOST=${{MySQL.MYSQLHOST}}`, and so on). Real
-environment variables are read first, so the same code works in both places and no password
-is ever committed.
+## Future Improvements
 
-`.env` itself is git-ignored. That is why a fresh clone cannot boot until `php setup.php` has
-created one — see section 1.
+- [ ] Improvement 1
+- [ ] Improvement 2
 
-### Deploy the website
-1. Railway project > your PHP service > **Settings** > connect the GitHub repository and choose the `main` branch.
-2. Every push to `main` triggers a new deployment automatically.
-3. Watch progress under the **Deployments** tab. Click a deployment to see **build logs** and **runtime logs**.
-4. If something breaks, read the logs first. Most errors show up there.
+## Team
 
-### Variables
-Service > **Variables** tab. Add the database variables (`MYSQLHOST`, `MYSQLPORT`, `MYSQLUSER`, `MYSQLPASSWORD`, `MYSQLDATABASE`), usually by referencing the MySQL service's variables. The database login must be here, because it is needed to reach the database in the first place. The AI API key lives in the database. After changing a variable, Railway redeploys the service.
-
-### Get a public link
-Service > **Settings** > **Networking** > **Generate Domain**. Put this link in the "Live demo" line at the top of this README.
-
-### Connect to the Railway database from your laptop
-Use this to import or run SQL files.
-1. Click the **MySQL service** > **Connect** tab.
-2. Copy the **public** host, port, user, password, and database name. (The private/internal host only works between Railway services.)
-3. Open HeidiSQL, DBeaver, or MySQL Workbench and create a connection with those details.
-4. Run or import your SQL file.
-
-Or from a terminal:
-```
-mysql -h PUBLIC_HOST -P PUBLIC_PORT -u USER -p DATABASE < database/migrations/003_xxx.sql
-```
-
-### Importing a full database (first time only)
-1. In phpMyAdmin: Export > Custom > SQL (tick "Add DROP TABLE" if you want to replace existing tables).
-2. Delete any `CREATE DATABASE` and `USE ...` lines from the file (Railway's database is named `railway`).
-3. Import it into Railway using the method above.
-
-Re-importing a full dump **replaces** the data on Railway, so only do it when the Railway database holds test data.
-
-### Before the submission deadline
-- Open the live link in an incognito window and test every main feature.
-- Make sure the repository link is accessible to the judges.
-- Check that the API key has a spending limit.
-- Keep the Railway project running through the judging period.
+| Name        | Role                | GitHub                                   |
+| ----------- | ------------------- | ---------------------------------------- |
+| Member Name | Team Lead / Backend | [@username](https://github.com/username) |
+| Member Name | Frontend            | [@username](https://github.com/username) |
+| Member Name | AI / RunPod         | [@username](https://github.com/username) |
 
 ---
 
-## 6. Environment variables reference
+## Submission Checklist
 
-Only the database connection uses environment variables, and they are set in Railway **Variables**.
+- [ ] Team name, domain (Domain 1 / Domain 2) and SDG track filled in
+- [ ] Slide deck link added
+- [ ] Demo video link added
+- [ ] Replit used, with proof of use in `submission/`
+- [ ] RunPod used, with proof of use in `submission/`
+- [ ] Submission template completed in `submission/`
+- [ ] "How to Run" steps verified
+- [ ] No API keys or secrets committed to the repository
 
-| Variable | Purpose |
-|---|---|
-| `MYSQLHOST` | Database host |
-| `MYSQLPORT` | Database port |
-| `MYSQLDATABASE` | Database name |
-| `MYSQLUSER` | Database user |
-| `MYSQLPASSWORD` | Database password |
+## License
 
----
-
-## 7. Declarations
-
-- **AI tools used in development:** (list them)
-- **External APIs / services:** (for example Gemini / GPT, Railway)
-- **Datasets / models:** (list them, or "none")
-- **Pre-existing code:** (list it, or "none")
+This project is licensed under the [Apache License 2.0](LICENSE).

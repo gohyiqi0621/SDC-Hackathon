@@ -1,33 +1,25 @@
-# --- Secrets: never commit real credentials -------------------------------
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Environment
 .env
-.env.*
-!.env.example
 
-# --- Logs and runtime output ----------------------------------------------
-*.log
-storage/logs/*
-!storage/logs/.gitkeep
+# Runtime storage
+storage/logs/*.log
+storage/uploads/*
+!storage/uploads/.gitkeep
 
-# --- Database dumps: may contain real user data or API keys ---------------
-*.sql.gz
-*dump*.sql
-storage/backups/
+# PHP
+vendor/
+composer.lock
 
-# --- OS / editor junk ------------------------------------------------------
+# OS / Editor
 .DS_Store
-Thumbs.db
-__MACOSX/
-._*
-*.swp
-
-# --- Tooling ---------------------------------------------------------------
-.workbuddy-ai/
 .vscode/
 .idea/
 
-# --- Python AI service -----------------------------------------------------
-ai-service/venv/
-ai-service/__pycache__/
-__pycache__/
-*.pyc
-.workbuddy-ai/
+# User-uploaded product images
+public/uploads/products/
