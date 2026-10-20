@@ -4,7 +4,9 @@
  *
  * Expects (from ChatbotController): $title, $heading, $sub, $icon, $intro,
  * $suggestions, $notes, $settingsUrl.
- * Replies are a frontend demo (assets/js/app.js) until the AI service is connected.
+ * Optional (Customer): $sendUrl, $previewUrl, $history - messages then go
+ * through the real pipeline (PostgreSQL settings -> Flowise), the same one
+ * Telegram uses. Without $sendUrl (Staff) replies are a frontend demo.
  */
 view('layouts/header', ['title' => $title]);
 ?>
@@ -23,14 +25,14 @@ view('layouts/header', ['title' => $title]);
 <div class="page-body">
     <div class="grid-main-side">
 
-        <section class="panel chat-panel" data-chat>
+        <section class="panel chat-panel" data-chat<?= $sendUrl ? ' data-chat-endpoint="' . e($sendUrl) . '"' : '' ?>>
             <div class="chat-head">
                 <span class="chat-head-avatar"><i class="<?= e($icon) ?>"></i></span>
                 <div>
                     <strong><?= e($heading) ?></strong>
-                    <span>Demo mode &middot; AI service not connected yet</span>
+                    <span><?= $sendUrl ? 'Test chat &middot; uses your AI Settings and Flowise, like Telegram' : 'Demo mode &middot; AI service not connected yet' ?></span>
                 </div>
-                <span class="badge">Preview</span>
+                <span class="badge"><?= $sendUrl ? 'Live test' : 'Preview' ?></span>
             </div>
 
             <div class="chat-body">
@@ -40,6 +42,9 @@ view('layouts/header', ['title' => $title]);
                         <button class="chip" type="button" data-suggest><?= e($suggestion) ?></button>
                     <?php endforeach; ?>
                 </div>
+                <?php foreach ($history as $item): ?>
+                    <div class="chat-bubble chat-bubble--<?= $item['role'] === 'customer' ? 'me' : 'bot' ?><?= $item['status'] !== 'ok' ? ' chat-bubble--muted' : '' ?>"><?= e($item['content']) ?></div>
+                <?php endforeach; ?>
             </div>
 
             <form class="composer">
@@ -51,7 +56,40 @@ view('layouts/header', ['title' => $title]);
             </form>
         </section>
 
-        <aside class="panel">
+        <aside class="stack">
+        <?php if ($previewUrl): ?>
+            <section class="panel" data-ai-preview="<?= e($previewUrl) ?>">
+                <div class="panel-header">
+                    <div>
+                        <h2>What Flowise receives</h2>
+                        <p>Built from AI Settings for every message.</p>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <ul class="item-list" data-ai-status>
+                        <li><span class="item-icon"><i class="fa-solid fa-spinner fa-spin"></i></span><span><strong>Checking setup…</strong></span></li>
+                    </ul>
+                    <div class="form-actions">
+                        <button class="secondary-btn" type="button" data-ai-preview-open>
+                            <i class="fa-regular fa-file-lines"></i> View system message
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <dialog class="preview-dialog" data-ai-preview-dialog aria-label="System message preview">
+                <div class="preview-head">
+                    <h3>System message &amp; Flowise request</h3>
+                    <button type="button" class="icon-btn" data-ai-preview-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <h4>System message</h4>
+                <pre data-ai-preview-system></pre>
+                <h4>Request body sent to Flowise (secrets masked)</h4>
+                <pre data-ai-preview-payload></pre>
+            </dialog>
+        <?php endif; ?>
+
+        <section class="panel">
             <div class="panel-header">
                 <div>
                     <h2>How it works</h2>
@@ -68,6 +106,7 @@ view('layouts/header', ['title' => $title]);
                     <?php endforeach; ?>
                 </ul>
             </div>
+        </section>
         </aside>
 
     </div>

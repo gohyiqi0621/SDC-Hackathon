@@ -4,6 +4,10 @@ Options -Indexes
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # Pass the Authorization header to PHP (Flowise tools send a Bearer token).
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
     # Real files and folders (css, js, index.php) are served as-is.
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d

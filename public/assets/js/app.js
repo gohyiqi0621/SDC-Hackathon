@@ -8,7 +8,7 @@
    4. Password reveal   <button data-toggle-password="inputId">
    5. AJAX forms        <form data-ajax> (falls back to a normal post)
    6. Upload picker     [data-file-input] + [data-file-label]
-   7. Chat demo         [data-chat] composer (no backend yet)
+   7. Chat              [data-chat] composer; real AI when data-chat-endpoint is set, demo otherwise
    8. Confirm dialog    <form data-confirm="Message" data-confirm-title data-confirm-ok>
    9. Filter forms      <form data-auto-submit> submits when a select changes
   10. Image picker      [data-image-picker] preview before upload
@@ -272,7 +272,7 @@
         }
     });
 
-    /* ---------- 7. Chat demo ---------- */
+    /* ---------- 7. Chat ---------- */
 
     document.querySelectorAll('[data-chat]').forEach(function (chat) {
         var body = chat.querySelector('.chat-body');
@@ -287,11 +287,85 @@
             body.scrollTop = body.scrollHeight;
         }
 
+        var endpoint = chat.getAttribute('data-chat-endpoint');
+        var button = form.querySelector('button[type="submit"]');
+        var busy = false;
+
+        body.scrollTop = body.scrollHeight;
+
+        function note(text) {
+            var el = document.createElement('div');
+            el.className = 'chat-note';
+            el.textContent = text;
+            body.appendChild(el);
+            body.scrollTop = body.scrollHeight;
+        }
+
+        function typing(on) {
+            var el = body.querySelector('.chat-typing');
+            if (on && !el) {
+                el = document.createElement('div');
+                el.className = 'chat-bubble chat-bubble--bot chat-typing';
+                el.innerHTML = '<span></span><span></span><span></span>';
+                body.appendChild(el);
+                body.scrollTop = body.scrollHeight;
+            } else if (!on && el) {
+                el.remove();
+            }
+        }
+
+        // Real AI: same pipeline as Telegram (AI Settings -> Flowise).
+        function ask(text) {
+            busy = true;
+            setLoading(button, true);
+            typing(true);
+
+            var data = new FormData();
+            data.append('message', text);
+
+            fetch(endpoint, {
+                method: 'POST',
+                body: data,
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': csrfToken() }
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (result) {
+                    typing(false);
+                    if (!result.success) {
+                        note(result.message || 'The message could not be sent.');
+                        return;
+                    }
+                    var d = result.data || {};
+                    if (d.reply) { bubble(d.reply, 'bot'); }
+                    if (d.status === 'skipped') {
+                        note('No reply: the AI assistant is switched off in AI Settings.');
+                    } else if (d.status === 'error') {
+                        note('Customers would get the reply above. Reason: ' + (d.error || 'unknown error'));
+                    }
+                })
+                .catch(function () {
+                    typing(false);
+                    note('Network error. Please try again.');
+                })
+                .then(function () {
+                    busy = false;
+                    setLoading(button, false);
+                    input.focus();
+                });
+        }
+
         function send(text) {
             text = text.trim();
-            if (!text) { return; }
+            if (!text || busy) { return; }
             bubble(text, 'me');
             input.value = '';
+
+            if (endpoint) {
+                ask(text);
+                return;
+            }
+
             setTimeout(function () {
                 bubble('Thanks! The AI assistant is not connected yet, so this is a demo reply. '
                     + 'Once it is connected, it will answer from your records.', 'bot');
@@ -467,5 +541,50 @@
             var parts = formatMoney(input.value).split('.');
             input.value = (parts[0] || '0') + '.' + ((parts[1] || '') + '00').slice(0, 2);
         });
+    });
+
+    /* ---------- 14. AI preview ---------- */
+
+    document.querySelectorAll('[data-ai-preview]').forEach(function (panel) {
+        var list = panel.querySelector('[data-ai-status]');
+        var dialogEl = document.querySelector('[data-ai-preview-dialog]');
+        var loaded = null;
+
+        function row(ok, title, text) {
+            var li = document.createElement('li');
+            li.innerHTML = '<span class="item-icon"><i class="fa-solid ' + (ok ? 'fa-circle-check' : 'fa-triangle-exclamation') + '"></i></span><span><strong></strong><small></small></span>';
+            li.querySelector('.item-icon').classList.add(ok ? 'item-icon--ok' : 'item-icon--warn');
+            li.querySelector('strong').textContent = title;
+            li.querySelector('small').textContent = text;
+            return li;
+        }
+
+        fetch(panel.getAttribute('data-ai-preview'), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (result) {
+                var d = result.data || {};
+                loaded = d;
+                list.innerHTML = '';
+                list.appendChild(row(d.flowise_configured, 'Flowise', d.flowise_configured ? 'Connected in .env' : 'Not set up yet (FLOWISE_API_URL / FLOWISE_CHATFLOW_ID)'));
+                list.appendChild(row(d.enabled, 'Assistant', d.enabled ? 'Switched on' : 'Switched off or not saved'));
+                list.appendChild(row(true, 'Model', (d.model || '?') + ' (' + (d.provider || '?') + '), temperature ' + d.temperature));
+                (d.problems || []).forEach(function (p) { list.appendChild(row(false, 'To do', p)); });
+            })
+            .catch(function () {
+                list.innerHTML = '';
+                list.appendChild(row(false, 'Could not load', 'Refresh the page to try again.'));
+            });
+
+        var open = panel.querySelector('[data-ai-preview-open]');
+        if (open && dialogEl) {
+            open.addEventListener('click', function () {
+                if (!loaded) { toast('Still loading, try again in a moment.'); return; }
+                dialogEl.querySelector('[data-ai-preview-system]').textContent = loaded.system_message || '';
+                dialogEl.querySelector('[data-ai-preview-payload]').textContent = JSON.stringify(loaded.payload || {}, null, 2);
+                dialogEl.showModal();
+            });
+            dialogEl.querySelector('[data-ai-preview-close]').addEventListener('click', function () { dialogEl.close(); });
+            dialogEl.addEventListener('click', function (e) { if (e.target === dialogEl) { dialogEl.close(); } });
+        }
     });
 })();

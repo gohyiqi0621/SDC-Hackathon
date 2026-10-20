@@ -33,6 +33,7 @@ use Src\Models\TelegramIntegration;
 use Src\Services\GoogleAuthRevoked;
 use Src\Services\GoogleCalendarService;
 use Src\Services\TelegramService;
+use Src\Services\TelegramWebhookService;
 use Src\Support\Crypto;
 use Throwable;
 
@@ -300,7 +301,22 @@ final class AiSettingsController
                     '✅ ' . APP_NAME . ': @' . $result['bot_username'] . ' is now connected. Staff alerts will arrive in this chat.');
             }
 
-            json_response(true, ['telegram' => $this->presentTelegram($row)], 'Telegram connected.');
+            // Send customer messages to this app (Telegram -> website -> Flowise).
+            // Not fatal: without a public https PUBLIC_APP_URL the bot is still
+            // saved, and the webhook can be registered later.
+            try {
+                $webhook = (new TelegramWebhookService())->register($row, $token);
+            } catch (PDOException $e) {
+                error_log('[telegram] webhook columns missing: ' . $e->getMessage());
+                $webhook = ['ok' => false, 'message' => 'Run the database migrations (007_create_telegram_messaging.sql) first, then connect again.'];
+            }
+            $row = $model->find($userId) ?? $row;
+
+            json_response(true, [
+                'telegram' => $this->presentTelegram($row),
+                'webhook'  => ['ok' => $webhook['ok'], 'message' => $webhook['message']],
+            ], $webhook['ok'] ? 'Telegram connected. Customer messages will be answered by the AI assistant.'
+                              : 'Telegram connected, but customer messages are not linked yet: ' . $webhook['message']);
         });
     }
 
@@ -310,6 +326,15 @@ final class AiSettingsController
         $this->run(function (int $userId): void {
             $model = new TelegramIntegration();
             $row   = $model->find($userId);
+
+            if ($row !== null && !empty($row['bot_token_encrypted'])) {
+                try {
+                    // Stop Telegram from sending customer messages here.
+                    (new TelegramWebhookService())->unregister($row, Crypto::decrypt((string) $row['bot_token_encrypted']));
+                } catch (RuntimeException | PDOException $e) {
+                    // Unreadable token: nothing to unregister with.
+                }
+            }
 
             if ($row !== null) {
                 $row = $model->save($userId, [
@@ -639,6 +664,8 @@ final class AiSettingsController
             'connection_status'      => $row['connection_status'] ?? 'disconnected',
             'is_enabled'             => $this->bool($row['is_enabled'] ?? false),
             'has_bot_token'          => !empty($row['bot_token_encrypted']),
+            // Customer messages reach this app (Telegram webhook registered).
+            'webhook_linked'         => !empty($row['webhook_url']),
             'updated_at'             => $this->iso($row['updated_at'] ?? null),
         ];
     }

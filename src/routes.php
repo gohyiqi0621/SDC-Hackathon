@@ -20,6 +20,8 @@ use Src\Controllers\FinancialController;
 use Src\Controllers\GmailController;
 use Src\Controllers\ProductController;
 use Src\Controllers\ProfileController;
+use Src\Controllers\TelegramWebhookController;
+use Src\Controllers\ToolController;
 use Src\Middleware\AuthMiddleware;
 use Src\Middleware\GuestMiddleware;
 use Src\Support\Router;
@@ -114,6 +116,17 @@ $router->post(
     $router->post('ai_settings/google_calendar_save', [AiSettingsController::class, 'googleCalendarSave'], $auth);
     $router->post('ai_settings/google_calendar_test', [AiSettingsController::class, 'googleCalendarTest'], $auth);
     $router->post('ai_settings/google_calendar_disconnect', [AiSettingsController::class, 'googleCalendarDisconnect'], $auth);
+
+    /* ------------------------------ Telegram -> website -> Flowise ------- */
+    // Called by Telegram and by Flowise, not by a browser: no login and no
+    // CSRF token (csrf: false). Each checks its own secret instead - the
+    // webhook secret header / the signed tool token.
+    $router->post('telegram/webhook', [TelegramWebhookController::class, 'handle'], [], false);
+    $router->post('tools/check_product', [ToolController::class, 'checkProduct'], [], false);
+
+    // Website Chat Interface: the same AI pipeline, for testing without Telegram.
+    $router->post('customer/chat_send', [ChatbotController::class, 'customerChatSend'], $auth);
+    $router->get('customer/system_message', [ChatbotController::class, 'customerSystemMessage'], $auth);
 
     /* ----------------------------------------------- AI chatbot: staff --- */
     $router->get('staff/settings', [ChatbotController::class, 'staffSettings'], $auth);
