@@ -25,6 +25,9 @@ $to        = min($total, $page * $perPage);
         <p>Manage what you sell. The customer assistant answers from this list.</p>
     </div>
     <div class="welcome-actions">
+        <button class="secondary-btn" type="button" data-import-open>
+            <i class="fa-solid fa-file-import"></i> Import products
+        </button>
         <a class="primary-btn" href="<?= e(url('products', ['action' => 'create'])) ?>">
             <i class="fa-solid fa-plus"></i> Add product / service
         </a>
@@ -214,4 +217,86 @@ $to        = min($total, $page * $perPage);
     </section>
 
 </div>
-<?php view('layouts/footer'); ?>
+<!-- Import products from CSV / XLSX (logic in assets/js/product-import.js) -->
+<dialog class="import-dialog" id="importDialog" aria-labelledby="importTitle"
+        data-preview-url="<?= e(url('products', ['action' => 'import_preview'])) ?>"
+        data-commit-url="<?= e(url('products', ['action' => 'import_commit'])) ?>"
+        data-cancel-url="<?= e(url('products', ['action' => 'import_cancel'])) ?>">
+
+    <!-- Step 1: choose a file -->
+    <section class="import-step" data-step="upload">
+        <div class="import-head">
+            <div>
+                <h3 id="importTitle">Import products</h3>
+                <p>Upload a CSV or Excel (.xlsx) file. Columns are detected automatically from the header row.</p>
+            </div>
+            <button class="icon-btn" type="button" data-import-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <label class="upload-drop import-drop" data-import-drop>
+            <i class="fa-solid fa-file-csv import-drop-icon"></i>
+            <strong data-import-file-label>Drop your file here or click to browse</strong>
+            <span class="muted">.csv or .xlsx, up to 5 MB and <?= number_format(\Src\Services\ProductImportService::MAX_ROWS) ?> rows</span>
+            <input type="file" name="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-import-file hidden>
+        </label>
+        <p class="field-error" data-import-error></p>
+
+        <div class="import-template" style="margin-top:8px;font-size:12px">
+            <a href="<?= e(url('products', ['action' => 'import_template'])) ?>"><i class="fa-solid fa-download"></i> Download a template</a>
+        </div>
+    </section>
+
+    <!-- Step 2: new categories found -->
+    <section class="import-step import-ask" data-step="categories" hidden>
+        <div class="confirm-icon import-ask-icon"><i class="fa-solid fa-folder-plus"></i></div>
+        <h3>New categories found</h3>
+        <p>Some products in <strong data-import-filename></strong> belong to categories you don't have yet:</p>
+        <div class="import-chips" data-import-new-categories></div>
+        <p><strong>Do you want me to help you add these new categories?</strong><br>
+            <span class="muted">If not, the import will be cancelled.</span></p>
+        <div class="confirm-actions">
+            <button class="secondary-btn" type="button" data-import-decline>No, cancel import</button>
+            <button class="primary-btn" type="button" data-import-accept><i class="fa-solid fa-check"></i> Yes, add categories</button>
+        </div>
+    </section>
+
+    <!-- Step 3: review and import -->
+    <section class="import-step" data-step="review" hidden>
+        <div class="import-head">
+            <div>
+                <h3>Review import</h3>
+                <p><i class="fa-regular fa-file"></i> <span data-import-filename></span></p>
+            </div>
+            <button class="icon-btn" type="button" data-import-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="import-summary" data-import-summary></div>
+
+        <div data-import-categories-note hidden class="flash flash--info">
+            <i class="fa-solid fa-folder-plus"></i>
+            <div><strong>New categories will be added</strong><span data-import-categories-list></span></div>
+        </div>
+
+        <div data-import-sample-wrap hidden>
+            <h4 class="import-subtitle">Preview (first rows)</h4>
+            <div class="table-wrap import-table">
+                <table class="data-table">
+                    <thead><tr><th>Name</th><th>SKU</th><th>Category</th><th class="num">Price</th><th>Status</th></tr></thead>
+                    <tbody data-import-sample></tbody>
+                </table>
+            </div>
+        </div>
+
+        <details class="import-skipped" data-import-skipped-wrap hidden>
+            <summary data-import-skipped-title></summary>
+            <ul data-import-skipped></ul>
+        </details>
+
+        <div class="import-foot">
+            <button class="secondary-btn" type="button" data-import-restart><i class="fa-solid fa-arrow-left"></i> Choose another file</button>
+            <button class="primary-btn" type="button" data-import-commit><i class="fa-solid fa-file-import"></i> Import</button>
+        </div>
+    </section>
+</dialog>
+
+<?php view('layouts/footer', ['scripts' => ['assets/js/product-import.js']]); ?>

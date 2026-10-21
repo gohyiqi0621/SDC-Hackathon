@@ -94,6 +94,10 @@ $router->post(
     $router->get('products/edit', [ProductController::class, 'edit'], $auth);
     $router->post('products/update', [ProductController::class, 'update'], $auth);
     $router->post('products/delete', [ProductController::class, 'delete'], $auth);
+    $router->post('products/import_preview', [ProductController::class, 'importPreview'], $auth);
+    $router->post('products/import_commit', [ProductController::class, 'importCommit'], $auth);
+    $router->post('products/import_cancel', [ProductController::class, 'importCancel'], $auth);
+    $router->get('products/import_template', [ProductController::class, 'importTemplate'], $auth);
 
     // Orders from the AI chatbot (buy_product): review payment receipts
     $router->get('orders', [OrderController::class, 'index'], $auth);
