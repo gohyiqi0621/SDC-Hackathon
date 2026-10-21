@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Src\Controllers;
 
 use Src\Models\ChatMessage;
+use Src\Models\Order;
 use Src\Models\Product;
 use Src\Services\AssistantConfigService;
 use Src\Services\AssistantReplyService;
@@ -107,8 +108,43 @@ final class ChatbotController
     /** GET /?page=customer&action=chat */
     public function customerChat(): void
     {
+        $user   = require_login();
+        $userId = (int) $user['id'];
+
+        // ?tab=conversations: view-only history of the AI with each customer.
+        $tab = (string) ($_GET['tab'] ?? '') === 'conversations' ? 'conversations' : 'test';
+        $conversations = [];
+        $thread = null;
+        if ($tab === 'conversations') {
+            try {
+                $conversations = (new ChatMessage())->conversations($userId);
+            } catch (Throwable $e) {
+                $conversations = []; // migration 007 not run yet
+            }
+
+            $selected = (string) ($_GET['chat'] ?? '');
+            if ($selected === '' && $conversations !== []) {
+                $selected = $conversations[0]['channel'] . ':' . $conversations[0]['chat_id'];
+            }
+            foreach ($conversations as $c) {
+                if ($c['channel'] . ':' . $c['chat_id'] === $selected) {
+                    $thread = $c + [
+                        'history'  => (new ChatMessage())->recent($userId, $c['channel'], (string) $c['chat_id'], 200),
+                        'orders'   => $this->ordersFor($userId, $c['channel'], (string) $c['chat_id']),
+                    ];
+                }
+            }
+        }
+
         view('chatbot/chat', [
-            'user'        => require_login(),
+            'user'        => $user,
+            'tab'         => $tab,
+            'tabUrls'     => [
+                'test'          => url('customer', ['action' => 'chat']),
+                'conversations' => url('customer', ['action' => 'chat', 'tab' => 'conversations']),
+            ],
+            'conversations' => $conversations,
+            'thread'        => $thread,
             'title'       => 'Customer Chat Interface',
             'heading'     => 'Customer assistant',
             'sub'         => 'Answer customer questions about your products, services and orders.',
@@ -196,6 +232,16 @@ final class ChatbotController
     }
 
     /** Last web test messages, so the chat keeps its history on reload. */
+    /** A customer's latest orders, for the conversation view. */
+    private function ordersFor(int $userId, string $channel, string $chatId): array
+    {
+        try {
+            return (new Order())->recentForChat($userId, $channel, $chatId, 5);
+        } catch (Throwable $e) {
+            return []; // migration 009 not run yet
+        }
+    }
+
     private function webHistory(int $userId): array
     {
         try {

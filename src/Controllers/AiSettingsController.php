@@ -92,7 +92,7 @@ final class AiSettingsController
         }
         return self::LEGACY_MODELS[$model] ?? self::DEFAULT_AI_MODEL;
     }
-    private const DURATIONS      = [15, 30, 45, 60, 90];
+    private const DURATIONS      = [15, 30, 45, 60, 90, 120, 180];
     private const MAX_INSTRUCTIONS = 20000;
 
     private const TG_TOKEN    = '/^\d{5,12}:[A-Za-z0-9_-]{30,64}$/';
@@ -368,7 +368,7 @@ final class AiSettingsController
             $row      = $model->find($userId);
             $useSaved = $this->bool($_POST['use_saved'] ?? '0');
             $token    = trim((string) ($_POST['bot_token'] ?? ''));
-            $botName  = trim((string) preg_replace('/\s+/', ' ', (string) ($_POST['bot_name'] ?? '')));
+            $botName  = trim((string) preg_replace('/\s+/u', ' ', (string) ($_POST['bot_name'] ?? '')));
             $errors   = [];
 
             if ($useSaved) {
@@ -688,6 +688,12 @@ final class AiSettingsController
             $values = [
                 'default_appointment_duration_minutes' => $input['duration'],
                 'timezone'                             => $input['timezone'],
+                'booking_mode'                         => $input['booking_mode'],
+                'slot_capacity'                        => $input['slot_capacity'],
+                'capacity_unit'                        => $input['capacity_unit'],
+                'open_time'                            => $input['open_time'],
+                'close_time'                           => $input['close_time'],
+                'open_days'                            => $input['open_days'],
             ];
             if ($connected) {
                 $values['calendar_id'] = $input['calendar_id'];
@@ -855,8 +861,15 @@ final class AiSettingsController
             'google_account_email'                 => $row['google_account_email'] ?? null,
             'calendar_id'                          => $row['calendar_id'] ?? null,
             'connection_status'                    => $row['connection_status'] ?? 'disconnected',
-            'default_appointment_duration_minutes' => (int) ($row['default_appointment_duration_minutes'] ?? 30),
+            'default_appointment_duration_minutes' => (int) ($row['default_appointment_duration_minutes'] ?? 60),
             'timezone'                             => $row['timezone'] ?? 'Asia/Kuala_Lumpur',
+            'booking_mode'                         => $row['booking_mode'] ?? 'single',
+            'slot_capacity'                        => (int) ($row['slot_capacity'] ?? 1),
+            'capacity_unit'                        => $row['capacity_unit'] ?? 'bookings',
+            'open_time'                            => substr((string) ($row['open_time'] ?? '09:00'), 0, 5),
+            'close_time'                           => substr((string) ($row['close_time'] ?? '18:00'), 0, 5),
+            'open_days'                            => array_map('intval', array_filter(explode(',', (string) ($row['open_days'] ?? '1,2,3,4,5,6,7')))),
+            'durations'                            => self::DURATIONS,
             'is_enabled'                           => $this->bool($row['is_enabled'] ?? false),
             'updated_at'                           => $this->iso($row['updated_at'] ?? null),
             'oauth_configured'                     => $google->isConfigured(),
@@ -992,15 +1005,15 @@ final class AiSettingsController
     /** @return array{0: array{calendar_id: string, duration: int, timezone: string}, 1: array<string, string>} */
     private function calendarInput(?array $row): array
     {
-        $input  = $this->strings($_POST, ['calendar_id', 'default_appointment_duration_minutes', 'timezone']);
+        $input  = $this->strings($_POST, ['calendar_id', 'default_appointment_duration_minutes', 'timezone',
+                                          'booking_mode', 'slot_capacity', 'capacity_unit', 'open_time', 'close_time']);
         $errors = [];
 
-        // The page no longer edits the duration: keep the saved one (30 minutes by default).
         $duration = $input['default_appointment_duration_minutes'] !== ''
             ? (int) $input['default_appointment_duration_minutes']
-            : (int) ($row['default_appointment_duration_minutes'] ?? 30);
+            : (int) ($row['default_appointment_duration_minutes'] ?? 60);
         if (!in_array($duration, self::DURATIONS, true)) {
-            $duration = 30;
+            $errors['default_appointment_duration_minutes'] = 'Choose a slot length from the list.';
         }
 
         if (!in_array($input['timezone'], DateTimeZone::listIdentifiers(), true)) {
@@ -1016,7 +1029,54 @@ final class AiSettingsController
             }
         }
 
-        return [['calendar_id' => $calendarId, 'duration' => $duration, 'timezone' => $input['timezone']], $errors];
+        // Booking rules (migration 013).
+        $mode = in_array($input['booking_mode'], ['single', 'multi'], true) ? $input['booking_mode'] : 'single';
+        $unit = in_array($input['capacity_unit'], ['bookings', 'pax'], true) ? $input['capacity_unit'] : 'bookings';
+        $capacity = 1;
+        if ($mode === 'multi') {
+            $capacity = (int) $input['slot_capacity'];
+            if (!preg_match('/^\d+$/', $input['slot_capacity']) || $capacity < 2 || $capacity > 1000) {
+                $errors['slot_capacity'] = 'Enter how many fit in one slot (2 to 1000).';
+            }
+        }
+
+        $times = [];
+        foreach (['open_time', 'close_time'] as $field) {
+            $times[$field] = preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $input[$field]) ? $input[$field] : null;
+            if ($times[$field] === null) {
+                $errors[$field] = 'Enter a time like 09:00.';
+            }
+        }
+        if ($times['open_time'] !== null && $times['close_time'] !== null) {
+            [$oh, $om] = array_map('intval', explode(':', $times['open_time']));
+            [$ch, $cm] = array_map('intval', explode(':', $times['close_time']));
+            if (($ch * 60 + $cm) - ($oh * 60 + $om) < $duration) {
+                $errors['close_time'] = 'Closing time must be at least one slot (' . $duration . ' min) after opening time.';
+            }
+        }
+
+        $rawDays = $_POST['open_days'] ?? [];
+        if (is_string($rawDays)) {
+            $rawDays = explode(',', $rawDays);
+        }
+        $days = array_values(array_unique(array_filter(array_map('intval', (array) $rawDays),
+            static fn (int $d): bool => $d >= 1 && $d <= 7)));
+        sort($days);
+        if ($days === []) {
+            $errors['open_days'] = 'Choose at least one day.';
+        }
+
+        return [[
+            'calendar_id'   => $calendarId,
+            'duration'      => $duration,
+            'timezone'      => $input['timezone'],
+            'booking_mode'  => $mode,
+            'slot_capacity' => $capacity,
+            'capacity_unit' => $mode === 'multi' ? $unit : 'bookings',
+            'open_time'     => $times['open_time'],
+            'close_time'    => $times['close_time'],
+            'open_days'     => implode(',', $days),
+        ], $errors];
     }
 
     /** @return array{0: GoogleCalendarIntegration, 1: array, 2: GoogleCalendarService} */

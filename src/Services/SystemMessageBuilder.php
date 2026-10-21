@@ -163,6 +163,14 @@ final class SystemMessageBuilder
         $setting = (string) ($config['reply_language'] ?? 'auto');
         [$values['language_rule'], $values['language_check']] = self::languageRules($setting);
 
+        // "Today" for bookings: the AI has no clock of its own.
+        $zone = new \DateTimeZone(date_default_timezone_get());
+        $now  = new \DateTimeImmutable('now', $zone);
+        $values['current_datetime'] = $now->format('l, j F Y, g:i A') . ' (' . $zone->getName() . ', UTC' . $now->format('P') . ')';
+        $values['timezone']         = $zone->getName();
+        $values['datetime_example'] = $now->setTime(15, 0)->modify('+1 day')->format('Y-m-d\TH:i:sP')
+                                    . ' for 3:00 PM tomorrow';
+
         $detected = !isset(self::LANGUAGES[$setting]) ? self::detectLanguage($latestMessage) : null;
         if ($detected !== null) {
             [$name, $write] = self::LANGUAGES[$detected];
@@ -177,7 +185,7 @@ final class SystemMessageBuilder
         }
 
         $message = (string) preg_replace_callback(
-            '/\{\{\s*([a-z_]+)\s*\}\}/',
+            '/\{\{\s*([a-z_]+)\s*\}\}/u',
             static fn (array $m): string => (string) ($values[$m[1]] ?? $m[0]),
             str_replace("\r\n", "\n", $template)
         );

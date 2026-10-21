@@ -218,8 +218,8 @@ TXT;
     private function parse(string $text): array
     {
         // Drop any "thinking" block and code fences around the JSON.
-        $text  = (string) preg_replace('/<think>.*?<\/think>/is', '', $text);
-        $text  = trim((string) preg_replace('/```(?:json|JSON)?/', '', $text));
+        $text  = (string) preg_replace('/<think>.*?<\/think>/isu', '', $text);
+        $text  = trim((string) preg_replace('/```(?:json|JSON)?/u', '', $text));
         $items = $this->jsonItems($text) ?? $this->textItems($text);
 
         if (!is_array($items) || $items === []) {
@@ -242,7 +242,7 @@ TXT;
 
             $rawSteps = $item['steps'] ?? $item['Steps'] ?? $item['procedure'] ?? [];
             if (is_string($rawSteps)) {
-                $rawSteps = preg_split('/\R+/', $rawSteps) ?: [];
+                $rawSteps = preg_split('/\R+/u', $rawSteps) ?: [];
             }
             $steps = [];
             foreach ((array) $rawSteps as $step) {
@@ -250,7 +250,7 @@ TXT;
                     $step = $step['step'] ?? $step['text'] ?? $step['description'] ?? implode(' ', array_filter($step, 'is_string'));
                 }
                 $step = trim((string) preg_replace('/^\s*(?:\d+[.)]|[-*•])\s*/u', '', (string) $step));
-                $step = trim((string) preg_replace('/\s+/', ' ', $step));
+                $step = trim((string) preg_replace('/\s+/u', ' ', $step));
                 if ($step !== '') {
                     $steps[] = mb_strimwidth($step, 0, self::MAX_STEP_LEN, '…');
                 }
@@ -259,7 +259,7 @@ TXT;
                 throw new RuntimeException('Agnes AI returned an incomplete SOP. Please try again.');
             }
 
-            $title = trim((string) preg_replace('/\s+/', ' ', (string) ($item['title'] ?? $item['name'] ?? '')));
+            $title = trim((string) preg_replace('/\s+/u', ' ', (string) ($item['title'] ?? $item['name'] ?? '')));
             $bySlot[$slot] = [
                 'slot'    => $slot,
                 'heading' => self::SLOTS[$slot],
@@ -288,7 +288,7 @@ TXT;
         $json = substr($text, $start, $end - $start + 1);
         $data = json_decode($json, true);
         if (!is_array($data)) {
-            $data = json_decode((string) preg_replace('/,\s*([}\]])/', '$1', $json), true); // trailing commas
+            $data = json_decode((string) preg_replace('/,\s*([}\]])/u', '$1', $json), true); // trailing commas
         }
         if (!is_array($data)) {
             return null;
@@ -324,8 +324,8 @@ TXT;
     {
         $items   = [];
         $current = null;
-        foreach (preg_split('/\R/', $text) ?: [] as $line) {
-            $line = trim((string) preg_replace('/[*_#]+/', '', $line));
+        foreach (preg_split('/\R/u', $text) ?: [] as $line) {
+            $line = trim((string) preg_replace('/[*_#]+/u', '', $line));
             if ($line === '') {
                 continue;
             }
@@ -335,11 +335,11 @@ TXT;
                 }
                 continue;
             }
-            if (preg_match('/^why\s*:\s*(.+)$/i', $line, $m) && $current !== null) {
+            if (preg_match('/^why\s*:\s*(.+)$/iu', $line, $m) && $current !== null) {
                 $items[$current]['why'] = $m[1];
                 continue;
             }
-            $items[] = ['title' => (string) preg_replace('/^(?:title\s*:\s*|SOP\s*\d+\s*[:.-]\s*)/i', '', $line), 'steps' => []];
+            $items[] = ['title' => (string) preg_replace('/^(?:title\s*:\s*|SOP\s*\d+\s*[:.-]\s*)/iu', '', $line), 'steps' => []];
             $current = count($items) - 1;
         }
         return array_values(array_filter($items, static fn (array $i): bool => count($i['steps']) >= self::STEPS));

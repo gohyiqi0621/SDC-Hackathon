@@ -1328,6 +1328,10 @@
         var calendarHint = $('[data-calendar-hint]', form);
         var timezoneSelect = $('#timezone', form);
         var keepNote = $('[data-gcal-keep-note]', form);
+        var capacityFields = $('[data-capacity-fields]', form);
+        var capacityHint = $('[data-capacity-hint]', form);
+        var summary = $('[data-booking-summary]', form);
+        var DAY_NAMES = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         var buttons = {
             oauth: $('[data-action="oauth"]', form),
             refresh: $('[data-action="refresh-calendars"]', form),
@@ -1336,7 +1340,44 @@
 
         var state = { status: 'disconnected', saved: null };
 
-        var ctrl = new FormController(form, { tab: 'calendar' });
+        var ctrl = new FormController(form, { tab: 'calendar', onChange: updateRules });
+
+        function openDays(v) {
+            var days = [];
+            for (var d = 1; d <= 7; d++) { if (v['open_day_' + d]) { days.push(d); } }
+            return days;
+        }
+
+        function durationLabel(min) {
+            min = Number(min) || 60;
+            if (min < 60) { return min + ' minutes'; }
+            var h = Math.floor(min / 60), m = min % 60;
+            return h + (h === 1 ? ' hour' : ' hours') + (m ? ' ' + m + ' min' : '');
+        }
+
+        /** Show the capacity fields only for "many customers", and a plain-language summary. */
+        function updateRules() {
+            var v = ctrl.values();
+            var multi = v.booking_mode === 'multi';
+            capacityFields.hidden = !multi;
+            capacityHint.textContent = v.capacity_unit === 'pax'
+                ? 'Total people in one slot, e.g. 40 seats.'
+                : 'Bookings in one slot, e.g. 10 tables.';
+
+            var days = openDays(v).map(function (d) { return DAY_NAMES[d]; });
+            var cap = Number(v.slot_capacity) || 0;
+            var who = multi
+                ? 'up to ' + (cap || '?') + (v.capacity_unit === 'pax' ? ' people' : ' bookings') + ' in the same slot'
+                : 'one customer per slot';
+            var mins = function (t) { return Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)); };
+            var last = /^\d{2}:\d{2}$/.test(v.close_time) ? mins(v.close_time) - (Number(v.default_appointment_duration_minutes) || 60) : -1;
+            var lastText = last >= 0 ? ('0' + Math.floor(last / 60)).slice(-2) + ':' + ('0' + last % 60).slice(-2) : '';
+            summary.textContent = days.length && v.open_time && v.close_time
+                ? 'Summary: bookings of ' + durationLabel(v.default_appointment_duration_minutes) + ', '
+                    + (days.length === 7 ? 'every day' : days.join(', ')) + ', ' + v.open_time + ' to ' + v.close_time
+                    + (lastText ? ' (the last booking starts at ' + lastText + ')' : '') + ', ' + who + '.'
+                : '';
+        }
 
         function option(value, label) {
             var o = document.createElement('option');
@@ -1429,7 +1470,19 @@
         function values(data) {
             var zone = data.timezone || 'Asia/Kuala_Lumpur';
             ensureTimezone(zone);
-            return { calendar_id: data.calendar_id || '', timezone: zone };
+            var out = {
+                calendar_id: data.calendar_id || '',
+                timezone: zone,
+                booking_mode: data.booking_mode === 'multi' ? 'multi' : 'single',
+                slot_capacity: data.booking_mode === 'multi' ? String(data.slot_capacity || 10) : '10',
+                capacity_unit: data.capacity_unit === 'bookings' ? 'bookings' : 'pax',
+                default_appointment_duration_minutes: String(data.default_appointment_duration_minutes || 60),
+                open_time: data.open_time || '09:00',
+                close_time: data.close_time || '18:00'
+            };
+            var days = Array.isArray(data.open_days) && data.open_days.length ? data.open_days : [1, 2, 3, 4, 5, 6, 7];
+            for (var d = 1; d <= 7; d++) { out['open_day_' + d] = days.indexOf(d) !== -1; }
+            return out;
         }
 
         function fill(g) {
@@ -1437,6 +1490,7 @@
             return loadCalendars().then(function () {
                 ctrl.load(values(g || {}));
                 ctrl.setSavedMeta(savedMetaText((g || {}).updated_at));
+                updateRules();
             });
         }
 
@@ -1457,7 +1511,19 @@
                 calendar_id: [function (value) {
                     return state.status === 'connected' && trimmed(value) === '' ? 'Choose the calendar for new appointments.' : null;
                 }],
-                timezone: [Rules.required('Timezone'), Rules.oneOf(selectOptions(timezoneSelect), 'Choose a timezone from the list.')]
+                timezone: [Rules.required('Timezone'), Rules.oneOf(selectOptions(timezoneSelect), 'Choose a timezone from the list.')],
+                slot_capacity: [function (value, all) {
+                    if (all.booking_mode !== 'multi') { return null; }
+                    var n = Number(value);
+                    return /^\d+$/.test(trimmed(value)) && n >= 2 && n <= 1000 ? null : 'Enter how many fit in one slot (2 to 1000).';
+                }],
+                open_time: [function (value) { return /^\d{2}:\d{2}$/.test(value) ? null : 'Enter the opening time.'; }],
+                close_time: [function (value, all) {
+                    if (!/^\d{2}:\d{2}$/.test(value)) { return 'Enter the closing time.'; }
+                    var mins = function (t) { return Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)); };
+                    return /^\d{2}:\d{2}$/.test(all.open_time) && mins(value) - mins(all.open_time) < Number(all.default_appointment_duration_minutes)
+                        ? 'Closing time must be at least one booking length after opening time.' : null;
+                }]
             };
         }
 
@@ -1487,6 +1553,7 @@
             event.preventDefault();
             var v = ctrl.values();
             var errors = validate(v, schema());
+            if (!openDays(v).length) { errors.open_days = 'Choose at least one day.'; }
             if (Object.keys(errors).length) {
                 ctrl.showErrors(errors);
                 toast('Please fix the highlighted fields.', 'error');
@@ -1495,7 +1562,14 @@
             ctrl.setBusy(true);
             Api.calendar.save({
                 calendar_id: v.calendar_id,
-                timezone: v.timezone
+                timezone: v.timezone,
+                booking_mode: v.booking_mode,
+                slot_capacity: v.booking_mode === 'multi' ? v.slot_capacity : '1',
+                capacity_unit: v.capacity_unit,
+                default_appointment_duration_minutes: v.default_appointment_duration_minutes,
+                open_time: v.open_time,
+                close_time: v.close_time,
+                open_days: openDays(v).join(',')
             }).then(function (data) {
                 ctrl.busy = false;
                 return fill(data.google_calendar).then(function () {

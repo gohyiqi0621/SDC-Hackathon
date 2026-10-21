@@ -212,7 +212,7 @@ function require_login(): array
 /** Up to two initials for the avatar circle: "Goh Yi Qi" -> "GY". */
 function initials_of(?array $user): string
 {
-    $words = preg_split('/\s+/', trim((string) ($user['name'] ?? ''))) ?: [];
+    $words = preg_split('/\s+/u', trim((string) ($user['name'] ?? ''))) ?: [];
     $words = array_values(array_filter($words, static fn (string $w): bool => $w !== ''));
 
     if ($words === []) {
@@ -287,12 +287,13 @@ function nav_items(): array
             'icon'     => 'fa-solid fa-robot',
             'group'    => 'Workspace',
             // Pages that keep this group open and highlighted.
-            'match'    => ['customer', 'staff', 'products', 'categories', 'orders'],
+            'match'    => ['customer', 'staff', 'products', 'categories', 'orders', 'bookings'],
             'children' => [
                 ['heading' => 'Customer'],
                 ['key' => 'customer/settings', 'label' => 'Setting & Integration', 'icon' => 'fa-solid fa-sliders',       'url' => url('customer', ['action' => 'settings'])],
                 ['key' => 'products',          'label' => 'Product & Service',     'icon' => 'fa-solid fa-box-open',      'url' => url('products'), 'match' => ['products', 'categories']],
                 ['key' => 'orders',            'label' => 'Orders',                'icon' => 'fa-solid fa-bag-shopping',  'url' => url('orders'), 'match' => ['orders', 'orders/receipt']],
+                ['key' => 'bookings',          'label' => 'Bookings',              'icon' => 'fa-regular fa-calendar-check', 'url' => url('bookings'), 'match' => ['bookings']],
                 ['key' => 'customer/chat',     'label' => 'Chat Interface',        'icon' => 'fa-regular fa-comments',    'url' => url('customer', ['action' => 'chat'])],
                 ['heading' => 'Staff'],
                 ['key' => 'staff/settings',    'label' => 'Setting & Integration', 'icon' => 'fa-solid fa-sliders',       'url' => url('staff', ['action' => 'settings'])],

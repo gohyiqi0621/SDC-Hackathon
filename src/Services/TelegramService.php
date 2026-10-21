@@ -162,35 +162,38 @@ final class TelegramService
      */
     public static function markdownToHtml(string $text): string
     {
+        // Every pattern below uses /u (UTF-8). Without it, \R and \s treat the
+        // byte 0x85 inside emoji and Chinese characters as a line break or
+        // space and cut those characters in half (shown as "�" in Telegram).
         $out = [];
-        foreach (preg_split('/\R/', $text) ?: [] as $line) {
+        foreach (preg_split('/\R/u', $text) ?: [] as $line) {
             // Table separator rows (|---|---|) and horizontal rules add nothing in a chat.
-            if (preg_match('/^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/', $line) || preg_match('/^\s*([-*_])\1{2,}\s*$/', $line)) {
+            if (preg_match('/^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/u', $line) || preg_match('/^\s*([-*_])\1{2,}\s*$/u', $line)) {
                 continue;
             }
             $line = htmlspecialchars($line, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
             // Table rows: | a | b |  ->  a · b
-            if (preg_match('/^\s*\|(.+)\|\s*$/', $line, $m)) {
+            if (preg_match('/^\s*\|(.+)\|\s*$/u', $line, $m)) {
                 $line = implode(' · ', array_map('trim', explode('|', $m[1])));
             }
             // ### Heading -> bold line
-            if (preg_match('/^\s*#{1,6}\s+(.+)$/', $line, $m)) {
+            if (preg_match('/^\s*#{1,6}\s+(.+)$/u', $line, $m)) {
                 $line = '<b>' . trim($m[1], " *") . '</b>';
             }
             // - item / * item -> bullet
-            $line = (string) preg_replace('/^(\s*)[-*]\s+/', '$1• ', $line);
+            $line = (string) preg_replace('/^(\s*)[-*]\s+/u', '$1• ', $line);
 
-            $line = (string) preg_replace('/`([^`]+)`/', '<code>$1</code>', $line);
-            $line = (string) preg_replace('/\*\*(.+?)\*\*/', '<b>$1</b>', $line);
-            $line = (string) preg_replace('/__(.+?)__/', '<b>$1</b>', $line);
-            $line = (string) preg_replace('/(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])/', '<i>$1</i>', $line);
-            $line = (string) preg_replace('/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/', '<a href="$2">$1</a>', $line);
+            $line = (string) preg_replace('/`([^`]+)`/u', '<code>$1</code>', $line);
+            $line = (string) preg_replace('/\*\*(.+?)\*\*/u', '<b>$1</b>', $line);
+            $line = (string) preg_replace('/__(.+?)__/u', '<b>$1</b>', $line);
+            $line = (string) preg_replace('/(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])/u', '<i>$1</i>', $line);
+            $line = (string) preg_replace('/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/u', '<a href="$2">$1</a>', $line);
 
             $out[] = $line;
         }
 
-        return trim((string) preg_replace("/\n{3,}/", "\n\n", implode("\n", $out)));
+        return trim((string) preg_replace("/\n{3,}/u", "\n\n", implode("\n", $out)));
     }
 
     /** Send an image file from this server (e.g. the payment QR code). Best effort. */

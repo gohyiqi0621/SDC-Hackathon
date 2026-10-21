@@ -1,0 +1,62 @@
+/* conversations.css - Chat Interface tabs and Customer conversations (view only) */
+
+.chat-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.chat-tabs a {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 16px; border: 1px solid var(--border); border-radius: 12px;
+    background: #fff; color: var(--text-soft); font-size: 13px; font-weight: 600; text-decoration: none;
+}
+.chat-tabs a.active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+
+.convo-layout {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr) 280px;
+    gap: 18px;
+    align-items: start;
+}
+
+.convo-list ul { list-style: none; margin: 0; padding: 0 10px 12px; max-height: 70vh; overflow-y: auto; }
+.convo-list a {
+    display: flex; gap: 10px; align-items: center;
+    padding: 10px; border-radius: 12px; color: inherit; text-decoration: none;
+}
+.convo-list a:hover { background: #fafaff; }
+.convo-list a.active { background: var(--primary-light); }
+.convo-avatar {
+    display: grid; place-items: center; flex-shrink: 0;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #eef6fc; color: #229ed9; font-size: 16px;
+}
+.convo-avatar--web { background: #f1f2f8; color: var(--muted); }
+.convo-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.convo-text small { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.convo-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.convo-row strong { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.convo-row time { flex-shrink: 0; color: var(--muted); font-size: 11px; }
+
+.convo-thread { display: flex; flex-direction: column; min-height: 60vh; }
+.convo-body { max-height: 68vh; overflow-y: auto; }
+.convo-body .chat-bubble { white-space: normal; overflow-wrap: anywhere; }
+.convo-body .chat-bubble time { display: block; margin-top: 4px; font-size: 10.5px; opacity: .65; }
+.chat-bubble--event { background: #fffaf0 !important; color: var(--text) !important; border: 1px dashed #f2d29b; }
+.convo-day { text-align: center; margin: 8px 0; }
+.convo-day span { padding: 3px 10px; border-radius: 999px; background: #f1f2f8; color: var(--muted); font-size: 11px; }
+.convo-readonly {
+    margin: 0; padding: 12px 18px; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 12px; display: flex; gap: 8px; align-items: center;
+}
+
+.convo-order-list { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 10px; }
+.convo-order-list li { padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; display: grid; gap: 4px; }
+.convo-order-list small { font-size: 12px; }
+.convo-order-list .order-no { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
+.convo-orders-link { width: 100%; justify-content: center; }
+
+@media (max-width: 1200px) {
+    .convo-layout { grid-template-columns: 280px minmax(0, 1fr); }
+    .convo-orders { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+    .convo-layout { grid-template-columns: 1fr; }
+    .convo-list ul { max-height: 260px; }
+}

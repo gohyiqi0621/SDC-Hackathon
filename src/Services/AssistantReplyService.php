@@ -37,7 +37,8 @@ final class AssistantReplyService
         $config   = (new AssistantConfigService())->forUser($userId);
         $messages = new ChatMessage();
 
-        $this->log($messages, $userId, $channel, $chatId, 'customer', $message, 'ok');
+        $this->log($messages, $userId, $channel, $chatId, 'customer', $message, 'ok',
+            $context['customer_name'] ?? null, $context['customer_username'] ?? null);
 
         FlowLog::write('system.config', [
             'channel'   => $channel,
@@ -95,10 +96,11 @@ final class AssistantReplyService
     }
 
     /** Logging must never stop a reply (e.g. migration 007 not run yet). */
-    private function log(ChatMessage $messages, int $userId, string $channel, string $chatId, string $role, string $content, string $status): void
+    private function log(ChatMessage $messages, int $userId, string $channel, string $chatId, string $role, string $content, string $status,
+                         ?string $customerName = null, ?string $customerUsername = null): void
     {
         try {
-            $messages->add($userId, $channel, $chatId, $role, $content, $status);
+            $messages->add($userId, $channel, $chatId, $role, $content, $status, $customerName, $customerUsername);
         } catch (Throwable $e) {
             error_log('[assistant] could not log message: ' . $e->getMessage());
         }

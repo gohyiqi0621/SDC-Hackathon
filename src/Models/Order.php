@@ -156,6 +156,29 @@ final class Order
     }
 
     /**
+     * This customer's latest order that is already paid or has its receipt
+     * sent (it can no longer change), placed in the last $hours.
+     *
+     * @return array|null orders row with an extra 'items' list
+     */
+    public function latestLocked(int $userId, string $channel, string $chatId, int $hours = 24): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT * FROM orders
+              WHERE user_id = ? AND channel = ? AND customer_chat_id = ?
+                AND status IN ('payment_submitted', 'paid')
+                AND created_at > CURRENT_TIMESTAMP - (? * INTERVAL '1 hour')
+              ORDER BY created_at DESC, id DESC LIMIT 1"
+        );
+        $stmt->execute([$userId, $channel, $chatId, $hours]);
+        $order = $stmt->fetch() ?: null;
+        if ($order !== null) {
+            $order['items'] = $this->items((int) $order['id']);
+        }
+        return $order;
+    }
+
+    /**
      * Cancel this customer's other unpaid orders (no receipt sent yet): a
      * new order replaces them, so there is only one order to pay.
      *

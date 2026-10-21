@@ -19,6 +19,7 @@ declare(strict_types=1);
 namespace Src\Services;
 
 use RuntimeException;
+use Src\Models\ChatMessage;
 use Src\Models\Order;
 use Src\Models\TelegramIntegration;
 use Src\Support\Crypto;
@@ -83,12 +84,16 @@ final class OrderService
         FlowLog::write('order.receipt_received', ['order_no' => $order['order_no'], 'mime' => $stored['file_mime'], 'size' => $stored['file_size']]);
 
         $total = format_money($order['total'], $order['currency']);
-        $telegram->sendText($token, $chatId,
-            "🧾 Thank you! We received your payment receipt for order {$order['order_no']} ({$total}).\n"
-            . 'Our team will verify it and let you know here shortly.');
+        $thanks = "🧾 Thank you! We received your payment receipt for order {$order['order_no']} ({$total}).\n"
+            . 'Our team will verify it and let you know here shortly.';
+        $telegram->sendText($token, $chatId, $thanks);
+        $this->remember($userId, $order, 'customer', '📎 [Payment receipt sent for ' . $order['order_no'] . ']');
+        $this->remember($userId, $order, 'assistant', $thanks);
 
+        // Staff alert with the approve link: never into the customer's own chat
+        // (when you test with the same Telegram account that is linked as staff).
         $staff = (string) ($integration['staff_telegram_chat_id'] ?? '');
-        if ($staff !== '') {
+        if ($staff !== '' && $staff !== $chatId) {
             $caption = "🧾 Payment receipt to review\n"
                 . "Order: {$order['order_no']}\n"
                 . 'Customer: ' . $this->customerLabel($order) . "\n"
@@ -126,9 +131,13 @@ final class OrderService
             return false;
         }
 
-        $total = format_money($order['total'], $order['currency']);
-        return (new TelegramService())->sendPhoto($token, (string) $order['customer_chat_id'], $path,
-            "Scan to pay {$total} for order {$order['order_no']}.\nThen send the payment receipt (photo or PDF) in this chat.");
+        $total   = format_money($order['total'], $order['currency']);
+        $caption = "Scan to pay {$total} for order {$order['order_no']}.\nThen send the payment receipt (photo or PDF) in this chat.";
+        $sent    = (new TelegramService())->sendPhoto($token, (string) $order['customer_chat_id'], $path, $caption);
+        if ($sent) {
+            $this->remember($userId, $order, 'assistant', '🖼 [Payment QR code] ' . $caption);
+        }
+        return $sent;
     }
 
     /** Staff approved the receipt. */
@@ -143,9 +152,9 @@ final class OrderService
         ]) ?? $order;
 
         $total = format_money($order['total'], $order['currency']);
-        $sent  = $this->notifyCustomer($userId, $order,
-            "✅ Payment verified!\n"
-            . "We have received {$total} for order {$order['order_no']}. Thank you for your order.");
+        $text  = "✅ Payment verified!\nWe have received {$total} for order {$order['order_no']}. Thank you for your order.";
+        $sent  = $this->notifyCustomer($userId, $order, $text);
+        $this->remember($userId, $order, 'assistant', $text);
 
         FlowLog::write('order.approved', ['order_no' => $order['order_no'], 'customer_notified' => $sent]);
 
@@ -165,10 +174,11 @@ final class OrderService
             'review_note' => $reason !== '' ? mb_substr($reason, 0, 300) : null,
         ]) ?? $order;
 
-        $sent = $this->notifyCustomer($userId, $order,
-            "⚠️ We could not verify the payment for order {$order['order_no']}."
+        $text = "⚠️ We could not verify the payment for order {$order['order_no']}."
             . ($reason !== '' ? "\nReason: {$reason}" : '')
-            . "\nPlease send a clear photo or PDF of the payment receipt here, or reply if you need help.");
+            . "\nPlease send a clear photo or PDF of the payment receipt here, or reply if you need help.";
+        $sent = $this->notifyCustomer($userId, $order, $text);
+        $this->remember($userId, $order, 'assistant', $text);
 
         FlowLog::write('order.rejected', ['order_no' => $order['order_no'], 'reason' => $reason, 'customer_notified' => $sent]);
 
@@ -183,7 +193,9 @@ final class OrderService
         }
 
         $order = (new Order())->update($userId, (int) $order['id'], ['status' => 'cancelled', 'reviewed_at' => date('c')]) ?? $order;
-        $sent  = $this->notifyCustomer($userId, $order, "Order {$order['order_no']} has been cancelled. Reply here if you have any questions.");
+        $text  = "Order {$order['order_no']} has been cancelled. Reply here if you have any questions.";
+        $sent  = $this->notifyCustomer($userId, $order, $text);
+        $this->remember($userId, $order, 'assistant', $text);
 
         FlowLog::write('order.cancelled', ['order_no' => $order['order_no'], 'customer_notified' => $sent]);
 
@@ -191,6 +203,16 @@ final class OrderService
     }
 
     /* ---------------------------------------------------------- private ---- */
+
+    /** Keep order events in the conversation history (Chat Interface > Customer conversations). */
+    private function remember(int $userId, array $order, string $role, string $text): void
+    {
+        try {
+            (new ChatMessage())->add($userId, (string) $order['channel'], (string) $order['customer_chat_id'], $role, $text, 'ok');
+        } catch (\Throwable $e) {
+            // history only; never stop the order flow
+        }
+    }
 
     /** Message the customer in the chat the order came from (Telegram only). */
     private function notifyCustomer(int $userId, array $order, string $text): bool

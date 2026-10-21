@@ -16,6 +16,17 @@
  *     the payment receipt in Telegram (TelegramWebhookController attaches it)
  *     and staff approve it on the Orders page.
  *
+ *   POST /tools/check_availability
+ *     JSON body: { "date": "2026-10-22", "time": "21:00", "pax": 4 }
+ *     Is there room at that time on the business's Google Calendar? Answers
+ *     available true/false, the reason, and up to 3 other free times.
+ *
+ *   POST /tools/make_booking
+ *     JSON body: { "date": "2026-10-22", "time": "21:00", "pax": 4,
+ *                  "customer_name": "Ali", "phone": "0123456789", "note": "Birthday" }
+ *     Checks again, adds the event to Google Calendar and saves the booking
+ *     (AI Chatbot > Customer > Bookings). See BookingService for the rules.
+ *
  * The token says which business is asking (Src\Support\ToolToken), so a tool
  * can only ever read that business's own products; for buy_product it also
  * says which customer chat is ordering. No login and no CSRF token (Flowise
@@ -30,10 +41,12 @@ namespace Src\Controllers;
 
 use Src\Models\CompanyProfile;
 use Src\Models\Order;
+use Src\Services\BookingService;
 use Src\Services\OrderService;
 use Src\Support\Database;
 use Src\Support\FlowLog;
 use Src\Support\ToolToken;
+use RuntimeException;
 use Throwable;
 
 final class ToolController
@@ -148,6 +161,30 @@ final class ToolController
         $phone = mb_substr(trim((string) ($input['phone'] ?? $input['customer_phone'] ?? '')), 0, 30);
         $note  = mb_substr(trim((string) ($input['note'] ?? $input['delivery_note'] ?? '')), 0, 500);
 
+        // An add-on after a finished order: the AI sometimes repeats the items
+        // of the order that was already paid. Those items are taken out, so the
+        // new order holds only what was added.
+        $addOnOf = null;
+        try {
+            $locked = (new Order())->latestLocked($userId, $auth['channel'], $auth['chat_id']);
+        } catch (Throwable $e) {
+            $locked = null;
+        }
+        if ($locked !== null) {
+            [$remaining, $contained, $sameItems] = $this->subtractItems($items, $locked['items']);
+            $lockedLabel = $locked['order_no'] . ($locked['status'] === 'paid' ? ' (already paid)' : ' (receipt sent, being checked)');
+
+            if ($sameItems && strtotime((string) $locked['created_at']) > time() - 600) {
+                $this->fail('The order was NOT created: these are exactly the items of order ' . $lockedLabel . '. '
+                    . 'Do not order them again. If the customer really wants the same items again, ask them to confirm first, '
+                    . 'then call buy_product with only the items they want now.');
+            }
+            if ($contained && $remaining !== []) {
+                $addOnOf = $lockedLabel;
+                $items    = $remaining;
+            }
+        }
+
         // One order at a time per customer chat: the lock makes two calls that
         // arrive together (the AI sometimes repeats a tool call) wait for each
         // other, so the second one finds the first order instead of making a copy.
@@ -227,10 +264,16 @@ final class ToolController
             $result['note'] = 'This exact order already exists (created a moment ago), so no new order was made. '
                             . 'Do not call buy_product again; just answer the customer with this order.';
         }
+        if ($addOnOf !== null) {
+            $result['add_on_of'] = $addOnOf;
+            $result['note'] = 'Order ' . $addOnOf . ' is finished, so its items were NOT added again. '
+                            . 'This is a separate new order with ONLY the add-on items listed here. '
+                            . 'Tell the customer it is a new order for the add-on and they pay only this total.';
+        }
         if ($replaced !== []) {
             $result['replaced_orders'] = $replaced;
-            $result['note'] = 'This order replaces the customer\'s earlier unpaid order(s) ' . implode(', ', $replaced)
-                            . ', which were cancelled. Tell the customer to pay only this order.';
+            $result['note'] = trim(($result['note'] ?? '') . ' This order replaces the customer\'s earlier unpaid order(s) '
+                            . implode(', ', $replaced) . ', which were cancelled. Tell the customer to pay only this order.');
         }
         FlowLog::write($duplicate ? 'tool.buy_product_same' : 'tool.buy_product_ok',
             ['order_no' => $order['order_no'], 'total' => $order['total'], 'replaced' => $replaced]);
@@ -238,7 +281,210 @@ final class ToolController
         $this->json(200, $result);
     }
 
+    /** POST /tools/check_availability */
+    public function checkAvailability(): void
+    {
+        $auth  = $this->token();
+        $input = $this->input();
+        FlowLog::write('tool.check_availability', ['user_id' => $auth['user_id'], 'input' => $input]);
+
+        [$service, $s, $start, $pax] = $this->bookingRequest($auth['user_id'], $input);
+
+        try {
+            $check = $service->check($auth['user_id'], $s, $start, $pax);
+        } catch (Throwable $e) {
+            $this->bookingError($e);
+        }
+
+        $result = [
+            'success'   => true,
+            'available' => $check['available'],
+            'requested' => BookingService::label($check['start'], $check['end']),
+            'pax'       => $pax,
+            'rules'     => BookingService::rulesText($s),
+        ];
+        if ($s['booking_mode'] === 'multi' && ($check['available'] || $check['used'] > 0)) {
+            $result['places_left'] = max(0, $s['slot_capacity'] - $check['used']) . ' of ' . $s['slot_capacity']
+                . ($s['capacity_unit'] === 'pax' ? ' seats' : ' bookings');
+        }
+        if ($check['available']) {
+            $result['next_step'] = 'The time is free. Summarise date, time, pax and name for the customer and ask them to confirm. '
+                                 . 'Only after they say yes, call make_booking with the same date and time.';
+        } else {
+            $result['reason']       = $check['reason'];
+            $result['alternatives'] = $check['alternatives'];
+            $result['next_step']    = 'Do not book this time. Tell the customer the reason and offer the alternatives (if any).';
+        }
+        FlowLog::write('tool.check_availability_result', ['available' => $check['available'], 'reason' => $check['reason']]);
+        $this->json(200, $result);
+    }
+
+    /** POST /tools/make_booking */
+    public function makeBooking(): void
+    {
+        $auth  = $this->token();
+        $input = $this->input();
+        FlowLog::write('tool.make_booking', ['user_id' => $auth['user_id'], 'chat' => $auth['channel'] . ':' . $auth['chat_id'], 'input' => $input]);
+
+        if ($auth['chat_id'] === null || !in_array($auth['channel'], ['telegram', 'web'], true)) {
+            $this->json(400, ['success' => false, 'error' => 'This tool token is not linked to a customer chat.']);
+        }
+
+        [$service, $s, $start, $pax] = $this->bookingRequest($auth['user_id'], $input);
+
+        $name = mb_substr(trim((string) ($input['customer_name'] ?? $input['name'] ?? '')), 0, 150);
+        [$knownName, $knownUser] = $this->chatCustomer($auth['user_id'], (string) $auth['channel'], (string) $auth['chat_id']);
+        if ($name === '') {
+            $name = $knownName;
+        }
+        if ($name === '') {
+            $this->fail('The booking was NOT made: the customer\'s name is missing. Ask for it, then call make_booking again.');
+        }
+
+        try {
+            $result = $service->book($auth['user_id'], $start, $pax, [
+                'channel'           => (string) $auth['channel'],
+                'customer_chat_id'  => (string) $auth['chat_id'],
+                'customer_name'     => $name,
+                'customer_username' => mb_substr(ltrim(trim((string) ($input['customer_username'] ?? $knownUser)), '@'), 0, 64),
+                'customer_phone'    => mb_substr(trim((string) ($input['phone'] ?? $input['customer_phone'] ?? '')), 0, 30),
+                'note'              => mb_substr(trim((string) ($input['note'] ?? '')), 0, 500),
+            ]);
+        } catch (Throwable $e) {
+            $this->bookingError($e);
+        }
+
+        if (!$result['ok']) {
+            FlowLog::write('tool.make_booking_refused', ['message' => $result['message']]);
+            $this->json(200, [
+                'success'      => false,
+                'message'      => 'The booking was NOT made: ' . $result['message'],
+                'alternatives' => $result['alternatives'] ?? [],
+                'next_step'    => 'Tell the customer and offer the alternatives. Do not say it is booked.',
+            ]);
+        }
+
+        $b    = $result['booking'];
+        $zone = $s['zone'];
+        $out  = [
+            'success'    => true,
+            'booking_no' => $b['booking_no'],
+            'status'     => 'confirmed',
+            'when'       => BookingService::label((new \DateTimeImmutable((string) $b['starts_at']))->setTimezone($zone),
+                                                  (new \DateTimeImmutable((string) $b['ends_at']))->setTimezone($zone)),
+            'pax'        => (int) $b['pax'],
+            'name'       => $b['customer_name'],
+            'next_step'  => 'Tell the customer the booking is confirmed with the booking number, date, time and pax. '
+                          . 'The booking is done: do NOT call make_booking again for it.',
+        ];
+        if (!empty($result['duplicate'])) {
+            $out['note'] = 'This booking already existed, so no new booking was made. Do not call make_booking again.';
+        }
+        FlowLog::write('tool.make_booking_ok', ['booking_no' => $b['booking_no'], 'duplicate' => !empty($result['duplicate'])]);
+        $this->json(200, $out);
+    }
+
     /* ---------------------------------------------------------- private ---- */
+
+    /** @return array{0: BookingService, 1: array, 2: \DateTimeImmutable, 3: int} */
+    private function bookingRequest(int $userId, array $input): array
+    {
+        $service = new BookingService();
+        try {
+            $s = $service->settings($userId);
+        } catch (Throwable $e) {
+            $this->bookingError($e);
+        }
+
+        $date  = trim((string) ($input['date'] ?? $input['start'] ?? $input['datetime'] ?? ''));
+        $time  = trim((string) ($input['time'] ?? ''));
+        $start = $service->parseStart($date, $time, $s['zone']);
+        if ($start === null) {
+            $this->fail('Give the date as YYYY-MM-DD and the time as HH:MM (24-hour), e.g. date "'
+                . (new \DateTimeImmutable('tomorrow', $s['zone']))->format('Y-m-d') . '", time "19:30". '
+                . 'Today is ' . (new \DateTimeImmutable('now', $s['zone']))->format('l, Y-m-d H:i') . ' (' . $s['zone']->getName() . ').');
+        }
+
+        $pax = (int) ($input['pax'] ?? $input['people'] ?? $input['guests'] ?? 1);
+        if ($pax < 1 || $pax > 1000) {
+            $this->fail('The number of people (pax) must be 1 or more.');
+        }
+
+        return [$service, $s, $start, $pax];
+    }
+
+    /** Name and username Telegram gave for this chat (saved with the messages). */
+    private function chatCustomer(int $userId, string $channel, string $chatId): array
+    {
+        try {
+            $stmt = Database::connection()->prepare(
+                "SELECT customer_name, customer_username FROM chat_messages
+                  WHERE user_id = ? AND channel = ? AND chat_id = ? AND COALESCE(customer_name, '') <> ''
+                  ORDER BY id DESC LIMIT 1"
+            );
+            $stmt->execute([$userId, $channel, $chatId]);
+            $row = $stmt->fetch();
+            return [(string) ($row['customer_name'] ?? ''), (string) ($row['customer_username'] ?? '')];
+        } catch (Throwable) {
+            return ['', ''];
+        }
+    }
+
+    private function bookingError(Throwable $e): never
+    {
+        if ($e instanceof RuntimeException && str_starts_with($e->getMessage(), 'Bookings are not available')) {
+            FlowLog::write('tool.booking_unavailable', ['message' => $e->getMessage()]);
+            $this->json(200, ['success' => false, 'message' => $e->getMessage()
+                . ' Tell the customer bookings cannot be made in this chat right now and staff will contact them.']);
+        }
+        error_log('[tools] booking: ' . $e->getMessage());
+        FlowLog::write('tool.booking_error', ['error' => $e->getMessage()]);
+        $this->json(500, ['success' => false, 'error' => 'The booking system could not be reached. '
+            . (str_contains($e->getMessage(), 'bookings') ? 'Run the database migrations (013). ' : '') . 'Please try again.']);
+    }
+
+    /**
+     * Take the items of an earlier order out of a new list.
+     *
+     * @return array{0: list<array>, 1: bool, 2: bool} [items left, every earlier item was in the new list, the lists are identical]
+     */
+    private function subtractItems(array $new, array $earlier): array
+    {
+        $old = [];
+        foreach ($earlier as $item) {
+            $id = (int) ($item['product_id'] ?? 0);
+            $old[$id] = ($old[$id] ?? 0) + (int) $item['quantity'];
+        }
+        if ($old === [] || isset($old[0])) {
+            return [$new, false, false];
+        }
+
+        $wanted = [];
+        foreach ($new as $item) {
+            $wanted[(int) $item['product_id']] = ($wanted[(int) $item['product_id']] ?? 0) + (int) $item['quantity'];
+        }
+
+        foreach ($old as $id => $qty) {
+            if (($wanted[$id] ?? 0) < $qty) {
+                return [$new, false, false]; // not a copy of the earlier order: keep as asked
+            }
+        }
+        if ($wanted == $old) {
+            return [[], true, true];
+        }
+
+        $left = [];
+        foreach ($new as $item) {
+            $id   = (int) $item['product_id'];
+            $take = min($old[$id] ?? 0, (int) $item['quantity']);
+            $old[$id] = ($old[$id] ?? 0) - $take;
+            if ((int) $item['quantity'] - $take > 0) {
+                $item['quantity'] = (int) $item['quantity'] - $take;
+                $left[] = $item;
+            }
+        }
+        return [$left, true, false];
+    }
 
     /**
      * The one active product whose name is clearly closest to $name (at most
@@ -297,7 +543,7 @@ final class ToolController
     /** A problem the AI should explain to the customer (HTTP 200 so the tool shows the text). */
     private function fail(string $message): never
     {
-        FlowLog::write('tool.buy_product_refused', ['message' => $message]);
+        FlowLog::write('tool.refused', ['path' => $_SERVER['REQUEST_URI'] ?? '', 'message' => $message]);
         $this->json(200, ['success' => false, 'message' => $message]);
     }
 

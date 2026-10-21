@@ -19,6 +19,7 @@ use Src\Controllers\DashboardController;
 use Src\Controllers\FinancialController;
 use Src\Controllers\GmailController;
 use Src\Controllers\OrderController;
+use Src\Controllers\BookingController;
 use Src\Controllers\ProductController;
 use Src\Controllers\ProfileController;
 use Src\Controllers\TelegramWebhookController;
@@ -101,6 +102,9 @@ $router->post(
     $router->post('orders/reject', [OrderController::class, 'reject'], $auth);
     $router->post('orders/cancel', [OrderController::class, 'cancel'], $auth);
 
+    $router->get('bookings', [BookingController::class, 'index'], $auth);
+    $router->post('bookings/cancel', [BookingController::class, 'cancel'], $auth);
+
     $router->get('categories', [CategoryController::class, 'index'], $auth);
     $router->post('categories/store', [CategoryController::class, 'store'], $auth);
     $router->post('categories/update', [CategoryController::class, 'update'], $auth);
@@ -134,6 +138,8 @@ $router->post(
     $router->post('telegram/webhook', [TelegramWebhookController::class, 'handle'], [], false);
     $router->post('tools/check_product', [ToolController::class, 'checkProduct'], [], false);
     $router->post('tools/buy_product', [ToolController::class, 'buyProduct'], [], false);
+    $router->post('tools/check_availability', [ToolController::class, 'checkAvailability'], [], false);
+    $router->post('tools/make_booking', [ToolController::class, 'makeBooking'], [], false);
 
     // Website Chat Interface: the same AI pipeline, for testing without Telegram.
     $router->post('customer/chat_send', [ChatbotController::class, 'customerChatSend'], $auth);

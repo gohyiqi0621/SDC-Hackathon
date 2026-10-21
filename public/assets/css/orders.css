@@ -79,3 +79,17 @@
 }
 .order-table td[data-label="Items"] { min-width: 180px; }
 .order-table td[data-label="Order"] small { white-space: nowrap; }
+
+/* Bookings page: the booking rules in one line under the header */
+.booking-rules-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--primary-light);
+    color: var(--text-soft);
+    font-size: 13px;
+}
+.booking-rules-line i { color: var(--primary); margin-top: 2px; }
