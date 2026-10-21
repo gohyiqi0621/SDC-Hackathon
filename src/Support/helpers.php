@@ -212,7 +212,7 @@ function require_login(): array
 /** Up to two initials for the avatar circle: "Goh Yi Qi" -> "GY". */
 function initials_of(?array $user): string
 {
-    $words = preg_split('/\s+/', trim((string) ($user['name'] ?? ''))) ?: [];
+    $words = preg_split('/\s+/u', trim((string) ($user['name'] ?? ''))) ?: [];
     $words = array_values(array_filter($words, static fn (string $w): bool => $w !== ''));
 
     if ($words === []) {

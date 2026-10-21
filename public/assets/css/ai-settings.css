@@ -929,7 +929,7 @@
 
 /* ---- Google Calendar card (two numbered blocks) ---------------------- */
 .gcal-block { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
-.gcal-block[data-gcal-settings] { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.gcal-block[data-gcal-rules] { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
 [data-section="calendar"] .ai-result { margin: 14px 0 0; }
 .gcal-block__title {
     display: flex;
@@ -966,6 +966,72 @@
 @media (max-width: 650px) {
     .gcal-account__actions { width: 100%; }
     .gcal-account__actions > button { flex: 1 1 100%; }
+}
+
+/* ---- Booking rules (Google Calendar, block 3) ------------------------- */
+.gcal-block__intro { margin: -4px 0 14px; }
+.booking-mode { margin-bottom: 14px; }
+.booking-mode__options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.booking-mode__card { position: relative; display: block; cursor: pointer; }
+.booking-mode__card input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.booking-mode__body {
+    display: grid;
+    gap: 4px;
+    height: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+    transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.booking-mode__body i { color: var(--muted); font-size: 15px; }
+.booking-mode__body strong { font-size: 13.5px; color: var(--text); }
+.booking-mode__body small { font-size: 12px; color: var(--muted); line-height: 1.45; }
+.booking-mode__card:hover .booking-mode__body { border-color: #d5d0ff; }
+.booking-mode__card input:checked + .booking-mode__body {
+    border-color: var(--primary);
+    background: var(--primary-light);
+    box-shadow: 0 0 0 1px var(--primary) inset;
+}
+.booking-mode__card input:checked + .booking-mode__body i { color: var(--primary); }
+.booking-mode__card input:focus-visible + .booking-mode__body { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 12px; }
+.gcal-block .field-row .field + .field { margin-top: 0; }
+
+.day-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.day-chip { position: relative; cursor: pointer; }
+.day-chip input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.day-chip span {
+    display: inline-grid;
+    place-items: center;
+    min-width: 50px;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--white);
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 700;
+    transition: background .15s, color .15s, border-color .15s;
+}
+.day-chip input:checked + span { background: var(--primary); border-color: var(--primary); color: #fff; }
+.day-chip input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.booking-summary {
+    margin: 14px 0 0;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--background);
+    border: 1px dashed var(--border);
+    color: var(--text-soft);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+.booking-summary:empty { display: none; }
+
+@media (max-width: 650px) {
+    .booking-mode__options { grid-template-columns: 1fr; }
 }
 
 /* Payment QR upload (Company Information): same layout as the logo field */

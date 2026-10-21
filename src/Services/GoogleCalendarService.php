@@ -31,7 +31,7 @@ final class GoogleCalendarService
         'openid',
         'email',
         'https://www.googleapis.com/auth/calendar.readonly',     // list calendars, free/busy
-        'https://www.googleapis.com/auth/calendar.events',       // create bookings later
+        'https://www.googleapis.com/auth/calendar.events',       // read and create bookings
     ];
 
     /** Opening hours used by the availability test (local time in the chosen timezone). */
@@ -205,6 +205,54 @@ final class GoogleCalendarService
         }
 
         return $slots;
+    }
+
+    /**
+     * Events between two times (recurring events expanded), not cancelled.
+     *
+     * @return list<array> Google event resources
+     */
+    public function events(string $accessToken, string $calendarId, DateTimeImmutable $from, DateTimeImmutable $to): array
+    {
+        $items = [];
+        $page  = null;
+        do {
+            $query = [
+                'timeMin'      => $from->format(DATE_RFC3339),
+                'timeMax'      => $to->format(DATE_RFC3339),
+                'singleEvents' => 'true',
+                'orderBy'      => 'startTime',
+                'maxResults'   => 250,
+            ] + ($page !== null ? ['pageToken' => $page] : []);
+            $response = $this->api('GET', '/calendar/v3/calendars/' . rawurlencode($calendarId) . '/events?' . http_build_query($query), $accessToken);
+            foreach ((array) ($response['items'] ?? []) as $item) {
+                if (($item['status'] ?? '') !== 'cancelled') {
+                    $items[] = $item;
+                }
+            }
+            $page = $response['nextPageToken'] ?? null;
+        } while ($page !== null && count($items) < 2000);
+
+        return $items;
+    }
+
+    /** Create an event; returns the created resource (with its id). */
+    public function insertEvent(string $accessToken, string $calendarId, array $event): array
+    {
+        return $this->api('POST', '/calendar/v3/calendars/' . rawurlencode($calendarId) . '/events', $accessToken, $event);
+    }
+
+    /** Delete an event. Returns true when deleted (or already gone). */
+    public function deleteEvent(string $accessToken, string $calendarId, string $eventId): bool
+    {
+        $response = Http::request('DELETE',
+            $this->apiBase() . '/calendar/v3/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($eventId),
+            ['Authorization' => 'Bearer ' . $accessToken]);
+
+        if ($response['status'] === 401) {
+            throw new GoogleAuthRevoked('Google no longer accepts the saved access. Connect the account again.');
+        }
+        return in_array($response['status'], [200, 204, 404, 410], true);
     }
 
     /* ------------------------------------------------------------ helpers --- */

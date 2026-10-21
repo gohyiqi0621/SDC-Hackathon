@@ -2371,3 +2371,281 @@ a.badge:hover {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+
+/* ========================================
+   PRODUCT IMPORT DIALOG (products/index.php)
+======================================== */
+
+.import-dialog {
+    width: min(720px, calc(100vw - 32px));
+    max-height: 90vh;
+    margin: auto;
+    padding: 24px;
+    border: 1px solid #e5e2ff;
+    border-radius: 18px;
+    background: white;
+    color: var(--text);
+    box-shadow: 0 25px 60px rgba(23, 27, 69, 0.25);
+    overflow-y: auto;
+}
+
+.import-dialog--narrow {
+    width: min(440px, calc(100vw - 32px));
+}
+
+.import-dialog::backdrop {
+    background: rgba(23, 27, 69, 0.35);
+}
+
+.import-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.import-head h3,
+.import-ask h3 {
+    font-size: 17px;
+    font-weight: 800;
+}
+
+.import-head p {
+    margin-top: 4px;
+    color: var(--text-soft);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.import-drop {
+    cursor: pointer;
+    margin-bottom: 6px;
+    transition: border-color 0.15s, background-color 0.15s;
+}
+
+.import-drop:hover {
+    border-color: var(--primary);
+}
+
+.import-drop.is-loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.import-drop-icon {
+    font-size: 30px;
+    color: var(--primary);
+}
+
+.import-drop.is-loading .import-drop-icon::before {
+    content: "\f110"; /* spinner */
+    display: inline-block;
+    animation: import-spin 0.9s linear infinite;
+}
+
+@keyframes import-spin {
+    to { transform: rotate(360deg); }
+}
+
+.import-fields {
+    margin-top: 8px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fafaff;
+    font-size: 12px;
+}
+
+.import-fields h4,
+.import-subtitle {
+    margin: 0 0 8px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.import-subtitle {
+    margin-top: 18px;
+}
+
+.import-fields ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+    list-style: none;
+}
+
+.import-fields li {
+    padding: 5px 10px;
+    border: 1px solid #e2e1f7;
+    border-radius: 999px;
+    background: white;
+    color: var(--text-soft);
+}
+
+.import-fields .req {
+    color: var(--danger);
+}
+
+.import-ask {
+    text-align: center;
+}
+
+.import-ask p {
+    margin: 10px 0;
+    color: var(--text-soft);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.import-ask-icon {
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+.import-chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    max-height: 160px;
+    overflow-y: auto;
+    margin: 6px 0 12px;
+}
+
+.import-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.import-stat {
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fafaff;
+}
+
+.import-stat strong {
+    display: block;
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.import-stat span {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.import-stat.is-ok strong   { color: var(--success); }
+.import-stat.is-warn strong { color: #a86f05; }
+
+.import-missing {
+    grid-column: 1 / -1;
+    margin: 0;
+}
+
+.import-map {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 14px;
+    list-style: none;
+    font-size: 12.5px;
+}
+
+.import-map li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 7px 10px;
+    border-radius: 9px;
+    background: #fafaff;
+}
+
+.import-map-label {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.import-map-col {
+    margin-left: auto;
+    overflow: hidden;
+    color: var(--muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.import-map .is-found i   { color: var(--success); }
+.import-map .is-missing   { background: var(--danger-bg); }
+.import-map .is-missing i,
+.import-map .is-missing .import-map-col { color: var(--danger); }
+.import-map .is-absent i  { color: #c3c6dd; }
+
+.import-dialog .flash {
+    margin-top: 16px;
+}
+
+.import-table {
+    max-height: 220px;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 12px;
+}
+
+.import-skipped {
+    margin-top: 14px;
+    font-size: 12.5px;
+}
+
+.import-skipped summary {
+    cursor: pointer;
+    color: #a86f05;
+    font-weight: 600;
+}
+
+.import-skipped ul {
+    max-height: 180px;
+    overflow-y: auto;
+    margin-top: 8px;
+    list-style: none;
+}
+
+.import-skipped li {
+    display: grid;
+    gap: 2px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+}
+
+.import-skipped li span {
+    color: var(--danger);
+}
+
+.import-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.import-foot .primary-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+    .import-summary,
+    .import-map {
+        grid-template-columns: 1fr;
+    }
+
+    .import-foot {
+        flex-direction: column-reverse;
+    }
+}

@@ -85,6 +85,7 @@ $router->post(
     /* -------------------------------------------- AI chatbot: customer --- */
     $router->get('customer/settings', [ChatbotController::class, 'customerSettings'], $auth);
     $router->get('customer/chat', [ChatbotController::class, 'customerChat'], $auth);
+    $router->get('customer/chat_feed', [ChatbotController::class, 'customerChatFeed'], $auth);
 
     // Product & Service (Customer)
     $router->get('products', [ProductController::class, 'index'], $auth);
@@ -93,12 +94,17 @@ $router->post(
     $router->get('products/edit', [ProductController::class, 'edit'], $auth);
     $router->post('products/update', [ProductController::class, 'update'], $auth);
     $router->post('products/delete', [ProductController::class, 'delete'], $auth);
+    $router->post('products/import_preview', [ProductController::class, 'importPreview'], $auth);
+    $router->post('products/import_commit', [ProductController::class, 'importCommit'], $auth);
+    $router->post('products/import_cancel', [ProductController::class, 'importCancel'], $auth);
+    $router->get('products/import_template', [ProductController::class, 'importTemplate'], $auth);
 
     // Orders from the AI chatbot (buy_product): review payment receipts
     $router->get('orders', [OrderController::class, 'index'], $auth);
     $router->get('orders/receipt', [OrderController::class, 'receipt'], $auth);
     $router->post('orders/approve', [OrderController::class, 'approve'], $auth);
     $router->post('orders/reject', [OrderController::class, 'reject'], $auth);
+    $router->post('orders/ship', [OrderController::class, 'ship'], $auth);
     $router->post('orders/cancel', [OrderController::class, 'cancel'], $auth);
 
     $router->get('categories', [CategoryController::class, 'index'], $auth);
@@ -134,9 +140,10 @@ $router->post(
     $router->post('telegram/webhook', [TelegramWebhookController::class, 'handle'], [], false);
     $router->post('tools/check_product', [ToolController::class, 'checkProduct'], [], false);
     $router->post('tools/buy_product', [ToolController::class, 'buyProduct'], [], false);
+    $router->post('tools/check_availability', [ToolController::class, 'checkAvailability'], [], false);
+    $router->post('tools/make_booking', [ToolController::class, 'makeBooking'], [], false);
 
-    // Website Chat Interface: the same AI pipeline, for testing without Telegram.
-    $router->post('customer/chat_send', [ChatbotController::class, 'customerChatSend'], $auth);
+    // Preview of the system message built from AI Settings.
     $router->get('customer/system_message', [ChatbotController::class, 'customerSystemMessage'], $auth);
 
     /* ----------------------------------------------- AI chatbot: staff --- */

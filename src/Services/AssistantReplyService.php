@@ -18,6 +18,7 @@ declare(strict_types=1);
 namespace Src\Services;
 
 use Src\Models\ChatMessage;
+use Src\Models\Order;
 use Src\Support\FlowLog;
 use Throwable;
 
@@ -36,7 +37,8 @@ final class AssistantReplyService
         $config   = (new AssistantConfigService())->forUser($userId);
         $messages = new ChatMessage();
 
-        $this->log($messages, $userId, $channel, $chatId, 'customer', $message, 'ok');
+        $this->log($messages, $userId, $channel, $chatId, 'customer', $message, 'ok',
+            $context['customer_name'] ?? null, $context['customer_username'] ?? null);
 
         FlowLog::write('system.config', [
             'channel'   => $channel,
@@ -59,7 +61,15 @@ final class AssistantReplyService
             return ['status' => 'skipped', 'reply' => null, 'error' => 'The AI assistant is switched off in AI Settings.', 'problems' => $config['problems']];
         }
 
-        $systemMessage = (new SystemMessageBuilder())->build($config, $message);
+        // This customer's latest orders, so "one more roti" is not mixed up
+        // with an order that was already paid.
+        try {
+            $recentOrders = (new Order())->recentForChat($userId, $channel, $chatId, 3);
+        } catch (Throwable $e) {
+            $recentOrders = []; // orders table not created yet
+        }
+
+        $systemMessage = (new SystemMessageBuilder())->build($config, $message, $recentOrders);
         $sessionId     = $channel . ':' . $userId . ':' . $chatId;
         $context      += ['channel' => $channel, 'customer_chat_id' => $chatId];
 
@@ -86,10 +96,11 @@ final class AssistantReplyService
     }
 
     /** Logging must never stop a reply (e.g. migration 007 not run yet). */
-    private function log(ChatMessage $messages, int $userId, string $channel, string $chatId, string $role, string $content, string $status): void
+    private function log(ChatMessage $messages, int $userId, string $channel, string $chatId, string $role, string $content, string $status,
+                         ?string $customerName = null, ?string $customerUsername = null): void
     {
         try {
-            $messages->add($userId, $channel, $chatId, $role, $content, $status);
+            $messages->add($userId, $channel, $chatId, $role, $content, $status, $customerName, $customerUsername);
         } catch (Throwable $e) {
             error_log('[assistant] could not log message: ' . $e->getMessage());
         }

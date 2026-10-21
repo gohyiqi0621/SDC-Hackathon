@@ -37,7 +37,8 @@ button shows the exact system message and Flowise request (secrets masked).
 | Fill the template | `src/Services/SystemMessageBuilder.php` |
 | Call Flowise | `src/Services/FlowiseService.php` (`payload()` and `parseReply()`) |
 | One message → one reply | `src/Services/AssistantReplyService.php` |
-| Tools for Flowise | `src/Controllers/ToolController.php` (check_product, buy_product), token: `src/Support/ToolToken.php` |
+| Tools for Flowise | `src/Controllers/ToolController.php` (check_product, buy_product, check_availability, make_booking), token: `src/Support/ToolToken.php` |
+| Bookings (Google Calendar) | `src/Services/BookingService.php`, `src/Controllers/BookingController.php`, `database/migrations/013_create_bookings.sql` |
 | Orders, receipts, approval | `src/Services/OrderService.php`, `src/Controllers/OrderController.php`, `database/migrations/009_create_orders.sql` |
 | Tables | `database/migrations/007_create_telegram_messaging.sql` |
 
@@ -120,7 +121,7 @@ check_product
 
 **Tool Description**
 ```
-Look up this shop's products and services: name, category, description, normal price, promotion price, the final price to pay and availability. Use it whenever the customer asks about a product, a price, a promotion or what is available, and before placing an order. Only quote prices and products that this tool returns; never invent any.
+Look up this shop's products and services: name, category, description, price and availability. Use it whenever the customer asks about a product, a price, a promotion or what is available, and before placing an order. Only quote prices and products that this tool returns; never invent any.
 ```
 
 **Input Schema**
@@ -158,7 +159,7 @@ buy_product
 
 **Tool Description**
 ```
-Place an order for the customer in this chat. Only call it after the customer has clearly confirmed the exact products and quantities (check them with check_product first). It creates an order that is awaiting payment and returns the order number, the items, the total and the payment instructions. Tell the customer all of these and ask them to send a photo or PDF of the payment receipt in this chat. Never say the order is paid or confirmed: staff verify the receipt first. If it returns success=false, explain the message to the customer and ask again.
+Place an order for the customer in this chat. Call it ONCE per order, and only after the customer has clearly confirmed the exact products and quantities (check them with check_product first). Never call it again after it succeeded. Include only the items of this order, not items from earlier paid orders. It creates an order that is awaiting payment and returns the order number, the items, the total and the payment instructions. Tell the customer all of these and ask them to send a photo or PDF of the payment receipt in this chat. Never say the order is paid or confirmed: staff verify the receipt first. If it returns success=false, explain the message to the customer and ask again.
 ```
 
 **Input Schema**
@@ -215,6 +216,113 @@ message gets a fresh one.
 Payment details given to the customer come from **Company Information → How
 customers pay**.
 
+### Custom tool 3: `check_availability`
+
+**Tool Name**
+```
+check_availability
+```
+
+**Tool Description**
+```
+Check if a date and time can be booked for a number of people, using the business's Google Calendar and booking rules (opening hours, slot length, how many customers fit in one slot). Use it before every booking. Give the date as YYYY-MM-DD and the time in 12-hour format with AM/PM (e.g. 10:00 AM, 2:30 PM; noon is 12:00 PM, midnight is 12:00 AM) in the business's timezone. It returns available true/false; when false it gives the reason and up to 3 other free times to offer. If the customer has no preferred time or asks what times are free, leave time empty: it returns the real free times. Never offer a time this tool did not return. It does NOT book anything.
+```
+
+**Input Schema**
+
+| Property | Type | Description | Required |
+|---|---|---|---|
+| `date` | string | Date in YYYY-MM-DD, e.g. 2026-10-22. | yes |
+| `time` | string | Start time in 12-hour format with AM/PM, e.g. 10:00 AM, 2:30 PM, 12:00 PM (noon). Leave empty to list the free times. | no |
+| `pax` | number | Number of people. Use 1 if the customer did not say. | yes |
+
+**JavaScript Function**
+```javascript
+const httpFetch = typeof globalThis.fetch === 'function' ? globalThis.fetch : require('node-fetch');
+const res = await httpFetch($vars.tool_base_url + '/check_availability', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + $vars.tool_token,
+    'ngrok-skip-browser-warning': 'true'
+  },
+  body: JSON.stringify({
+    date: typeof $date !== 'undefined' ? String($date) : '',
+    time: typeof $time !== 'undefined' ? String($time) : '',
+    pax: typeof $pax !== 'undefined' && $pax ? Number($pax) : 1
+  })
+});
+return await res.text();
+```
+
+### Custom tool 4: `make_booking`
+
+**Tool Name**
+```
+make_booking
+```
+
+**Tool Description**
+```
+Book a time slot for the customer in this chat on the business's Google Calendar. Call it ONCE, only after check_availability said the time is available AND the customer clearly confirmed the date, time, number of people and name. Never call it again after it succeeded. It checks the slot again and returns the booking number, or success=false with the reason and other free times. Never say the booking is confirmed unless it returned success=true.
+```
+
+**Input Schema**
+
+| Property | Type | Description | Required |
+|---|---|---|---|
+| `date` | string | Date in YYYY-MM-DD. | yes |
+| `time` | string | Start time in 12-hour format with AM/PM, e.g. 7:30 PM. | yes |
+| `pax` | number | Number of people. | yes |
+| `customer_name` | string | Name for the booking. | yes |
+| `phone` | string | Customer's phone number, if given. | no |
+| `note` | string | Special requests (birthday, baby chair, topic of the meeting...). | no |
+
+**JavaScript Function**
+```javascript
+const httpFetch = typeof globalThis.fetch === 'function' ? globalThis.fetch : require('node-fetch');
+const v = (x) => (typeof x !== 'undefined' && x !== null ? String(x) : '');
+const res = await httpFetch($vars.tool_base_url + '/make_booking', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + $vars.tool_token,
+    'ngrok-skip-browser-warning': 'true'
+  },
+  body: JSON.stringify({
+    date: v(typeof $date !== 'undefined' ? $date : ''),
+    time: v(typeof $time !== 'undefined' ? $time : ''),
+    pax: typeof $pax !== 'undefined' && $pax ? Number($pax) : 1,
+    customer_name: v(typeof $customer_name !== 'undefined' ? $customer_name : '') || $vars.customer_name || '',
+    phone: v(typeof $phone !== 'undefined' ? $phone : ''),
+    note: v(typeof $note !== 'undefined' ? $note : ''),
+    customer_username: $vars.customer_username || ''
+  })
+});
+return await res.text();
+```
+
+**Remove the Flowise "Google Calendar" tool node** from the chatflow when you
+add these two: the website now talks to Google Calendar itself (with the
+account connected in AI Settings → Google Calendar), so the AI must not create
+events on its own.
+
+### How a slot is counted (AI Settings → Google Calendar → Booking rules)
+
+| Setting | Effect |
+|---|---|
+| One customer per slot | Any timed event in the calendar at that time makes it unavailable (office, clinic, salon). |
+| Many customers per slot | The slot is full at *Slot is full at*; counted by **people** (pax of each booking) or **bookings** (each = 1). Bookings made here carry their pax; events you add by hand count as 1, or the number in the title ("Ali 4 pax"). |
+| Each booking lasts | Slot length; the event's end time. |
+| Opens / Closes / Open days | Times outside them are refused; the last start is closing time minus the slot length. |
+| All-day event "Closed", "Tutup", "Cuti", "Holiday", "Full" | Closes that day. Other all-day events are ignored. |
+| Event marked "Free" in Google Calendar | Ignored. |
+
+`make_booking` checks again inside a database lock, so two customers asking
+for the last place at the same moment cannot both get it. Bookings are listed
+under **AI Chatbot → Customer → Bookings**; cancelling one there deletes the
+Google event and tells the customer on Telegram.
+
 ## Telegram needs a public https address
 
 Telegram can't call `http://localhost`. For XAMPP:
@@ -228,7 +336,5 @@ Telegram can't call `http://localhost`. For XAMPP:
 
 ## Not built yet
 
-- Booking tools: `GoogleCalendarService::freeSlots()` exists; creating the
-  calendar event does not.
 - Stock: `products` has no stock column, so `check_product` reports active
   products as `available` and orders do not reduce stock.

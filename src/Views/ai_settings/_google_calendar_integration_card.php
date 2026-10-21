@@ -4,11 +4,14 @@
  *
  * Table: google_calendar_integrations (google_account_email, calendar_id,
  * connection_status, timezone, is_enabled). The access/refresh tokens stay on
- * the server. default_appointment_duration_minutes is kept in the table but
- * no longer edited here (the server keeps the saved value, 30 by default).
+ * the server. default_appointment_duration_minutes is the booking length
+ * ("Each booking lasts", block 3).
  *
  * Layout: 1. Google account (sign in / switch / disconnect)
  *         2. Booking settings: calendar (one row), timezone (one row)
+ *         3. Booking rules (migration 013): one customer per slot or many,
+ *            capacity, slot length, opening hours and days. The Flowise tools
+ *            check_availability / make_booking follow these (BookingService).
  *
  * "Connect Google account" asks the server for a Google sign-in URL and sends
  * the browser there (OAuth). The page never asks for a Google password. After
@@ -98,6 +101,87 @@ foreach ($timezones as $zone) {
                         <p class="field-hint" id="hint-timezone">Your business's local time. Free times and booking times are read in this timezone.</p>
                         <p class="field-error" id="err-timezone" data-error-for="timezone"></p>
                     </div>
+                </div>
+
+                <!-- 3. Booking rules -->
+                <div class="gcal-block" data-gcal-rules>
+                    <h3 class="gcal-block__title"><span class="gcal-step">3</span> Booking rules</h3>
+                    <p class="field-hint gcal-block__intro">The AI checks these rules and your Google Calendar before it books. Events you add in Google Calendar yourself also fill slots; an all-day event called "Closed" or "Cuti" closes that day.</p>
+
+                    <fieldset class="field booking-mode">
+                        <legend>How many customers can book the same time?</legend>
+                        <div class="booking-mode__options">
+                            <label class="booking-mode__card">
+                                <input type="radio" name="booking_mode" value="single" checked>
+                                <span class="booking-mode__body">
+                                    <i class="fa-solid fa-user" aria-hidden="true"></i>
+                                    <strong>One customer per slot</strong>
+                                    <small>Office, clinic, salon, consultation. A slot is taken as soon as anything is in your calendar at that time.</small>
+                                </span>
+                            </label>
+                            <label class="booking-mode__card">
+                                <input type="radio" name="booking_mode" value="multi">
+                                <span class="booking-mode__body">
+                                    <i class="fa-solid fa-users" aria-hidden="true"></i>
+                                    <strong>Many customers per slot</strong>
+                                    <small>Cafe, restaurant, class, tour. Each slot takes bookings until it is full.</small>
+                                </span>
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <div class="field-row" data-capacity-fields hidden>
+                        <div class="field">
+                            <label for="slot_capacity">Slot is full at</label>
+                            <input id="slot_capacity" name="slot_capacity" type="number" min="2" max="1000" step="1" inputmode="numeric" value="10"
+                                   aria-describedby="hint-slot_capacity err-slot_capacity">
+                            <p class="field-hint" id="hint-slot_capacity" data-capacity-hint>For example 40 seats, or 10 tables.</p>
+                            <p class="field-error" id="err-slot_capacity" data-error-for="slot_capacity"></p>
+                        </div>
+                        <div class="field">
+                            <label for="capacity_unit">Count by</label>
+                            <select id="capacity_unit" name="capacity_unit">
+                                <option value="pax">People (pax), e.g. seats</option>
+                                <option value="bookings">Bookings, e.g. tables</option>
+                            </select>
+                            <p class="field-hint">"People" adds up the pax of each booking. "Bookings" counts each booking as one.</p>
+                        </div>
+                    </div>
+
+                    <div class="field-row">
+                        <div class="field">
+                            <label for="default_appointment_duration_minutes">Each booking lasts</label>
+                            <select id="default_appointment_duration_minutes" name="default_appointment_duration_minutes"
+                                    aria-describedby="err-default_appointment_duration_minutes">
+                                <?php foreach ([15 => '15 minutes', 30 => '30 minutes', 45 => '45 minutes', 60 => '1 hour', 90 => '1 hour 30 minutes', 120 => '2 hours', 180 => '3 hours'] as $minutes => $label): ?>
+                                    <option value="<?= $minutes ?>"<?= $minutes === 60 ? ' selected' : '' ?>><?= e($label) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <p class="field-error" id="err-default_appointment_duration_minutes" data-error-for="default_appointment_duration_minutes"></p>
+                        </div>
+                        <div class="field">
+                            <label for="open_time">Opens</label>
+                            <input id="open_time" name="open_time" type="time" value="09:00" step="900" aria-describedby="err-open_time">
+                            <p class="field-error" id="err-open_time" data-error-for="open_time"></p>
+                        </div>
+                        <div class="field">
+                            <label for="close_time">Closes</label>
+                            <input id="close_time" name="close_time" type="time" value="18:00" step="900" aria-describedby="err-close_time">
+                            <p class="field-error" id="err-close_time" data-error-for="close_time"></p>
+                        </div>
+                    </div>
+
+                    <fieldset class="field">
+                        <legend>Open days</legend>
+                        <div class="day-chips">
+                            <?php foreach ([1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 7 => 'Sun'] as $day => $label): ?>
+                                <label class="day-chip"><input type="checkbox" name="open_day_<?= $day ?>" checked> <span><?= $label ?></span></label>
+                            <?php endforeach; ?>
+                        </div>
+                        <p class="field-error" data-error-for="open_days"></p>
+                    </fieldset>
+
+                    <p class="booking-summary" data-booking-summary aria-live="polite"></p>
                 </div>
 
                 <div class="ai-result" data-result hidden></div>
