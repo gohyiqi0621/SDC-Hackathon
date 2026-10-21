@@ -2,10 +2,11 @@
 /**
  * ClaimController.php - Financial > Claims.
  *
- * Staff expense claims, kept separate from invoices: list (search, filter,
- * sort, paginate), a form of its own to add or edit a claim with an optional
- * receipt, review actions (approve, reject, mark reimbursed, reopen), remove,
- * and open the stored receipt. Every query is scoped to the signed-in user.
+ * Staff expense claims, kept separate from invoices: one page with the list
+ * (search, filter, sort, paginate) and a "New claim" popup with an optional
+ * receipt. Anyone can view and submit; only a Supervisor can edit, approve,
+ * reject, mark reimbursed, reopen or delete (see finance_role()). Every query
+ * is scoped to the signed-in user.
  */
 declare(strict_types=1);
 
@@ -19,49 +20,29 @@ final class ClaimController
 {
     private const PER_PAGE = 10;
 
-    /** GET /?page=financial&action=claims */
+    /**
+     * GET /?page=financial&action=claims
+     *   &new=1     opens the new-claim popup
+     *   &edit=N    opens the popup on claim N (Supervisor only)
+     */
     public function index(): void
     {
-        $user    = require_login();
-        $userId  = (int) $user['id'];
-        $filters = $this->filters();
-        $page    = max(1, (int) ($_GET['p'] ?? 1));
+        $user  = require_login();
+        $modal = null;
 
-        $result = (new Claim())->search($userId, $filters, self::PER_PAGE, ($page - 1) * self::PER_PAGE);
-        $pages  = max(1, (int) ceil($result['total'] / self::PER_PAGE));
-
-        // Asked for a page past the end (e.g. after a delete): show the last one.
-        if ($page > $pages && $result['total'] > 0) {
-            $page   = $pages;
-            $result = (new Claim())->search($userId, $filters, self::PER_PAGE, ($page - 1) * self::PER_PAGE);
+        if (!empty($_GET['new'])) {
+            $modal = $this->newModal($user);
+        } elseif (!empty($_GET['edit']) && is_supervisor()) {
+            $claim = $this->ownedOr404($user, (int) $_GET['edit']);
+            if ($claim['status'] !== 'reimbursed') {
+                $modal = ['claim' => $claim, 'values' => $claim, 'errors' => []];
+            }
         }
 
-        view('financial/claims', [
-            'user'     => $user,
-            'claims'   => $result['items'],
-            'total'    => $result['total'],
-            'allCount' => (new Claim())->countForUser($userId),
-            'stats'    => (new Claim())->stats($userId),
-            'filters'  => $filters,
-            'page'     => $page,
-            'pages'    => $pages,
-            'perPage'  => self::PER_PAGE,
-        ]);
+        $this->renderList($user, $modal);
     }
 
-    /** GET /?page=financial&action=claim_new */
-    public function create(): void
-    {
-        $user = require_login();
-
-        $this->renderForm($user, null, [
-            'claimant_name' => (string) ($user['name'] ?? ''),
-            'expense_date'  => date('Y-m-d'),
-            'currency'      => 'MYR',
-        ]);
-    }
-
-    /** POST /?page=financial&action=claim_store */
+    /** POST /?page=financial&action=claim_store - anyone may submit. */
     public function store(): void
     {
         $user    = require_login();
@@ -98,19 +79,12 @@ final class ClaimController
         respond_ok('Claim "' . $data['title'] . '" was submitted.', url('financial', ['action' => 'claims']));
     }
 
-    /** GET /?page=financial&action=claim_edit&id=N */
-    public function edit(): void
-    {
-        $user  = require_login();
-        $claim = $this->ownedOr404($user, (int) ($_GET['id'] ?? 0));
-
-        $this->renderForm($user, $claim, $claim);
-    }
-
-    /** POST /?page=financial&action=claim_update */
+    /** POST /?page=financial&action=claim_update - Supervisor only. */
     public function update(): void
     {
-        $user    = require_login();
+        $user = require_login();
+        require_supervisor('edit a claim');
+
         $userId  = (int) $user['id'];
         $claim   = $this->ownedOr404($user, (int) ($_POST['id'] ?? 0));
         $service = new ClaimService();
@@ -159,10 +133,12 @@ final class ClaimController
         respond_ok('Claim "' . $data['title'] . '" was updated.', url('financial', ['action' => 'claims']));
     }
 
-    /** POST /?page=financial&action=claim_status  (id, do = approve|reject|reimburse|reopen) */
+    /** POST /?page=financial&action=claim_status  (id, do = approve|reject|reimburse|reopen) - Supervisor only. */
     public function status(): void
     {
-        $user   = require_login();
+        $user = require_login();
+        require_supervisor('review a claim');
+
         $userId = (int) $user['id'];
         $claim  = (new Claim())->find($userId, (int) ($_POST['id'] ?? 0));
         $do     = (string) ($_POST['do'] ?? '');
@@ -185,10 +161,12 @@ final class ClaimController
         redirect($this->backUrl());
     }
 
-    /** POST /?page=financial&action=claim_delete */
+    /** POST /?page=financial&action=claim_delete - Supervisor only. */
     public function delete(): void
     {
-        $user   = require_login();
+        $user = require_login();
+        require_supervisor('delete a claim');
+
         $userId = (int) $user['id'];
         $claim  = (new Claim())->find($userId, (int) ($_POST['id'] ?? 0));
 
@@ -219,7 +197,70 @@ final class ClaimController
         $files->send($path, (string) $claim['file_mime'], (string) ($claim['file_name'] ?: 'receipt'), !empty($_GET['download']));
     }
 
+    /* ---------------------------------------- old addresses (redirect) ---- */
+
+    /** GET /?page=financial&action=claim_new - the form became a popup. */
+    public function create(): void
+    {
+        redirect(url('financial', ['action' => 'claims', 'new' => 1]));
+    }
+
+    /** GET /?page=financial&action=claim_edit&id=N */
+    public function edit(): void
+    {
+        redirect(url('financial', ['action' => 'claims', 'edit' => (int) ($_GET['id'] ?? 0)]));
+    }
+
     /* ---------------------------------------------------------- private ---- */
+
+    /**
+     * The list page, optionally with the popup open.
+     *
+     * @param array{claim: ?array, values: array, errors: array}|null $modal
+     */
+    private function renderList(array $user, ?array $modal): void
+    {
+        $userId  = (int) $user['id'];
+        $filters = $this->filters();
+        $page    = max(1, (int) ($_GET['p'] ?? 1));
+
+        $result = (new Claim())->search($userId, $filters, self::PER_PAGE, ($page - 1) * self::PER_PAGE);
+        $pages  = max(1, (int) ceil($result['total'] / self::PER_PAGE));
+
+        // Asked for a page past the end (e.g. after a delete): show the last one.
+        if ($page > $pages && $result['total'] > 0) {
+            $page   = $pages;
+            $result = (new Claim())->search($userId, $filters, self::PER_PAGE, ($page - 1) * self::PER_PAGE);
+        }
+
+        view('financial/claims', [
+            'user'      => $user,
+            'claims'    => $result['items'],
+            'total'     => $result['total'],
+            'allCount'  => (new Claim())->countForUser($userId),
+            'stats'     => (new Claim())->stats($userId),
+            'filters'   => $filters,
+            'page'      => $page,
+            'pages'     => $pages,
+            'perPage'   => self::PER_PAGE,
+            'modal'     => $modal ?? $this->newModal($user),
+            'modalOpen' => $modal !== null,
+        ]);
+    }
+
+    /** @return array{claim: null, values: array, errors: array} */
+    private function newModal(array $user): array
+    {
+        return [
+            'claim'  => null,
+            'values' => [
+                'claimant_name' => (string) ($user['name'] ?? ''),
+                'expense_date'  => date('Y-m-d'),
+                'currency'      => 'MYR',
+            ],
+            'errors' => [],
+        ];
+    }
 
     /** Search / filter / sort values from the query string, cleaned. */
     private function filters(): array
@@ -258,16 +299,7 @@ final class ClaimController
         return $claim;
     }
 
-    private function renderForm(array $user, ?array $claim, array $values, array $errors = []): void
-    {
-        view('financial/claim_form', [
-            'user'   => $user,
-            'claim'  => $claim,
-            'values' => $values,
-            'errors' => $errors,
-        ]);
-    }
-
+    /** A failed save: JSON errors for the popup, or the list with the popup reopened. */
     private function fail(array $user, ?array $claim, array $values, array $errors): void
     {
         if (wants_json()) {
@@ -275,7 +307,7 @@ final class ClaimController
         }
 
         set_status(422);
-        $this->renderForm($user, $claim, $values, $errors);
+        $this->renderList($user, ['claim' => $claim, 'values' => $values, 'errors' => $errors]);
     }
 
     private function dbErrors(PDOException $e): array

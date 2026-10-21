@@ -652,7 +652,7 @@ Thank you for your email regarding "${email.subject}".
 We have received your message and will review the details. We will get back to you with an update shortly.
 
 Best regards,
-Smart SME Team`,
+SME Smart Team`,
 
             friendly:
 `Hi ${email.sender} Team,
@@ -662,7 +662,7 @@ Thanks so much for reaching out!
 We've received your message about "${email.subject}". We'll take a look and get back to you soon.
 
 Best,
-Smart SME Team`,
+SME Smart Team`,
 
             concise:
 `Hi,
@@ -672,7 +672,7 @@ Thank you for your email about "${email.subject}".
 We will review it and respond shortly.
 
 Regards,
-Smart SME Team`
+SME Smart Team`
         };
 
         replyDraft.value = templates[tone];

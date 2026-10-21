@@ -1,6 +1,6 @@
 <?php
 /**
- * DashboardController.php - the home screen (the Smart SME AI email dashboard).
+ * DashboardController.php - the home screen (the SME Smart AI email dashboard).
  *
  * The inbox shows the user's real Gmail when connected (GmailController feeds
  * it as JSON), otherwise demo emails. The Brevo strip shows whether

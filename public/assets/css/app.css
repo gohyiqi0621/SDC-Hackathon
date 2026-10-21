@@ -44,6 +44,9 @@
     --danger-bg: #ffebef;
     --warning: #e5a124;
     --warning-bg: #fff3d9;
+    /* Brand wordmark: "SME" in the dark blue, "Smart" in the mid blue. */
+    --brand-navy: #14205c;
+    --brand-blue: #2b4bd0;
     --radius: 16px;
     --radius-sm: 10px;
     --shadow: 0 8px 25px rgba(49, 60, 123, 0.04);
@@ -198,11 +201,27 @@ code {
     text-decoration: none;
 }
 
+/* The PNG carries ~50% transparent margin, so a 40px box reads as a 20px mark. */
 .brand img {
-    width: 34px;
-    height: 34px;
+    width: 40px;
+    height: 40px;
     border-radius: 10px;
     object-fit: cover;
+}
+
+/* "SME Smart" - the first word dark blue, the rest mid blue. */
+.brand-name {
+    font-weight: 800;
+    letter-spacing: -0.4px;
+    white-space: nowrap;
+}
+
+.brand-name__lead {
+    color: var(--brand-navy);
+}
+
+.brand-name__tail {
+    color: var(--brand-blue);
 }
 
 .sidebar-nav {
@@ -346,7 +365,17 @@ code {
         justify-content: center;
     }
 
-    .sidebar-collapsed .brand,
+    .sidebar-collapsed .sidebar-collapse {
+        display: none;
+    }
+
+    .sidebar-collapsed .brand {
+        justify-content: center;
+        padding: 4px 0;
+    }
+
+    /* The logo stays; only the name goes away. */
+    .sidebar-collapsed .brand-name,
     .sidebar-collapsed .nav-label,
     .sidebar-collapsed .nav-caret,
     .sidebar-collapsed .nav-group.open .nav-sub,
@@ -1423,69 +1452,268 @@ code {
     font-size: 12px;
 }
 
-/* ---------- Invoice file library ---------- */
-
-.file-library .toolbar {
-    padding-bottom: 6px;
-}
-
-.file-list {
-    max-height: 640px;
-    overflow-y: auto;
-}
-
-.file-list li {
-    padding: 11px 8px;
-    border-radius: 10px;
-}
-
-.file-list li:hover,
-.file-list li.is-current {
-    background: #fafaff;
-}
-
-.file-list li.is-current {
-    box-shadow: inset 3px 0 0 var(--primary);
-}
-
-.file-icon--pdf {
-    background: var(--danger-bg);
-    color: var(--danger);
-}
-
-.file-meta {
-    min-width: 0;
-    flex: 1;
-}
-
-.file-meta small {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.file-meta a:hover {
-    text-decoration: none;
-}
-
-.file-meta a:hover strong {
-    color: var(--primary);
-}
-
-.file-actions {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-shrink: 0;
-}
-
-.file-actions .badge {
-    margin: 0 4px 0 0;
-}
-
 .file-link {
     font-size: 11px;
+}
+
+/* ---------- Large popup (Upload invoice / New claim) ---------- */
+
+.modal {
+    width: min(1100px, calc(100vw - 32px));
+    height: min(780px, calc(100vh - 48px));
+    margin: auto;
+    padding: 0;
+    border: 1px solid #e5e2ff;
+    border-radius: 20px;
+    background: white;
+    color: var(--text);
+    box-shadow: 0 30px 80px rgba(23, 27, 69, 0.28);
+    overflow: hidden;
+}
+
+.modal[open] {
+    display: flex;
+}
+
+.modal::backdrop {
+    background: rgba(23, 27, 69, 0.4);
+    backdrop-filter: blur(2px);
+}
+
+.modal-form {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 0;
+}
+
+.modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 26px 16px;
+    border-bottom: 1px solid var(--line);
+}
+
+.modal-head h2 {
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+}
+
+.modal-head p {
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.modal-close {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    color: var(--muted);
+    font-size: 16px;
+}
+
+.modal-close:hover {
+    background: #f4f3ff;
+    color: var(--text);
+}
+
+.modal-flash {
+    margin: 14px 26px 0;
+}
+
+.modal-body {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+}
+
+.modal-pane {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 22px 26px;
+}
+
+.modal-pane--file {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: #fafaff;
+    border-right: 1px solid var(--line);
+}
+
+.modal-pane--file .upload-drop {
+    margin-bottom: 0;
+    padding: 22px 18px;
+    background: white;
+}
+
+.modal-pane--file .upload-drop + .field-error {
+    margin: -6px 0 0;
+}
+
+.file-preview {
+    flex: 1;
+    min-height: 260px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: white;
+}
+
+.file-preview iframe {
+    width: 100%;
+    height: 100%;
+    min-height: 260px;
+    border: 0;
+}
+
+.file-preview img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #f7f7fd;
+}
+
+.file-preview-empty {
+    flex: 1;
+    min-height: 180px;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 10px;
+    padding: 20px;
+    border: 1px dashed var(--border);
+    border-radius: 14px;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+}
+
+.file-preview-empty i {
+    font-size: 26px;
+    color: #c7c3f5;
+}
+
+.modal-note {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    margin: 0 0 16px;
+    padding: 11px 13px;
+    border-radius: 10px;
+    background: var(--primary-light);
+    color: #4c43b8;
+}
+
+.modal-foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 26px;
+    border-top: 1px solid var(--line);
+    background: white;
+}
+
+.modal-foot-note {
+    margin-right: auto;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.modal-foot-note i {
+    margin-right: 5px;
+}
+
+@media (max-width: 860px) {
+    .modal {
+        width: 100vw;
+        height: 100vh;
+        max-width: none;
+        max-height: none;
+        border-radius: 0;
+    }
+
+    .modal-body {
+        display: block;
+        overflow-y: auto;
+    }
+
+    .modal-pane {
+        overflow: visible;
+        padding: 18px 16px;
+    }
+
+    .modal-pane--file {
+        border-right: none;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .modal-head,
+    .modal-foot {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .modal-foot-note {
+        display: none;
+    }
+}
+
+/* ---------- Financial tabs + role switch ---------- */
+
+.page-tabs-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.role-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.8);
+}
+
+.role-switch-label {
+    padding: 0 8px 0 6px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.role-switch button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    color: #5b6285;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.role-switch button:hover {
+    background: #f4f3ff;
+}
+
+.role-switch button.active {
+    background: var(--primary);
+    color: white;
 }
 
 /* ---------- Profile ---------- */
@@ -2138,6 +2366,12 @@ a.badge:hover {
     background: var(--danger-bg);
     color: var(--danger);
     font-size: 20px;
+}
+
+/* A non-destructive question (e.g. "Submit this invoice?") is not shown in red. */
+.confirm-dialog--primary .confirm-icon {
+    background: var(--primary-light);
+    color: var(--primary);
 }
 
 .confirm-dialog h3 {
