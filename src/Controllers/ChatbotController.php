@@ -72,7 +72,7 @@ final class ChatbotController
      * Router (GET/POST only, addressed as ?page=&action=), so the same
      * operations are mapped onto that convention. PUT becomes POST. They are
      * registered in routes.php and handled by AiSettingsController. If one is
-     * ever missing (404), the page falls back to a clearly labelled demo mode.
+     * ever missing (404), the page shows an error for that section.
      *
      * @return array<string, string>
      */
@@ -87,17 +87,19 @@ final class ChatbotController
             // AI assistant (ai_assistant_settings)
             'assistantGet'        => $to('assistant'),                  // GET
             'assistantSave'       => $to('assistant_save'),             // POST
+            'assistantGenerateSops' => $to('generate_sops'),            // POST -> {sops: [...]}
             // Telegram (telegram_integrations)
             'telegramGet'         => $to('telegram'),                   // GET
             'telegramConnect'     => $to('telegram_connect'),           // POST
-            'telegramTest'        => $to('telegram_test'),              // POST
             'telegramDisconnect'  => $to('telegram_disconnect'),        // POST
+            'telegramForget'      => $to('telegram_forget'),            // POST
+            'telegramStaffLink'   => $to('telegram_staff_link'),        // POST -> {link}
+            'telegramStaffUnlink' => $to('telegram_staff_unlink'),      // POST
             // Google Calendar (google_calendar_integrations)
             'calendarGet'         => $to('google_calendar'),            // GET
             'calendarOauthStart'  => $to('google_calendar_oauth_start'),// GET -> {auth_url}
             'calendarCalendars'   => $to('google_calendar_calendars'),  // GET
             'calendarSave'        => $to('google_calendar_save'),       // POST
-            'calendarTest'        => $to('google_calendar_test'),       // POST
             'calendarDisconnect'  => $to('google_calendar_disconnect'), // POST
         ];
     }

@@ -16,6 +16,7 @@ final class CompanyProfile extends UserSettingsRow
 
     protected function writable(): array
     {
-        return ['company_name', 'company_logo_url', 'company_background', 'company_description', 'business_category'];
+        return ['company_name', 'company_logo_url', 'company_background', 'company_description', 'business_category',
+                'payment_instructions', 'payment_qr_url'];
     }
 }

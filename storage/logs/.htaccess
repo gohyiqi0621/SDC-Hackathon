@@ -1,0 +1,2 @@
+# Logs are never served over the web (the root .htaccess also blocks storage/).
+Require all denied

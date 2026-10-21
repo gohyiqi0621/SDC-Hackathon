@@ -8,6 +8,10 @@
  *   sendText        a reply of any length (split at Telegram's 4096 limit)
  *   sendTyping      "typing..." while Flowise is thinking
  *   setWebhook / deleteWebhook / webhookInfo   customer messages -> this app
+ *   setMyName       the bot's display name ("AI chatbot name")
+ *
+ * Replies, webhook changes and failures are written to the flow log
+ * (Src\Support\FlowLog) with the token masked.
  *
  * The token is part of every Bot API URL, so URLs are never logged or put
  * in error messages.
@@ -17,6 +21,7 @@ declare(strict_types=1);
 namespace Src\Services;
 
 use RuntimeException;
+use Src\Support\FlowLog;
 use Src\Support\Http;
 
 final class TelegramService
@@ -88,19 +93,226 @@ final class TelegramService
         ];
     }
 
-    /** Best effort: returns false instead of throwing. */
-    public function sendMessage(string $token, string $chatId, string $text): bool
+    /**
+     * Send one message. Retries up to 3 times when Telegram cannot be reached
+     * or is busy (timeouts, HTTP 429/5xx), so a short network blip does not
+     * lose the customer's reply. Best effort: returns false instead of throwing.
+     *
+     * $html: the text is Telegram HTML (see markdownToHtml); if Telegram
+     * refuses the formatting, the plain text is sent instead.
+     */
+    public function sendMessage(string $token, string $chatId, string $text, ?string $html = null): bool
     {
-        try {
-            $response = Http::request('POST', $this->url($token, 'sendMessage'), [], [
-                'chat_id' => $chatId,
-                'text'    => $text,
-            ]);
-        } catch (RuntimeException $e) {
+        $started = microtime(true);
+        $params  = $html !== null
+            ? ['chat_id' => $chatId, 'text' => $html, 'parse_mode' => 'HTML', 'disable_web_page_preview' => 'true']
+            : ['chat_id' => $chatId, 'text' => $text];
+        $response = null;
+        $error    = null;
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                $response = Http::request('POST', $this->url($token, 'sendMessage'), [], $params, 20);
+                $error    = null;
+            } catch (RuntimeException $e) {
+                $response = null;
+                $error    = $e->getMessage();
+            }
+
+            $status = $response['status'] ?? 0;
+            if ($response !== null && $status !== 429 && $status < 500) {
+                break;
+            }
+            if ($attempt < 3) {
+                $wait = (int) ($response['json']['parameters']['retry_after'] ?? $attempt);
+                FlowLog::write('telegram.send_retry', ['chat_id' => $chatId, 'attempt' => $attempt, 'status' => $status, 'error' => $error]);
+                sleep(max(1, min(5, $wait)));
+            }
+        }
+
+        if ($response === null) {
+            FlowLog::write('telegram.send_failed', ['chat_id' => $chatId, 'error' => $error, 'attempts' => 3]);
             return false;
         }
 
-        return is_array($response['json']) && !empty($response['json']['ok']);
+        $ok = is_array($response['json']) && !empty($response['json']['ok']);
+
+        // Formatting rejected ("can't parse entities"): send it as plain text.
+        if (!$ok && $html !== null && $response['status'] === 400) {
+            FlowLog::write('telegram.html_refused', ['description' => $response['json']['description'] ?? null]);
+            return $this->sendMessage($token, $chatId, $text);
+        }
+
+        FlowLog::write('telegram.send', [
+            'chat_id'     => $chatId,
+            'status'      => $response['status'],
+            'ok'          => $ok,
+            'ms'          => (int) round((microtime(true) - $started) * 1000),
+            'text'        => $text,
+            'description' => $ok ? null : (string) ($response['json']['description'] ?? $response['raw']),
+        ]);
+
+        return $ok;
+    }
+
+    /**
+     * The AI writes Markdown (**bold**, ### headings, `code`, [links](url));
+     * Telegram shows that as raw symbols. Convert the common parts to
+     * Telegram HTML. Everything else is escaped, so it is always safe.
+     */
+    public static function markdownToHtml(string $text): string
+    {
+        $out = [];
+        foreach (preg_split('/\R/', $text) ?: [] as $line) {
+            // Table separator rows (|---|---|) and horizontal rules add nothing in a chat.
+            if (preg_match('/^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/', $line) || preg_match('/^\s*([-*_])\1{2,}\s*$/', $line)) {
+                continue;
+            }
+            $line = htmlspecialchars($line, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+            // Table rows: | a | b |  ->  a · b
+            if (preg_match('/^\s*\|(.+)\|\s*$/', $line, $m)) {
+                $line = implode(' · ', array_map('trim', explode('|', $m[1])));
+            }
+            // ### Heading -> bold line
+            if (preg_match('/^\s*#{1,6}\s+(.+)$/', $line, $m)) {
+                $line = '<b>' . trim($m[1], " *") . '</b>';
+            }
+            // - item / * item -> bullet
+            $line = (string) preg_replace('/^(\s*)[-*]\s+/', '$1• ', $line);
+
+            $line = (string) preg_replace('/`([^`]+)`/', '<code>$1</code>', $line);
+            $line = (string) preg_replace('/\*\*(.+?)\*\*/', '<b>$1</b>', $line);
+            $line = (string) preg_replace('/__(.+?)__/', '<b>$1</b>', $line);
+            $line = (string) preg_replace('/(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])/', '<i>$1</i>', $line);
+            $line = (string) preg_replace('/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/', '<a href="$2">$1</a>', $line);
+
+            $out[] = $line;
+        }
+
+        return trim((string) preg_replace("/\n{3,}/", "\n\n", implode("\n", $out)));
+    }
+
+    /** Send an image file from this server (e.g. the payment QR code). Best effort. */
+    public function sendPhoto(string $token, string $chatId, string $path, string $caption = ''): bool
+    {
+        if (!is_file($path)) {
+            return false;
+        }
+
+        try {
+            $response = Http::request('POST', $this->url($token, 'sendPhoto'), [], [
+                'chat_id' => $chatId,
+                'caption' => mb_substr($caption, 0, 1000),
+                'photo'   => new \CURLFile($path, (string) (mime_content_type($path) ?: 'image/png'), basename($path)),
+            ], 30);
+        } catch (RuntimeException $e) {
+            FlowLog::write('telegram.photo_failed', ['chat_id' => $chatId, 'error' => $e->getMessage()]);
+            return false;
+        }
+
+        $ok = is_array($response['json']) && !empty($response['json']['ok']);
+        FlowLog::write('telegram.photo', ['chat_id' => $chatId, 'ok' => $ok, 'caption' => $caption,
+                                          'description' => $ok ? null : ($response['json']['description'] ?? null)]);
+
+        return $ok;
+    }
+
+    /**
+     * Set the bot's display name (what customers see at the top of the chat).
+     * Best effort: the bot still works if Telegram refuses (e.g. rate limit).
+     *
+     * @return array{ok: bool, message: string}
+     */
+    public function setMyName(string $token, string $name): array
+    {
+        try {
+            $response = Http::request('POST', $this->url($token, 'setMyName'), [], ['name' => $name]);
+        } catch (RuntimeException $e) {
+            return ['ok' => false, 'message' => 'Could not reach Telegram to set the chatbot name.'];
+        }
+
+        $json = is_array($response['json']) ? $response['json'] : [];
+        FlowLog::write('telegram.set_name', ['name' => $name, 'status' => $response['status'], 'ok' => !empty($json['ok']),
+                                             'description' => $json['description'] ?? null]);
+
+        return !empty($json['ok'])
+            ? ['ok' => true, 'message' => 'Chatbot name set to "' . $name . '".']
+            : ['ok' => false, 'message' => 'Telegram did not change the name: ' . (string) ($json['description'] ?? 'unknown error') . '.'];
+    }
+
+    /**
+     * Download a file a customer sent (photo / PDF) by its file_id.
+     *
+     * @return array{bytes: string, name: string}|null null when Telegram refuses or the file is too big
+     */
+    public function downloadFile(string $token, string $fileId, int $maxBytes = 10485760): ?array
+    {
+        try {
+            $info = Http::request('GET', $this->url($token, 'getFile') . '?' . http_build_query(['file_id' => $fileId]));
+        } catch (RuntimeException $e) {
+            FlowLog::write('telegram.get_file_failed', ['error' => $e->getMessage()]);
+            return null;
+        }
+
+        $file = is_array($info['json']) && !empty($info['json']['ok']) ? (array) $info['json']['result'] : [];
+        $path = (string) ($file['file_path'] ?? '');
+        if ($path === '' || (int) ($file['file_size'] ?? 0) > $maxBytes) {
+            FlowLog::write('telegram.get_file_failed', ['status' => $info['status'], 'file_size' => $file['file_size'] ?? null,
+                                                        'description' => $info['json']['description'] ?? null]);
+            return null;
+        }
+
+        $base = rtrim((string) env('TELEGRAM_API_BASE', 'https://api.telegram.org'), '/');
+        try {
+            $download = Http::request('GET', $base . '/file/bot' . $token . '/' . $path, [], null, 30);
+        } catch (RuntimeException $e) {
+            FlowLog::write('telegram.download_failed', ['error' => $e->getMessage()]);
+            return null;
+        }
+
+        if ($download['status'] !== 200 || $download['raw'] === '' || strlen($download['raw']) > $maxBytes) {
+            FlowLog::write('telegram.download_failed', ['status' => $download['status']]);
+            return null;
+        }
+
+        return ['bytes' => $download['raw'], 'name' => basename($path)];
+    }
+
+    /**
+     * Forward a customer's message (e.g. the receipt photo) to the staff chat
+     * with a new caption. Best effort.
+     */
+    public function copyMessage(string $token, string $toChatId, string $fromChatId, int $messageId, string $caption = ''): bool
+    {
+        try {
+            $response = Http::request('POST', $this->url($token, 'copyMessage'), [], array_filter([
+                'chat_id'      => $toChatId,
+                'from_chat_id' => $fromChatId,
+                'message_id'   => (string) $messageId,
+                'caption'      => $caption !== '' ? mb_substr($caption, 0, 1000) : null,
+            ], static fn ($v) => $v !== null));
+        } catch (RuntimeException $e) {
+            FlowLog::write('telegram.copy_failed', ['error' => $e->getMessage()]);
+            return false;
+        }
+
+        $ok = is_array($response['json']) && !empty($response['json']['ok']);
+        FlowLog::write('telegram.copy', ['to' => $toChatId, 'ok' => $ok, 'description' => $ok ? null : ($response['json']['description'] ?? null)]);
+
+        return $ok;
+    }
+
+    /** The bot's current display name, or '' (best effort). */
+    public function myName(string $token): string
+    {
+        try {
+            $response = Http::request('GET', $this->url($token, 'getMyName'), [], null, 8);
+        } catch (RuntimeException $e) {
+            return '';
+        }
+
+        return is_array($response['json']) ? (string) ($response['json']['result']['name'] ?? '') : '';
     }
 
     /**
@@ -110,8 +322,8 @@ final class TelegramService
     public function sendText(string $token, string $chatId, string $text): bool
     {
         $ok = true;
-        foreach ($this->chunks($text, 4000) as $part) {
-            $ok = $this->sendMessage($token, $chatId, $part) && $ok;
+        foreach ($this->chunks($text, 3500) as $part) {
+            $ok = $this->sendMessage($token, $chatId, $part, self::markdownToHtml($part)) && $ok;
         }
 
         return $ok;
@@ -152,6 +364,8 @@ final class TelegramService
         }
 
         $json = is_array($response['json']) ? $response['json'] : [];
+        FlowLog::write('telegram.set_webhook', ['url' => $url, 'status' => $response['status'], 'ok' => !empty($json['ok']),
+                                                'description' => $json['description'] ?? null]);
 
         return !empty($json['ok'])
             ? ['ok' => true, 'message' => 'Customer messages to the bot now come to this app.']
@@ -170,10 +384,10 @@ final class TelegramService
     }
 
     /** Telegram's view of the webhook (url, pending updates, last error). */
-    public function webhookInfo(string $token): ?array
+    public function webhookInfo(string $token, int $timeout = 15): ?array
     {
         try {
-            $response = Http::request('GET', $this->url($token, 'getWebhookInfo'));
+            $response = Http::request('GET', $this->url($token, 'getWebhookInfo'), [], null, $timeout);
         } catch (RuntimeException $e) {
             return null;
         }

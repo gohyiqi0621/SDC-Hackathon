@@ -16,6 +16,14 @@
  * No login and no CSRF token (Telegram cannot send either); the secret header
  * is what authenticates the call. Only private chats are answered, so the bot
  * stays quiet in the staff group.
+ *
+ * "/start staff_<code>" (from the "Link my Telegram" button in AI Settings) is
+ * not sent to the AI: it saves that chat as the business's staff chat.
+ * A photo/PDF from a customer with an order awaiting payment is not sent to
+ * the AI either: it is the payment receipt (OrderService::attachReceipt).
+ *
+ * Every step, including why a message was ignored, is written to
+ * storage/logs/telegram-flow-<date>.log (Src\Support\FlowLog).
  */
 declare(strict_types=1);
 
@@ -24,8 +32,10 @@ namespace Src\Controllers;
 use RuntimeException;
 use Src\Models\TelegramIntegration;
 use Src\Services\AssistantReplyService;
+use Src\Services\OrderService;
 use Src\Services\TelegramService;
 use Src\Support\Crypto;
+use Src\Support\FlowLog;
 use Throwable;
 
 final class TelegramWebhookController
@@ -33,36 +43,73 @@ final class TelegramWebhookController
     public function handle(): void
     {
         $integrations = new TelegramIntegration();
-        $integration  = $integrations->findById((int) ($_GET['bot'] ?? 0));
+        $botId        = (int) ($_GET['bot'] ?? 0);
         $secret       = (string) ($_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '');
+        $raw          = (string) file_get_contents('php://input');
+        $update       = json_decode($raw, true);
+        $message      = is_array($update) ? ($update['message'] ?? null) : null;
+
+        FlowLog::write('webhook.received', [
+            'bot'        => $botId,
+            'has_secret' => $secret !== '',
+            'update_id'  => $update['update_id'] ?? null,
+            'chat_id'    => is_array($message) ? ($message['chat']['id'] ?? null) : null,
+            'chat_type'  => is_array($message) ? ($message['chat']['type'] ?? null) : null,
+            'from'       => is_array($message) ? trim(($message['from']['first_name'] ?? '') . ' @' . ($message['from']['username'] ?? '')) : null,
+            'text'       => is_array($message) ? ($message['text'] ?? $message['caption'] ?? '(no text)') : null,
+            'update_type' => is_array($update) ? implode(',', array_diff(array_keys($update), ['update_id'])) : 'invalid JSON',
+        ]);
+
+        try {
+            $integration = $integrations->findById($botId);
+        } catch (Throwable $e) {
+            FlowLog::write('webhook.error', ['reason' => 'Database error: ' . $e->getMessage()]);
+            $this->respond(500);
+            return;
+        }
 
         if ($integration === null || empty($integration['webhook_secret'])
             || !hash_equals((string) $integration['webhook_secret'], $secret)) {
+            FlowLog::write('webhook.rejected', ['reason' => $integration === null
+                ? 'No Telegram integration with id ' . $botId . ' (reconnect the bot in AI Settings).'
+                : 'Secret header does not match (an old webhook is still registered: reconnect the bot or run bin\\telegram-webhook.php).']);
             $this->respond(403);
             return;
         }
 
-        $update = json_decode((string) file_get_contents('php://input'), true);
         if (!is_array($update) || !isset($update['update_id'])) {
+            FlowLog::write('webhook.ignored', ['reason' => 'Not a Telegram update.']);
             $this->respond(200); // nothing we can use; do not make Telegram retry
             return;
         }
 
         if ($integration['connection_status'] !== 'connected' || !$this->isTrue($integration['is_enabled'])
             || empty($integration['bot_token_encrypted'])) {
+            FlowLog::write('webhook.ignored', ['reason' => 'The bot is not connected/enabled in AI Settings (status: ' . $integration['connection_status'] . ').']);
             $this->respond(200);
             return;
         }
 
         if (!$integrations->claimUpdate((int) $integration['id'], (int) $update['update_id'])) {
-            $this->respond(200); // already handled (Telegram retry)
+            FlowLog::write('webhook.ignored', ['reason' => 'Duplicate update (Telegram retry), already handled.']);
+            $this->respond(200);
             return;
         }
 
-        $message = $update['message'] ?? null;
-        $chat    = is_array($message) ? ($message['chat'] ?? []) : [];
+        $chat = is_array($message) ? ($message['chat'] ?? []) : [];
 
-        if (!is_array($message) || ($chat['type'] ?? '') !== 'private' || !empty($message['from']['is_bot'])) {
+        if (!is_array($message)) {
+            FlowLog::write('webhook.ignored', ['reason' => 'Not a new message (e.g. an edited message).']);
+            $this->respond(200);
+            return;
+        }
+        if (($chat['type'] ?? '') !== 'private') {
+            FlowLog::write('webhook.ignored', ['reason' => 'Group/channel chat: the assistant only answers private chats.']);
+            $this->respond(200);
+            return;
+        }
+        if (!empty($message['from']['is_bot'])) {
+            FlowLog::write('webhook.ignored', ['reason' => 'Message from a bot.']);
             $this->respond(200);
             return;
         }
@@ -74,10 +121,64 @@ final class TelegramWebhookController
             $token = Crypto::decrypt((string) $integration['bot_token_encrypted']);
         } catch (RuntimeException $e) {
             error_log('[telegram] cannot decrypt bot token for integration ' . $integration['id']);
+            FlowLog::write('webhook.error', ['reason' => 'Cannot decrypt the bot token (APP_ENCRYPTION_KEY changed?). Reconnect the bot.']);
+            return;
+        }
+
+        if ($this->linkStaff($integrations, $integration, $token, $message)) {
+            return;
+        }
+
+        // A photo / PDF from a customer whose order awaits payment is the
+        // payment receipt: attach it to the order instead of asking the AI.
+        if ((!empty($message['photo']) || !empty($message['document']))
+            && (new OrderService())->attachReceipt($integration, $token, $message)) {
+            FlowLog::write('flow.done', ['chat_id' => (string) $chat['id'], 'handled_as' => 'payment receipt']);
             return;
         }
 
         $this->answer($integration, $token, $message);
+        FlowLog::write('flow.done', ['chat_id' => (string) $chat['id']]);
+    }
+
+    /**
+     * "/start staff_<code>" from the Link-my-Telegram button: this chat becomes
+     * the business's staff chat. Returns true when the message was handled.
+     */
+    private function linkStaff(TelegramIntegration $integrations, array $integration, string $token, array $message): bool
+    {
+        $text = trim((string) ($message['text'] ?? ''));
+        if (!preg_match('/^\/start(?:@\w+)?\s+staff_([A-Za-z0-9]{16,40})$/', $text, $m)) {
+            return false;
+        }
+
+        $chatId   = (string) $message['chat']['id'];
+        $telegram = new TelegramService();
+        $code     = (string) ($integration['staff_link_code'] ?? '');
+        $expires  = strtotime((string) ($integration['staff_link_expires_at'] ?? '')) ?: 0;
+
+        if ($code === '' || !hash_equals($code, $m[1]) || $expires < time()) {
+            FlowLog::write('staff.link_failed', ['chat_id' => $chatId, 'reason' => $code === '' ? 'no link pending' : ($expires < time() ? 'link expired' : 'wrong code')]);
+            $telegram->sendText($token, $chatId, 'This staff link has expired or was already used. Open AI Settings → Telegram and click "Link my Telegram" again.');
+            return true;
+        }
+
+        $from = $message['from'] ?? [];
+        $name = trim(($from['first_name'] ?? '') . ' ' . ($from['last_name'] ?? ''));
+        if (!empty($from['username'])) {
+            $name = trim($name . ' (@' . $from['username'] . ')');
+        }
+
+        $integrations->save((int) $integration['user_id'], [
+            'staff_telegram_chat_id' => $chatId,
+            'staff_linked_name'      => mb_substr($name !== '' ? $name : 'Telegram user ' . $chatId, 0, 120),
+            'staff_link_code'        => null,
+            'staff_link_expires_at'  => null,
+        ]);
+        FlowLog::write('staff.linked', ['user_id' => (int) $integration['user_id'], 'chat_id' => $chatId, 'name' => $name]);
+
+        $telegram->sendText($token, $chatId, '✅ Linked! Staff alerts for ' . APP_NAME . ' will come to this chat.');
+        return true;
     }
 
     /* ---------------------------------------------------------- private ---- */

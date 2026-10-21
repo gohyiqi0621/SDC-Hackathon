@@ -17,6 +17,6 @@ final class AiAssistantSetting extends UserSettingsRow
     protected function writable(): array
     {
         return ['assistant_name', 'personality', 'tone_description', 'system_instructions', 'is_enabled',
-                'ai_model', 'api_key_encrypted', 'temperature'];
+                'ai_model', 'api_key_encrypted', 'temperature', 'reply_language'];
     }
 }

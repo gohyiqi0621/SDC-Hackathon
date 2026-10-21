@@ -796,3 +796,178 @@
         padding: 10px 14px;
     }
 }
+
+/* ---- Generate SOPs with AI (Agnes) ---------------------------------- */
+.sop-generate-btn { flex-shrink: 0; white-space: nowrap; }
+
+.sop-ai-note {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    border-radius: var(--radius, 12px);
+    background: var(--primary-light);
+    color: var(--text-soft);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+.sop-ai-note i { color: var(--primary); margin-top: 2px; }
+
+.sop-ai-result {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--success);
+    border-radius: var(--radius, 12px);
+    background: var(--success-bg);
+    font-size: 13px;
+}
+.sop-ai-result-head { font-weight: 700; margin-bottom: 6px; color: var(--text); }
+.sop-ai-result-head i { color: var(--success); }
+.sop-ai-result ul { margin: 0; padding-left: 18px; }
+.sop-ai-result li { margin: 3px 0; color: var(--text-soft); }
+.sop-ai-result li strong { color: var(--text); }
+
+@media (max-width: 640px) {
+    .panel-header:has(.sop-generate-btn) { flex-wrap: wrap; }
+    .sop-generate-btn { width: 100%; justify-content: center; }
+}
+
+/* ---- Telegram connect flow ----------------------------------------- */
+.tg-step-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tg-step-title { font-size: 15px; font-weight: 800; margin: 0 0 4px; }
+
+.tg-choice-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+}
+.tg-choice {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 12px);
+}
+.tg-choice--saved { border-color: var(--primary); background: var(--primary-light); }
+.tg-choice-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--primary-light);
+    color: var(--primary);
+    font-size: 16px;
+    flex-shrink: 0;
+}
+.tg-choice--saved .tg-choice-icon { background: var(--primary); color: #fff; }
+.tg-choice-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tg-choice-text span, .tg-choice-text a { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+.tg-forget { font-size: 12px; color: var(--muted); }
+
+.tg-steps { margin: 14px 0 0; padding-left: 20px; display: grid; gap: 14px; }
+.tg-steps > li::marker { font-weight: 800; color: var(--primary); }
+.tg-steps p { margin: 0 0 6px; }
+.tg-copy-list { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 4px; font-size: 13px; }
+.tg-copy-list code { overflow-wrap: anywhere; }
+.tg-botfather { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+
+.tg-connected { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.tg-status {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 12px);
+    font-size: 13px;
+}
+.tg-status > i { margin-top: 3px; color: var(--muted); }
+.tg-status p { margin: 2px 0 0; color: var(--text-soft); overflow-wrap: anywhere; }
+.tg-status[data-tg="webhook"] > i { color: var(--success); }
+.tg-status.is-error { border-color: var(--danger); background: var(--danger-bg); }
+.tg-status.is-error > i { color: var(--danger); }
+.tg-status.is-ok > i { color: var(--success); }
+.tg-staff-body { flex: 1; min-width: 0; }
+.tg-staff-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
+
+@media (max-width: 640px) {
+    .integration-actions { flex-wrap: wrap; }
+    .integration-actions .primary-btn, .integration-actions .secondary-btn { flex: 1 1 auto; justify-content: center; }
+}
+[data-section="telegram"] .ai-result { margin-top: 14px; }
+
+/* Telegram connected view: one read-only field per row, like Google Calendar */
+.tg-fields { display: grid; gap: 4px; margin-bottom: 4px; }
+.tg-fields input[readonly] { background: #fafaff; cursor: default; color: var(--text); }
+.tg-fields .field.is-ok input[readonly] { border-color: var(--success); background: var(--success-bg); }
+.tg-fields .field.is-problem input[readonly] { border-color: var(--danger); background: var(--danger-bg); }
+.tg-fields .field.is-problem .field-hint { color: var(--danger); }
+.tg-account__icon { color: #229ed9; }
+.tg-staff-actions { display: inline-flex; align-items: center; gap: 12px; }
+
+/* Telegram: problem message under the chatbot row when the pill shows Error */
+.tg-alert {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin: -6px 0 14px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--danger-bg);
+    color: var(--danger);
+    font-size: 12.5px;
+    overflow-wrap: anywhere;
+}
+.tg-alert i { margin-top: 2px; }
+
+/* ---- Google Calendar card (two numbered blocks) ---------------------- */
+.gcal-block { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+.gcal-block[data-gcal-settings] { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+[data-section="calendar"] .ai-result { margin: 14px 0 0; }
+.gcal-block__title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    font-size: 14px;
+    font-weight: 800;
+}
+.gcal-step {
+    display: inline-grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--primary-light);
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 800;
+}
+.gcal-block .gcal-account { margin-bottom: 0; }
+.gcal-account.is-connected { border-color: var(--success); background: var(--success-bg); }
+.gcal-account.is-connected .gcal-account__icon { color: #1a73e8; }
+.gcal-account__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.gcal-disconnect {
+    background: #fff;
+    color: var(--danger);
+    border: 1px solid #ffd3dc;
+}
+.gcal-disconnect:hover:not(:disabled) { background: var(--danger-bg); }
+.gcal-block .field + .field { margin-top: 6px; }
+.gcal-keep-note { margin: 4px 0 0; }
+
+@media (max-width: 650px) {
+    .gcal-account__actions { width: 100%; }
+    .gcal-account__actions > button { flex: 1 1 100%; }
+}
+
+/* Payment QR upload (Company Information): same layout as the logo field */
+.qr-field { margin-top: 6px; }
+.qr-field__preview img { object-fit: contain; background: #fff; }

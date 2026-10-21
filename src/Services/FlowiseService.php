@@ -33,6 +33,7 @@ namespace Src\Services;
 
 use RuntimeException;
 use Src\Support\Http;
+use Src\Support\FlowLog;
 use Src\Support\ToolToken;
 
 final class FlowiseService
@@ -50,6 +51,7 @@ final class FlowiseService
     public function ask(array $config, string $systemMessage, string $question, string $sessionId, array $context = []): array
     {
         if (!$this->isConfigured($config['provider'])) {
+            FlowLog::write('flowise.not_configured', ['flowise_api_url' => FLOWISE_API_URL, 'chatflow_id' => $this->chatflowId($config['provider'])]);
             return ['ok' => false, 'reply' => '', 'error' => 'Flowise is not configured (set FLOWISE_API_URL and FLOWISE_CHATFLOW_ID in .env).'];
         }
 
@@ -59,18 +61,32 @@ final class FlowiseService
             $headers['Authorization'] = 'Bearer ' . FLOWISE_API_KEY;
         }
 
-        $body = json_encode(
-            $this->payload($config, $systemMessage, $question, $sessionId, $context),
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
-        );
+        $payload = $this->payload($config, $systemMessage, $question, $sessionId, $context);
+        $body    = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        // Keys inside the payload (provider_api_key, tool_token) are masked by FlowLog.
+        FlowLog::write('flowise.request', [
+            'url'      => $url,
+            'has_auth' => FLOWISE_API_KEY !== '',
+            'timeout'  => FLOWISE_TIMEOUT,
+            'payload'  => $payload,
+        ]);
+        $started = microtime(true);
 
         try {
             $response = Http::request('POST', $url, $headers, (string) $body, FLOWISE_TIMEOUT);
         } catch (RuntimeException $e) {
-            // Never log the body: it holds the provider API key and the customer's message.
+            // The error log never gets the body: it holds the provider API key.
             error_log('[flowise] request failed: ' . $e->getMessage());
-            return ['ok' => false, 'reply' => '', 'error' => 'Could not reach Flowise.'];
+            FlowLog::write('flowise.unreachable', ['error' => $e->getMessage(), 'ms' => (int) round((microtime(true) - $started) * 1000)]);
+            return ['ok' => false, 'reply' => '', 'error' => 'Could not reach Flowise (' . $e->getMessage() . ').'];
         }
+
+        FlowLog::write('flowise.response', [
+            'status' => $response['status'],
+            'ms'     => (int) round((microtime(true) - $started) * 1000),
+            'body'   => $response['raw'],
+        ]);
 
         if ($response['status'] < 200 || $response['status'] >= 300) {
             $detail = is_array($response['json']) ? (string) ($response['json']['message'] ?? $response['json']['error'] ?? '') : '';
@@ -101,7 +117,9 @@ final class FlowiseService
             'model'             => $config['ai_model'],
             // Flowise custom tools call back into this app with these two values.
             'tool_base_url'     => PUBLIC_APP_URL . '/tools',
-            'tool_token'        => ToolToken::issue((int) $config['user_id']) ?? '',
+            // Signed for this business and this customer chat (buy_product uses the chat).
+            'tool_token'        => ToolToken::issue((int) $config['user_id'], ToolToken::TTL_SECONDS,
+                isset($context['channel'], $context['customer_chat_id']) ? $context['channel'] . ':' . $context['customer_chat_id'] : '') ?? '',
         ] + array_map('strval', $context);
 
         // The business's own AI provider key (Anthropic / DeepSeek), for a

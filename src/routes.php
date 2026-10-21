@@ -18,6 +18,7 @@ use Src\Controllers\ClaimController;
 use Src\Controllers\DashboardController;
 use Src\Controllers\FinancialController;
 use Src\Controllers\GmailController;
+use Src\Controllers\OrderController;
 use Src\Controllers\ProductController;
 use Src\Controllers\ProfileController;
 use Src\Controllers\TelegramWebhookController;
@@ -93,6 +94,13 @@ $router->post(
     $router->post('products/update', [ProductController::class, 'update'], $auth);
     $router->post('products/delete', [ProductController::class, 'delete'], $auth);
 
+    // Orders from the AI chatbot (buy_product): review payment receipts
+    $router->get('orders', [OrderController::class, 'index'], $auth);
+    $router->get('orders/receipt', [OrderController::class, 'receipt'], $auth);
+    $router->post('orders/approve', [OrderController::class, 'approve'], $auth);
+    $router->post('orders/reject', [OrderController::class, 'reject'], $auth);
+    $router->post('orders/cancel', [OrderController::class, 'cancel'], $auth);
+
     $router->get('categories', [CategoryController::class, 'index'], $auth);
     $router->post('categories/store', [CategoryController::class, 'store'], $auth);
     $router->post('categories/update', [CategoryController::class, 'update'], $auth);
@@ -105,16 +113,18 @@ $router->post(
     $router->post('ai_settings/company_profile_save', [AiSettingsController::class, 'companyProfileSave'], $auth);
     $router->get('ai_settings/assistant', [AiSettingsController::class, 'assistant'], $auth);
     $router->post('ai_settings/assistant_save', [AiSettingsController::class, 'assistantSave'], $auth);
+    $router->post('ai_settings/generate_sops', [AiSettingsController::class, 'generateSops'], $auth);
     $router->get('ai_settings/telegram', [AiSettingsController::class, 'telegram'], $auth);
-    $router->post('ai_settings/telegram_test', [AiSettingsController::class, 'telegramTest'], $auth);
     $router->post('ai_settings/telegram_connect', [AiSettingsController::class, 'telegramConnect'], $auth);
     $router->post('ai_settings/telegram_disconnect', [AiSettingsController::class, 'telegramDisconnect'], $auth);
+    $router->post('ai_settings/telegram_forget', [AiSettingsController::class, 'telegramForget'], $auth);
+    $router->post('ai_settings/telegram_staff_link', [AiSettingsController::class, 'telegramStaffLink'], $auth);
+    $router->post('ai_settings/telegram_staff_unlink', [AiSettingsController::class, 'telegramStaffUnlink'], $auth);
     $router->get('ai_settings/google_calendar', [AiSettingsController::class, 'googleCalendar'], $auth);
     $router->get('ai_settings/google_calendar_oauth_start', [AiSettingsController::class, 'googleCalendarOauthStart'], $auth);
     $router->get('ai_settings/google_calendar_oauth_callback', [AiSettingsController::class, 'googleCalendarOauthCallback'], $auth);
     $router->get('ai_settings/google_calendar_calendars', [AiSettingsController::class, 'googleCalendarCalendars'], $auth);
     $router->post('ai_settings/google_calendar_save', [AiSettingsController::class, 'googleCalendarSave'], $auth);
-    $router->post('ai_settings/google_calendar_test', [AiSettingsController::class, 'googleCalendarTest'], $auth);
     $router->post('ai_settings/google_calendar_disconnect', [AiSettingsController::class, 'googleCalendarDisconnect'], $auth);
 
     /* ------------------------------ Telegram -> website -> Flowise ------- */
@@ -123,6 +133,7 @@ $router->post(
     // webhook secret header / the signed tool token.
     $router->post('telegram/webhook', [TelegramWebhookController::class, 'handle'], [], false);
     $router->post('tools/check_product', [ToolController::class, 'checkProduct'], [], false);
+    $router->post('tools/buy_product', [ToolController::class, 'buyProduct'], [], false);
 
     // Website Chat Interface: the same AI pipeline, for testing without Telegram.
     $router->post('customer/chat_send', [ChatbotController::class, 'customerChatSend'], $auth);

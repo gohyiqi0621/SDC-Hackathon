@@ -37,7 +37,8 @@ button shows the exact system message and Flowise request (secrets masked).
 | Fill the template | `src/Services/SystemMessageBuilder.php` |
 | Call Flowise | `src/Services/FlowiseService.php` (`payload()` and `parseReply()`) |
 | One message → one reply | `src/Services/AssistantReplyService.php` |
-| Tools for Flowise | `src/Controllers/ToolController.php`, token: `src/Support/ToolToken.php` |
+| Tools for Flowise | `src/Controllers/ToolController.php` (check_product, buy_product), token: `src/Support/ToolToken.php` |
+| Orders, receipts, approval | `src/Services/OrderService.php`, `src/Controllers/OrderController.php`, `database/migrations/009_create_orders.sql` |
 | Tables | `database/migrations/007_create_telegram_messaging.sql` |
 
 ## Where each template value comes from
@@ -107,25 +108,112 @@ The reply is read from `text` (or `answer` / `output` / `json`).
 5. Put the URL, chatflow ID and API key in `.env`, then open the Chat
    Interface page and send a test message.
 
-### Custom tool: `check_product`
+### Custom tool 1: `check_product`
 
-Input schema: `query` (string, product name or SKU), `category` (string, optional).
-Function:
+In Flowise: **Tools → Create → Custom Tool**, then add it to the agent node.
+The Tool Name must be exactly `check_product` / `buy_product` (no spaces).
 
+**Tool Name**
+```
+check_product
+```
+
+**Tool Description**
+```
+Look up this shop's products and services: name, category, description, normal price, promotion price, the final price to pay and availability. Use it whenever the customer asks about a product, a price, a promotion or what is available, and before placing an order. Only quote prices and products that this tool returns; never invent any.
+```
+
+**Input Schema**
+
+| Property | Type | Description | Required |
+|---|---|---|---|
+| `query` | string | Product name, SKU or keyword the customer mentioned. Leave empty to list all products. | no |
+| `category` | string | Category name to filter by, e.g. "Food". | no |
+
+**JavaScript Function**
 ```javascript
-const res = await fetch($vars.tool_base_url + '/check_product', {
+// Flowise runs tools in a sandbox without a global fetch: use node-fetch.
+const httpFetch = typeof globalThis.fetch === 'function' ? globalThis.fetch : require('node-fetch');
+const query = typeof $query !== 'undefined' && $query ? String($query) : '';
+const category = typeof $category !== 'undefined' && $category ? String($category) : '';
+
+const res = await httpFetch($vars.tool_base_url + '/check_product', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'Authorization': 'Bearer ' + $vars.tool_token
+    'Authorization': 'Bearer ' + $vars.tool_token,
+    'ngrok-skip-browser-warning': 'true'
   },
-  body: JSON.stringify({ query: $query || '', category: $category || '' })
+  body: JSON.stringify({ query, category })
 });
 return await res.text();
 ```
 
-The tool token tells the website which business is asking, so a tool can only
-read that business's active products. It expires after 30 minutes.
+### Custom tool 2: `buy_product`
+
+**Tool Name**
+```
+buy_product
+```
+
+**Tool Description**
+```
+Place an order for the customer in this chat. Only call it after the customer has clearly confirmed the exact products and quantities (check them with check_product first). It creates an order that is awaiting payment and returns the order number, the items, the total and the payment instructions. Tell the customer all of these and ask them to send a photo or PDF of the payment receipt in this chat. Never say the order is paid or confirmed: staff verify the receipt first. If it returns success=false, explain the message to the customer and ask again.
+```
+
+**Input Schema**
+
+| Property | Type | Description | Required |
+|---|---|---|---|
+| `items` | string | The products and quantities, using the exact product names or SKUs from check_product, e.g. "Nasi Lemak Special x2, Teh Tarik x1". | yes |
+| `phone` | string | Customer's phone number, if they gave one. | no |
+| `note` | string | Pickup or delivery details, or other notes for the order. | no |
+
+**JavaScript Function**
+```javascript
+// Flowise runs tools in a sandbox without a global fetch: use node-fetch.
+const httpFetch = typeof globalThis.fetch === 'function' ? globalThis.fetch : require('node-fetch');
+const items = typeof $items !== 'undefined' && $items ? String($items) : '';
+const phone = typeof $phone !== 'undefined' && $phone ? String($phone) : '';
+const note = typeof $note !== 'undefined' && $note ? String($note) : '';
+
+const res = await httpFetch($vars.tool_base_url + '/buy_product', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + $vars.tool_token,
+    'ngrok-skip-browser-warning': 'true'
+  },
+  body: JSON.stringify({
+    items,
+    phone,
+    note,
+    customer_name: $vars.customer_name || '',
+    customer_username: $vars.customer_username || ''
+  })
+});
+return await res.text();
+```
+
+The tool token is signed for this business **and this customer chat**, so an
+order is always created for the customer who is chatting (the AI cannot be
+talked into ordering for someone else). It expires after 30 minutes; every new
+message gets a fresh one.
+
+### After `buy_product`: payment receipt and approval
+
+1. The customer sends the receipt (photo or PDF) in Telegram. The website does
+   not pass it to the AI: it attaches it to the customer's latest order that
+   is awaiting payment (`OrderService::attachReceipt`), thanks the customer and
+   forwards the receipt with the order details to the staff chat.
+2. Staff open **AI Chatbot → Customer → Orders**, click **View receipt**, then
+   **Approve** or **Reject** (with a reason).
+3. Approve: the order becomes *Paid* and the customer gets
+   "✅ Payment verified!" on Telegram. Reject: the customer is asked for a new
+   receipt (sending one puts the order back to *Receipt to review*).
+
+Payment details given to the customer come from **Company Information → How
+customers pay**.
 
 ## Telegram needs a public https address
 
@@ -140,9 +228,7 @@ Telegram can't call `http://localhost`. For XAMPP:
 
 ## Not built yet
 
-- `buy_product`: needs an orders table, receipt storage and payment
-  verification.
 - Booking tools: `GoogleCalendarService::freeSlots()` exists; creating the
   calendar event does not.
 - Stock: `products` has no stock column, so `check_product` reports active
-  products as `available`.
+  products as `available` and orders do not reduce stock.

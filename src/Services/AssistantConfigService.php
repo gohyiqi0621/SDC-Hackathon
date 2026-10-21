@@ -62,11 +62,8 @@ final class AssistantConfigService
             $problems[] = 'AI assistant settings are not saved yet.';
         }
 
-        $model    = (string) ($assistant['ai_model'] ?? '');
         $models   = AiSettingsController::AI_MODELS;
-        if (!isset($models[$model])) {
-            $model = AiSettingsController::DEFAULT_AI_MODEL;
-        }
+        $model    = AiSettingsController::resolveModel($assistant['ai_model'] ?? null);
 
         $apiKey = null;
         if (!empty($assistant['api_key_encrypted'])) {
@@ -97,6 +94,7 @@ final class AssistantConfigService
             'problems'           => $problems,
             'assistant_name'     => trim((string) ($assistant['assistant_name'] ?? '')) ?: 'Assistant',
             'personality'        => $personality,
+            'reply_language'     => (string) ($assistant['reply_language'] ?? 'auto'),
             'tone'               => $tone,
             'company_name'       => trim((string) ($company['company_name'] ?? '')) ?: APP_NAME,
             'business_category'  => trim((string) ($company['business_category'] ?? '')) ?: 'general',

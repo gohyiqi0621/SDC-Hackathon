@@ -6,7 +6,7 @@
  *   3. Validation        tiny rule helpers shared by every form
  *   4. FormController    load / dirty tracking / reset / errors (one for each form)
  *   5. Tabs              page tabs + SOP tabs (ARIA tablist, arrow keys)
- *   6. Demo banner
+ *   6. Section names
  *   7. Company information
  *   8. AI assistant      SOP editor
  *   9. Telegram
@@ -406,8 +406,8 @@
 
     function savedMetaText(updatedAt, demo) {
         var when = formatDateTime(updatedAt);
-        if (!when) { return demo ? 'Not saved yet (demo mode)' : 'Not saved yet'; }
-        return 'Last saved ' + when + (demo ? ' · this browser only' : '');
+        if (!when) { return 'Not saved yet'; }
+        return 'Last saved ' + when;
     }
 
     function updateCounters(scope) {
@@ -482,7 +482,7 @@
         if (tab) { pageTabList.select(tab, false); }
     }
 
-    /* ============================================== 6. Demo banner === */
+    /* ============================================== 6. Section names === */
 
     var SECTION_NAMES = {
         company: 'Company Information',
@@ -491,139 +491,137 @@
         calendar: 'Google Calendar'
     };
 
-    function updateDemoState() {
-        var demo = Object.keys(SECTION_NAMES).filter(function (key) { return Api.mode(key) === 'demo'; });
-        var banner = $('[data-demo-banner]', root);
-
-        Object.keys(SECTION_NAMES).forEach(function (key) {
-            var chip = $('[data-section="' + key + '"] [data-demo-chip]', root);
-            if (chip) { chip.hidden = Api.mode(key) !== 'demo'; }
-        });
-
-        if (!banner) { return; }
-        banner.hidden = demo.length === 0;
-        if (demo.length) {
-            var all = demo.length === Object.keys(SECTION_NAMES).length;
-            $('[data-demo-banner-text]', banner).textContent =
-                (all ? 'The server endpoints for this page are not available yet.'
-                     : 'The server endpoints for ' + demo.map(function (k) { return SECTION_NAMES[k]; }).join(', ') + ' are not available yet.')
-                + ' Company and assistant changes are kept in this browser only, and no Telegram bot or Google account is actually connected.';
-        }
-    }
-
     /* ====================================== 7. Company information === */
 
     var Company = (function () {
         var section = $('[data-section="company"]', root);
         var form = $('[data-form="company"]', section);
-        var input = $('[data-logo-input]', form);
-        var preview = $('[data-logo-preview]', form);
-        var placeholder = $('[data-logo-placeholder]', form);
-        var chooseLabel = $('[data-logo-choose-label]', form);
-        var removeWrap = $('[data-logo-remove-wrap]', form);
-        var removeBox = $('[data-logo-remove]', form);
-        var fileName = $('[data-logo-file-name]', form);
         var emptyNote = $('[data-empty-note]', form);
         var category = $('#business_category', form);
 
         var ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-        var maxBytes = parseInt(input.getAttribute('data-max-bytes'), 10) || 2 * 1024 * 1024;
-
-        var savedLogo = null;
-        var pendingFile = null;
-        var objectUrl = null;
+        var images = [];
 
         var ctrl = new FormController(form, {
             tab: 'company',
-            extraDirty: function () { return pendingFile !== null; },
-            onReset: function () { resetLogo(); },
+            extraDirty: function () { return images.some(function (img) { return img.pending() !== null; }); },
+            onReset: function () { images.forEach(function (img) { img.reset(); }); },
             onChange: function () {}
         });
 
-        function showLogo(src) {
-            preview.hidden = !src;
-            placeholder.hidden = !!src;
-            if (src) { preview.src = src; } else { preview.removeAttribute('src'); }
-            chooseLabel.textContent = src ? 'Replace image' : 'Choose image';
-        }
+        /**
+         * One image upload with preview, "Replace" and "Remove" (company logo,
+         * payment QR). prefix: the data-<prefix>-* attributes; field: the file
+         * field name sent to the server; removeName: the remove checkbox name.
+         */
+        function imageField(prefix, field, removeName) {
+            var input = $('[data-' + prefix + '-input]', form);
+            var preview = $('[data-' + prefix + '-preview]', form);
+            var placeholder = $('[data-' + prefix + '-placeholder]', form);
+            var chooseLabel = $('[data-' + prefix + '-choose-label]', form);
+            var removeWrap = $('[data-' + prefix + '-remove-wrap]', form);
+            var removeBox = $('[data-' + prefix + '-remove]', form);
+            var fileName = $('[data-' + prefix + '-file-name]', form);
+            var maxBytes = parseInt(input.getAttribute('data-max-bytes'), 10) || 2 * 1024 * 1024;
+            var saved = null;
+            var pendingFile = null;
+            var objectUrl = null;
 
-        function dropObjectUrl() {
-            if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
-        }
-
-        function resetLogo() {
-            pendingFile = null;
-            input.value = '';
-            removeBox.checked = false;
-            fileName.textContent = '';
-            dropObjectUrl();
-            showLogo(savedLogo);
-            removeWrap.hidden = !savedLogo;
-            ctrl.clearError('company_logo');
-            ctrl.refresh();
-        }
-
-        function logoError(message) {
-            pendingFile = null;
-            input.value = '';
-            dropObjectUrl();
-            showLogo(removeBox.checked ? null : savedLogo);
-            fileName.textContent = '';
-            ctrl.showErrors({ company_logo: message });
-            ctrl.refresh();
-        }
-
-        input.addEventListener('change', function () {
-            var file = input.files && input.files[0];
-            ctrl.clearError('company_logo');
-            if (!file) { resetLogo(); return; }
-
-            if (ALLOWED_TYPES.indexOf(file.type) === -1) {
-                logoError('Please choose a JPG, PNG or WebP image.');
-                return;
+            function show(src) {
+                preview.hidden = !src;
+                placeholder.hidden = !!src;
+                if (src) { preview.src = src; } else { preview.removeAttribute('src'); }
+                chooseLabel.textContent = src ? 'Replace image' : 'Choose image';
             }
-            if (file.size > maxBytes) {
-                logoError('That image is ' + (file.size / 1024 / 1024).toFixed(1) + ' MB. The limit is ' + Math.round(maxBytes / 1024 / 1024) + ' MB.');
-                return;
+            function dropObjectUrl() {
+                if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
             }
-
-            // Make sure it really decodes as an image before accepting it.
-            dropObjectUrl();
-            var url = URL.createObjectURL(file);
-            var probe = new Image();
-            probe.onload = function () {
-                objectUrl = url;
-                pendingFile = file;
-                removeBox.checked = false;
-                showLogo(url);
-                fileName.textContent = file.name + ' · ' + Math.max(1, Math.round(file.size / 1024)) + ' KB · not saved yet';
-                ctrl.refresh();
-            };
-            probe.onerror = function () {
-                URL.revokeObjectURL(url);
-                logoError('That file could not be read as an image.');
-            };
-            probe.src = url;
-        });
-
-        removeBox.addEventListener('change', function () {
-            if (removeBox.checked) {
+            function reset() {
                 pendingFile = null;
                 input.value = '';
+                removeBox.checked = false;
                 fileName.textContent = '';
                 dropObjectUrl();
-                showLogo(null);
-            } else {
-                showLogo(savedLogo);
+                show(saved);
+                removeWrap.hidden = !saved;
+                ctrl.clearError(field);
+                ctrl.refresh();
             }
-            ctrl.refresh();
-        });
+            function fail(message) {
+                pendingFile = null;
+                input.value = '';
+                dropObjectUrl();
+                show(removeBox.checked ? null : saved);
+                fileName.textContent = '';
+                var errors = {};
+                errors[field] = message;
+                ctrl.showErrors(errors);
+                ctrl.refresh();
+            }
+
+            input.addEventListener('change', function () {
+                var file = input.files && input.files[0];
+                ctrl.clearError(field);
+                if (!file) { reset(); return; }
+                if (ALLOWED_TYPES.indexOf(file.type) === -1) { fail('Please choose a JPG, PNG or WebP image.'); return; }
+                if (file.size > maxBytes) {
+                    fail('That image is ' + (file.size / 1024 / 1024).toFixed(1) + ' MB. The limit is ' + Math.round(maxBytes / 1024 / 1024) + ' MB.');
+                    return;
+                }
+                // Make sure it really decodes as an image before accepting it.
+                dropObjectUrl();
+                var url = URL.createObjectURL(file);
+                var probe = new Image();
+                probe.onload = function () {
+                    objectUrl = url;
+                    pendingFile = file;
+                    removeBox.checked = false;
+                    show(url);
+                    fileName.textContent = file.name + ' · ' + Math.max(1, Math.round(file.size / 1024)) + ' KB · not saved yet';
+                    ctrl.refresh();
+                };
+                probe.onerror = function () {
+                    URL.revokeObjectURL(url);
+                    fail('That file could not be read as an image.');
+                };
+                probe.src = url;
+            });
+
+            removeBox.addEventListener('change', function () {
+                if (removeBox.checked) {
+                    pendingFile = null;
+                    input.value = '';
+                    fileName.textContent = '';
+                    dropObjectUrl();
+                    show(null);
+                } else {
+                    show(saved);
+                }
+                ctrl.refresh();
+            });
+
+            var api = {
+                setSaved: function (url) { saved = url || null; reset(); },
+                reset: reset,
+                pending: function () { return pendingFile; },
+                appendTo: function (body) {
+                    if (pendingFile) { body.append(field, pendingFile, pendingFile.name); }
+                    if (removeBox.checked && !pendingFile) { body.append(removeName, '1'); }
+                }
+            };
+            images.push(api);
+            return api;
+        }
+
+        var logo = imageField('logo', 'company_logo', 'remove_logo');
+        var qr = imageField('qr', 'payment_qr', 'remove_payment_qr');
 
         function schema() {
             return {
                 company_name: [Rules.required('Company name'), Rules.minLength(2, 'Company name'), Rules.maxLength(150, 'Company name')],
                 business_category: [Rules.required('Business category'), Rules.oneOf(selectOptions(category), 'Choose a category from the list.')],
-                company_background: [Rules.maxLength(3000, 'Company background')]
+                company_background: [Rules.maxLength(3000, 'Company background')],
+                payment_instructions: [Rules.maxLength(1000, 'Payment instructions')]
             };
         }
 
@@ -633,10 +631,12 @@
                 company_name: p.company_name || '',
                 business_category: p.business_category || '',
                 company_background: p.company_background || '',
-                remove_logo: false
+                payment_instructions: p.payment_instructions || '',
+                remove_logo: false,
+                remove_payment_qr: false
             });
-            savedLogo = p.company_logo_url || null;
-            resetLogo();
+            logo.setSaved(p.company_logo_url);
+            qr.setSaved(p.payment_qr_url);
             emptyNote.hidden = !!profile;
             ctrl.setSavedMeta(savedMetaText(p.updated_at, demo));
         }
@@ -662,23 +662,16 @@
             }
 
             var body = new FormData();
-            ['company_name', 'business_category', 'company_background'].forEach(function (key) {
+            ['company_name', 'business_category', 'company_background', 'payment_instructions'].forEach(function (key) {
                 body.append(key, trimmed(values[key]));
             });
-            if (pendingFile) { body.append('company_logo', pendingFile, pendingFile.name); }
-            if (removeBox.checked && !pendingFile) { body.append('remove_logo', '1'); }
+            images.forEach(function (img) { img.appendTo(body); });
 
             ctrl.setBusy(true);
             Api.company.save(body).then(function (data) {
                 ctrl.busy = false;
                 fill(data.company_profile, !!data.demo);
-                if (data.logo_dropped) {
-                    toast('Saved in this browser, but the logo was too large to keep in demo mode.', 'info');
-                } else if (data.demo) {
-                    toast(data.stored === false ? 'Demo mode: browser storage is unavailable, so nothing was kept.' : 'Saved in this browser only (demo mode).', 'info');
-                } else {
-                    toast('Company information saved.', 'success');
-                }
+                toast('Company information saved.', 'success');
             }).catch(function (error) {
                 ctrl.saveFailed(error);
             }).then(function () {
@@ -686,7 +679,7 @@
             });
         });
 
-        $('[data-retry]', section).addEventListener('click', function () { load().then(updateDemoState); });
+        $('[data-retry]', section).addEventListener('click', function () { load(); });
 
         return {
             load: load,
@@ -714,7 +707,7 @@
 
         var MAX_INSTRUCTIONS = 20000;
         var DEFAULT_MODEL = modelSelect.options.length ? modelSelect.options[0].value : '';
-        var KEY_PREFIX = { Anthropic: 'sk-ant-', DeepSeek: 'sk-' };
+        var KEY_PREFIX = { Anthropic: 'sk-ant-', OpenAI: 'sk-', DeepSeek: 'sk-' };   // Agnes keys have no fixed prefix
 
         /** What the server last said: whether a key is saved, and for which provider. */
         var keyState = { saved: false, provider: null };
@@ -726,30 +719,6 @@
             { key: 'booking', label: 'Booking SOP' },
             { key: 'sales',   label: 'Salesman SOP' }
         ];
-
-        var TEMPLATES = {
-            service: [
-                '1. Apologise once and thank the customer for their patience.',
-                '2. Ask for the order number and the phone number used for the order.',
-                '3. Check the status and explain the next step and expected timing.',
-                '4. Refunds or replacements: collect a photo of the issue, then hand over to staff.',
-                '5. Close by asking if there is anything else we can help with.'
-            ].join('\n'),
-            booking: [
-                '1. Ask for the service, preferred date and time, name and phone number.',
-                '2. Only offer slots inside opening hours and at least 2 hours from now.',
-                '3. Check availability before confirming. Never double-book.',
-                '4. Repeat the booking details back and ask the customer to confirm.',
-                '5. Cancellations: allowed up to 24 hours before the appointment.'
-            ].join('\n'),
-            sales: [
-                '1. Ask what the customer needs before recommending anything.',
-                '2. Recommend at most 2 options and explain the main benefit of each.',
-                '3. Mention current promotions only if they apply to what the customer wants.',
-                '4. Quote prices exactly as listed. Never invent discounts.',
-                '5. End with a clear next step: order link, booking, or talk to staff.'
-            ].join('\n')
-        };
 
         var editors = {};
         SOP.forEach(function (s) { editors[s.key] = $('[data-sop="' + s.key + '"]', form); });
@@ -807,23 +776,70 @@
             editors[s.key].addEventListener('input', syncInstructions);
         });
 
-        $all('[data-sop-template]', form).forEach(function (button) {
-            button.addEventListener('click', function () {
-                var key = button.getAttribute('data-sop-template');
-                var editor = editors[key];
-                var apply = function () {
-                    editor.value = TEMPLATES[key];
-                    editor.dispatchEvent(new Event('input', { bubbles: true }));
-                    editor.focus();
-                };
-                if (editor.value.trim() === '') { apply(); return; }
-                confirmAction({
-                    title: 'Replace this section?',
-                    message: 'The starter template will replace what is in "' + editor.getAttribute('data-sop-label') + '". You can still reset before saving.',
-                    confirmLabel: 'Replace text'
-                }).then(function (ok) { if (ok) { apply(); } });
+        /* ---- Generate SOPs with AI (Agnes) ------------------------------- */
+
+        var generateBtn = $('[data-sop-generate]', form);
+        var aiResult = $('[data-sop-ai-result]', form);
+
+        function showAiResult(data) {
+            aiResult.innerHTML = '';
+            var head = document.createElement('p');
+            head.className = 'sop-ai-result-head';
+            head.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> ';
+            head.appendChild(document.createTextNode('Recommended for your business' + (data.model ? ' (' + data.model + ')' : '') + ':'));
+            aiResult.appendChild(head);
+            var list = document.createElement('ul');
+            data.sops.forEach(function (sop) {
+                var item = document.createElement('li');
+                var title = document.createElement('strong');
+                title.textContent = sop.title;
+                item.appendChild(title);
+                if (sop.why) { item.appendChild(document.createTextNode(' - ' + sop.why)); }
+                list.appendChild(item);
             });
-        });
+            aiResult.appendChild(list);
+            aiResult.hidden = false;
+        }
+
+        function applySops(sops) {
+            sops.forEach(function (sop) {
+                var editor = editors[sop.slot];
+                if (!editor) { return; }
+                editor.value = sop.title + '\n' + sop.steps.map(function (step, i) { return (i + 1) + '. ' + step; }).join('\n');
+                editor.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+            var firstTab = $('[data-sop-tab="' + sops[0].slot + '"]', form);
+            if (firstTab) { firstTab.click(); }
+        }
+
+        function generateSops() {
+            setBusy(generateBtn, true, 'Generating…');
+            Api.assistant.generateSops().then(function (data) {
+                if (!data || !data.sops || !data.sops.length) { throw new Error('Agnes AI returned no SOPs. Please try again.'); }
+                applySops(data.sops);
+                showAiResult(data);
+                toast('3 SOPs generated. Review them, then click Save.', 'success');
+            }).catch(function (error) {
+                var message = error && error.kind === 'unavailable'
+                    ? 'AI generation is not available right now (the server endpoint could not be reached).'
+                    : (error && error.message) || 'Could not generate the SOPs.';
+                toast(message, 'error');
+            }).then(function () {
+                setBusy(generateBtn, false);
+            });
+        }
+
+        if (generateBtn) {
+            generateBtn.addEventListener('click', function () {
+                var hasText = SOP.some(function (s) { return editors[s.key].value.trim() !== ''; });
+                if (!hasText) { generateSops(); return; }
+                confirmAction({
+                    title: 'Replace your SOPs?',
+                    message: 'Agnes AI will write 3 new SOPs and replace the text in all three sections. You can still reset before saving.',
+                    confirmLabel: 'Generate'
+                }).then(function (ok) { if (ok) { generateSops(); } });
+            });
+        }
 
         makeTabs($all('[data-sop-tab]', form), function (tab) {
             return document.getElementById(tab.getAttribute('aria-controls'));
@@ -939,6 +955,7 @@
                 system_instructions: output.value,
                 ai_model: model,
                 temperature: String(Math.round(temp * 10) / 10),
+                reply_language: ['auto', 'en', 'ms', 'zh', 'ta'].indexOf(s.reply_language) === -1 ? 'auto' : s.reply_language,
                 api_key: ''
             });
             ctrl.setSavedMeta(savedMetaText(s.updated_at, demo));
@@ -976,7 +993,8 @@
                 system_instructions: values.system_instructions,
                 is_enabled: !!values.is_enabled,
                 ai_model: values.ai_model,
-                temperature: values.temperature
+                temperature: values.temperature,
+                reply_language: values.reply_language || 'auto'
             };
             // Only sent when typed; otherwise the server keeps the saved key.
             if (trimmed(values.api_key) !== '') { payload.api_key = trimmed(values.api_key); }
@@ -984,9 +1002,7 @@
             Api.assistant.save(payload).then(function (data) {
                 ctrl.busy = false;
                 fill(data.ai_settings, !!data.demo);
-                toast(data.demo
-                    ? (data.stored === false ? 'Demo mode: browser storage is unavailable, so nothing was kept.' : 'Saved in this browser only (demo mode).')
-                    : 'AI assistant settings saved.', data.demo ? 'info' : 'success');
+                toast('AI assistant settings saved.', 'success');
             }).catch(function (error) {
                 ctrl.saveFailed(error);
             }).then(function () {
@@ -994,39 +1010,37 @@
             });
         });
 
-        $('[data-retry]', section).addEventListener('click', function () { load().then(updateDemoState); });
+        $('[data-retry]', section).addEventListener('click', function () { load(); });
 
         return { load: load };
     })();
 
     /* ================================================ 9. Telegram === */
 
+    /*
+     * Connect flow:
+     *   saved chatbot, not connected  -> "choose": use it, or create a new one
+     *   no saved chatbot              -> "create": name it, make it in @BotFather, paste token
+     *   connected                     -> "connected": name, username, staff link (pill = Error if Telegram can't reach the app)
+     */
     var Telegram = (function () {
         var section = $('[data-section="telegram"]', root);
         var form = $('[data-form="telegram"]', section);
         var badge = $('[data-status-badge="telegram"]', form);
         var result = $('[data-result]', form);
         var token = $('#bot_token', form);
-        var tokenRequired = $('[data-token-required]', form);
-        var tokenHint = $('[data-token-hint]', form);
-        var connectLabel = $('[data-connect-label]', form);
-        var buttons = {
-            test: $('[data-action="test"]', form),
-            connect: $('[data-action="connect"]', form),
-            disconnect: $('[data-action="disconnect"]', form)
-        };
-        var meta = { token: $('[data-meta="token"]', form), updated: $('[data-meta="updated"]', form) };
+        var nameInput = $('#bot_name', form);
+        var views = {};
+        $all('[data-tg-view]', form).forEach(function (el) { views[el.getAttribute('data-tg-view')] = el; });
+        function el(name) { return $('[data-tg="' + name + '"]', form); }
+        function action(name) { return $all('[data-action="' + name + '"]', form); }
 
-        // Errors are shown with the same helpers as the other forms; this
-        // controller has no Save/Reset buttons, so it never reports dirty.
         var errorsUi = new FormController(form, {});
         errorsUi.isDirty = function () { return false; };
 
-        var state = { status: 'disconnected', hasToken: false, demo: false };
-
-        var USERNAME = /^[A-Za-z][A-Za-z0-9_]{1,29}bot$/i;
-        var CHAT_ID = /^-?\d{5,20}$/;
         var TOKEN = /^\d{5,12}:[A-Za-z0-9_-]{30,64}$/;
+        var state = { telegram: {}, suggestions: {}, current: null };
+        var pollTimer = null;
 
         function clearToken() {
             token.value = '';
@@ -1039,142 +1053,246 @@
             }
         }
 
-        /** keepInputs: after a failed request, refresh the status but leave what the user typed. */
-        function render(t, demo, keepInputs) {
-            var data = t || {};
-            state.status = StatusBadge.normalize(data.connection_status);
-            state.hasToken = !!data.has_bot_token;
-            state.demo = !!demo;
-
-            if (!keepInputs) {
-                $('#bot_username', form).value = data.bot_username ? '@' + String(data.bot_username).replace(/^@/, '') : '';
-                $('#staff_telegram_chat_id', form).value = data.staff_telegram_chat_id || '';
-                clearToken();
-            }
-
-            StatusBadge.set(badge, state.status);
-            tokenRequired.hidden = state.hasToken;
-            token.placeholder = state.hasToken
-                ? 'Stored securely. Leave blank to keep the current token'
-                : '123456789:AAH...from @BotFather';
-            tokenHint.textContent = state.hasToken
-                ? 'A token is already stored (encrypted). Enter a new one only to replace it.'
-                : 'Hidden by default. It is sent to the server once, verified with Telegram, and stored encrypted. It is never shown again.';
-
-            meta.token.textContent = state.hasToken ? 'Yes, encrypted on the server' : (state.demo ? 'None (demo mode never stores tokens)' : 'None');
-            meta.updated.textContent = formatDateTime(data.updated_at) || '—';
-
-            connectLabel.textContent = state.status === 'connected' ? 'Update connection' : 'Connect';
-            buttons.disconnect.disabled = state.status === 'disconnected' && !state.hasToken;
-
-            if (state.status === 'error') {
-                showResult(result, 'error', 'Telegram connection has a problem',
-                    data.last_error || 'The server could not reach your bot. Check the token and try connecting again.');
-            }
-        }
-
-        function collect() {
-            return {
-                bot_username: trimmed($('#bot_username', form).value).replace(/^@/, ''),
-                staff_telegram_chat_id: trimmed($('#staff_telegram_chat_id', form).value),
-                bot_token: trimmed(token.value)
-            };
-        }
-
-        function check(values) {
-            var errors = validate(values, {
-                bot_username: [Rules.required('Bot username'), Rules.pattern(USERNAME, 'Bot usernames are 5–32 letters, numbers or underscores and end in "bot".')],
-                staff_telegram_chat_id: [Rules.pattern(CHAT_ID, 'Chat IDs are numbers only (groups start with a minus sign).')],
-                bot_token: [
-                    function (value) { return !state.hasToken && trimmed(value) === '' ? 'Bot token is required.' : null; },
-                    Rules.pattern(TOKEN, 'That doesn\'t look like a bot token. It looks like 123456789:AA… (from @BotFather).')
-                ]
-            });
-            if (Object.keys(errors).length) {
-                errorsUi.showErrors(errors);
-                return false;
-            }
+        function show(view) {
+            state.current = view;
+            Object.keys(views).forEach(function (key) { views[key].hidden = key !== view; });
             errorsUi.clearErrors();
-            return true;
         }
 
-        /** Only include the token when one was typed; the server keeps the stored one otherwise. */
-        function payload(values) {
-            var body = { bot_username: values.bot_username, staff_telegram_chat_id: values.staff_telegram_chat_id };
-            if (values.bot_token) { body.bot_token = values.bot_token; }
-            return body;
+        function hasSaved() {
+            return !!(state.telegram.has_bot_token && state.telegram.bot_username);
+        }
+
+        function botLabel(t) {
+            return t.bot_name || ('@' + t.bot_username);
+        }
+
+        /** Connected + Telegram reaches this app = Connected pill; otherwise Error with the reason. */
+        function renderWebhook(webhook, status) {
+            var problem = status === 'connected' && !!webhook && webhook.ok === false;
+            StatusBadge.set(badge, problem ? 'error' : status);
+            el('webhook-error').hidden = !problem;
+            el('webhook-error-text').textContent = problem ? webhook.message : '';
+        }
+
+        /** "@username" from the saved Telegram name "First Last (@username)", else the name. */
+        function staffHandle(t) {
+            var name = String(t.staff_linked_name || '');
+            var at = /@([A-Za-z0-9_]{3,})/.exec(name);
+            return at ? '@' + at[1] : name.trim();
+        }
+
+        function renderStaff(t) {
+            var linked = !!t.staff_telegram_chat_id;
+            var handle = staffHandle(t);
+            el('field-staff').value = linked
+                ? 'Linked to chat ' + (handle ? handle + ' ' : '') + '(' + t.staff_telegram_chat_id + ')'
+                : 'Not linked';
+            el('staff-text').textContent = linked
+                ? 'Staff alerts and hand-overs go there.'
+                : 'Link your own Telegram to receive staff alerts and hand-overs.';
+            el('staff-link-label').textContent = linked ? 'Link again' : 'Link my Telegram';
+            action('staff-unlink')[0].hidden = !linked;
+            el('staff-field').classList.toggle('is-ok', linked);
+        }
+
+        /** Pick the view from what the server says. */
+        function render(data, keepView) {
+            var t = (data && data.telegram) || {};
+            state.telegram = t;
+            if (data && data.suggestions) { state.suggestions = data.suggestions; }
+
+            var status = StatusBadge.normalize(t.connection_status);
+            if (data && 'webhook' in data) { state.webhook = data.webhook; }
+            if (status !== 'connected') { state.webhook = null; }
+
+            // Saved chatbot card
+            el('saved-name').textContent = t.bot_name || 'Saved chatbot';
+            el('saved-username').textContent = t.bot_username ? '@' + t.bot_username : '';
+
+            // Connected card
+            el('bot-name').textContent = t.bot_name || ('@' + (t.bot_username || ''));
+            var link = el('bot-link');
+            link.textContent = t.bot_link ? t.bot_link.replace(/^https:\/\//, '') : '';
+            link.href = t.bot_link || '#';
+            el('field-name').value = t.bot_name || '(not set)';
+            el('field-username').value = t.bot_username ? '@' + t.bot_username : '';
+            renderStaff(t);
+            renderWebhook(state.webhook, status);
+
+            // Create form suggestions
+            var suggestedName = nameInput.value.trim() || t.bot_name || state.suggestions.bot_name || '';
+            nameInput.value = suggestedName;
+            el('copy-name').textContent = suggestedName || '—';
+            el('copy-username').textContent = state.suggestions.bot_username || 'my_shop_bot';
+            el('none-note').hidden = hasSaved();
+            action('back-choose')[0].hidden = !hasSaved() || status === 'connected';
+
+            if (keepView && state.current) { return; }
+            if (status === 'connected') { show('connected'); }
+            else if (hasSaved()) { show('choose'); }
+            else { show('create'); }
         }
 
         function failed(error, title) {
             if (error.kind === 'validation') { errorsUi.showErrors(error.errors); }
-            if (error.data && error.data.telegram) { render(error.data.telegram, state.demo, true); }
-            showResult(result, error.kind === 'demo' ? 'warning' : 'error', error.kind === 'demo' ? 'Not connected (demo mode)' : title, error.message);
+            showResult(result, 'error', title, error.message);
         }
 
-        buttons.test.addEventListener('click', function () {
-            var values = collect();
-            if (!check(values)) { return; }
-            setBusy(buttons.test, true, 'Testing…');
-            showResult(result, 'loading', 'Testing connection…', 'Asking Telegram whether this bot token works.');
-
-            Api.telegram.test(payload(values)).then(function (data) {
-                if (data.telegram) { render(data.telegram, !!data.demo, true); }
-                if (data.demo) {
-                    showResult(result, 'warning', 'Not tested (demo mode)', data.message);
-                } else if (data.ok) {
-                    // The token stays in the field so "Connect" can send it next;
-                    // it is cleared as soon as the connection is saved.
-                    showResult(result, 'success', 'Connection works',
-                        data.message || ('Telegram recognised ' + (data.bot_username ? '@' + data.bot_username : 'your bot') + '. Click Connect to save it.'));
-                } else {
-                    showResult(result, 'error', 'Connection failed', data.message || 'Telegram rejected the token or chat ID.');
-                }
-            }).catch(function (error) {
-                failed(error, 'Connection test failed');
-            }).then(function () {
-                setBusy(buttons.test, false);
-            });
-        });
-
-        form.addEventListener('submit', function (event) {
-            event.preventDefault();
-            var values = collect();
-            if (!check(values)) { return; }
-            setBusy(buttons.connect, true, 'Connecting…');
-            showResult(result, 'loading', 'Connecting…', 'Verifying the bot with Telegram and saving it securely.');
-
-            Api.telegram.connect(payload(values)).then(function (data) {
-                render(data.telegram, !!data.demo);
-                if (state.status === 'connected') {
-                    showResult(result, 'success', 'Telegram connected', 'Customers can now message ' + $('#bot_username', form).value
-                        + ($('#staff_telegram_chat_id', form).value.trim() ? ' and staff alerts go to your staff chat.' : '.'));
-                    toast('Telegram connected.', 'success');
-                } else if (state.status !== 'error') {
-                    showResult(result, 'warning', 'Saved, but not connected', 'The server did not confirm the connection. Try “Test connection”.');
-                }
+        function connect(values, button, busyLabel) {
+            setBusy(button, true, busyLabel || 'Connecting…');
+            showResult(result, 'loading', 'Connecting…', 'Checking the chatbot with Telegram, setting its name and linking customer messages to this app.');
+            return Api.telegram.connect(values).then(function (data) {
+                clearToken();
+                render(data);
+                var ok = data.webhook && data.webhook.ok;
+                showResult(result, ok ? 'success' : 'warning', ok ? 'Chatbot connected' : 'Connected, but check the warning',
+                    data.message || (ok ? 'Customers can now message your chatbot.' : ''));
+                toast('Telegram chatbot connected.', 'success');
             }).catch(function (error) {
                 failed(error, 'Could not connect');
             }).then(function () {
-                setBusy(buttons.connect, false);
+                setBusy(button, false);
+            });
+        }
+
+        // Create a new chatbot (form submit = "Connect chatbot")
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+            var values = { bot_name: trimmed(nameInput.value), bot_token: trimmed(token.value) };
+            var errors = {};
+            if (!values.bot_token) { errors.bot_token = 'Paste the bot token that @BotFather sent you.'; }
+            else if (!TOKEN.test(values.bot_token)) { errors.bot_token = 'That doesn\'t look like a bot token. It looks like 123456789:AA… (from @BotFather).'; }
+            if (values.bot_name.length > 64) { errors.bot_name = 'The chatbot name must be 64 characters or fewer.'; }
+            if (Object.keys(errors).length) { errorsUi.showErrors(errors); return; }
+            connect(values, action('connect')[0]);
+        });
+
+        // Use the saved chatbot / reconnect the current one
+        action('use-saved').forEach(function (button) {
+            button.addEventListener('click', function () { connect({ use_saved: true }, button); });
+        });
+        action('reconnect').forEach(function (button) {
+            button.addEventListener('click', function () { connect({ use_saved: true }, button, 'Reconnecting…'); });
+        });
+
+        action('show-create').forEach(function (button) {
+            button.addEventListener('click', function () {
+                clearResult(result);
+                show('create');
+                action('back-choose')[0].hidden = false;
+                nameInput.focus();
+            });
+        });
+        action('back-choose').forEach(function (button) {
+            button.addEventListener('click', function () {
+                clearResult(result);
+                show(state.telegram.connection_status === 'connected' ? 'connected' : 'choose');
             });
         });
 
-        buttons.disconnect.addEventListener('click', function () {
-            confirmAction({
-                title: 'Disconnect Telegram?',
-                message: 'The assistant will stop replying on Telegram and staff alerts will stop. The stored bot token will be deleted. You can connect again later.',
-                confirmLabel: 'Disconnect'
-            }).then(function (ok) {
-                if (!ok) { return; }
-                setBusy(buttons.disconnect, true, 'Disconnecting…');
-                Api.telegram.disconnect().then(function (data) {
-                    setBusy(buttons.disconnect, false);
-                    render(data.telegram, !!data.demo);
-                    showResult(result, 'success', 'Telegram disconnected', data.demo ? 'Demo mode: there was nothing connected.' : 'The bot token was removed from the server.');
-                }).catch(function (error) {
-                    setBusy(buttons.disconnect, false);
-                    failed(error, 'Could not disconnect');
+        // Copy helpers for the @BotFather steps
+        nameInput.addEventListener('input', function () { el('copy-name').textContent = nameInput.value.trim() || '—'; });
+        $all('[data-copy]', form).forEach(function (button) {
+            button.addEventListener('click', function () {
+                var text = button.getAttribute('data-copy') === 'name' ? nameInput.value.trim() : el('copy-username').textContent;
+                if (!text || !navigator.clipboard) { return; }
+                navigator.clipboard.writeText(text).then(function () { toast('Copied: ' + text, 'success'); }, function () {});
+            });
+        });
+
+        action('disconnect').forEach(function (button) {
+            button.addEventListener('click', function () {
+                confirmAction({
+                    title: 'Disconnect Telegram?',
+                    message: 'The chatbot will stop replying to customers on Telegram. It stays saved on this account, so you can connect it again later.',
+                    confirmLabel: 'Disconnect'
+                }).then(function (ok) {
+                    if (!ok) { return; }
+                    setBusy(button, true, 'Disconnecting…');
+                    Api.telegram.disconnect().then(function (data) {
+                        render(data);
+                        showResult(result, 'success', 'Telegram disconnected', data.message || '');
+                    }).catch(function (error) {
+                        failed(error, 'Could not disconnect');
+                    }).then(function () { setBusy(button, false); });
                 });
+            });
+        });
+
+        action('forget').forEach(function (button) {
+            button.addEventListener('click', function () {
+                confirmAction({
+                    title: 'Remove the saved chatbot?',
+                    message: 'The bot token is deleted from this account. The bot itself still exists in Telegram (delete it in @BotFather if you no longer need it).',
+                    confirmLabel: 'Remove'
+                }).then(function (ok) {
+                    if (!ok) { return; }
+                    setBusy(button, true, 'Removing…');
+                    Api.telegram.forget().then(function (data) {
+                        render(data);
+                        showResult(result, 'success', 'Chatbot removed', data.message || '');
+                    }).catch(function (error) {
+                        failed(error, 'Could not remove it');
+                    }).then(function () { setBusy(button, false); });
+                });
+            });
+        });
+
+        /* ---- staff chat: "Link my Telegram" ---------------------------- */
+
+        function stopPolling() {
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        }
+
+        /** After the link is opened, check every 3 s (for 3 minutes) until the webhook saved the chat. */
+        function pollForStaff(before) {
+            stopPolling();
+            var tries = 0;
+            pollTimer = setInterval(function () {
+                tries += 1;
+                if (tries > 60) {
+                    stopPolling();
+                    showResult(result, 'warning', 'Not linked yet', 'Open the link again and press Start in Telegram. If nothing happens, check the "Customer messages" status above.');
+                    return;
+                }
+                Api.telegram.get().then(function (data) {
+                    var t = data.telegram || {};
+                    if (t.staff_telegram_chat_id && t.staff_telegram_chat_id !== before) {
+                        stopPolling();
+                        render(data, true);
+                        showResult(result, 'success', 'Staff chat linked', 'Linked to chat ' + (staffHandle(t) ? staffHandle(t) + ' ' : '') + '(' + t.staff_telegram_chat_id + '). Staff alerts and hand-overs go there.');
+                        toast('Your Telegram is linked for staff alerts.', 'success');
+                    }
+                }).catch(function () {});
+            }, 3000);
+        }
+
+        action('staff-link').forEach(function (button) {
+            button.addEventListener('click', function () {
+                // Open the window first (inside the click), so pop-up blockers allow it.
+                var win = window.open('about:blank', '_blank');
+                setBusy(button, true, 'Opening Telegram…');
+                Api.telegram.staffLink().then(function (data) {
+                    if (win) { win.location.href = data.link; } else { window.location.href = data.link; }
+                    showResult(result, 'info', 'Press Start in Telegram', 'Telegram opened your chatbot. Press Start (or send the message) and this page will update by itself.');
+                    pollForStaff(state.telegram.staff_telegram_chat_id || '');
+                }).catch(function (error) {
+                    if (win) { win.close(); }
+                    failed(error, 'Could not create the link');
+                }).then(function () { setBusy(button, false); });
+            });
+        });
+
+        action('staff-unlink').forEach(function (button) {
+            button.addEventListener('click', function () {
+                setBusy(button, true, 'Unlinking…');
+                Api.telegram.staffUnlink().then(function (data) {
+                    render(data, true);
+                    showResult(result, 'success', 'Staff chat unlinked', '');
+                }).catch(function (error) {
+                    failed(error, 'Could not unlink');
+                }).then(function () { setBusy(button, false); });
             });
         });
 
@@ -1183,14 +1301,15 @@
             StatusBadge.set(badge, 'checking');
             return Api.telegram.get().then(function (data) {
                 clearResult(result);
-                render(data.telegram, !!data.demo);
+                state.current = null;
+                render(data);
                 setView(section, 'ready');
             }).catch(function (error) {
                 showLoadError(section, error);
             });
         }
 
-        $('[data-retry]', section).addEventListener('click', function () { load().then(updateDemoState); });
+        $('[data-retry]', section).addEventListener('click', function () { load(); });
 
         return { load: load };
     })();
@@ -1208,16 +1327,14 @@
         var calendarSelect = $('#calendar_id', form);
         var calendarHint = $('[data-calendar-hint]', form);
         var timezoneSelect = $('#timezone', form);
-        var durationSelect = $('#default_appointment_duration_minutes', form);
+        var keepNote = $('[data-gcal-keep-note]', form);
         var buttons = {
             oauth: $('[data-action="oauth"]', form),
             refresh: $('[data-action="refresh-calendars"]', form),
-            test: $('[data-action="test"]', form),
             disconnect: $('[data-action="disconnect"]', form)
         };
 
-        var DURATIONS = ['15', '30', '45', '60', '90'];
-        var state = { status: 'disconnected', demo: false, saved: null };
+        var state = { status: 'disconnected', saved: null };
 
         var ctrl = new FormController(form, { tab: 'calendar' });
 
@@ -1245,10 +1362,10 @@
         function loadCalendars() {
             ctrl.clearError('calendar_id');
             if (state.status !== 'connected') {
-                setCalendarOptions([], 'Connect an account first');
+                setCalendarOptions([], 'Connect your Google account first');
                 calendarSelect.disabled = true;
                 buttons.refresh.disabled = true;
-                calendarHint.textContent = 'Appointments are added to this calendar.';
+                calendarHint.textContent = 'Connect your Google account in step 1, then pick the calendar for new appointments.';
                 return Promise.resolve();
             }
 
@@ -1265,8 +1382,8 @@
                 setCalendarOptions(list, list.length ? 'Choose a calendar' : 'No calendars found');
                 calendarSelect.disabled = list.length === 0;
                 calendarHint.textContent = list.length
-                    ? 'Appointments are added to this calendar.'
-                    : 'This Google account has no calendars you can write to.';
+                    ? 'New appointments are added to this calendar.'
+                    : 'This Google account has no calendar you can add events to. Create one in Google Calendar, then click Refresh list.';
             }).catch(function (error) {
                 var savedId = state.saved && state.saved.calendar_id;
                 setCalendarOptions(savedId ? [{ id: savedId, summary: 'Saved calendar' }] : [], savedId ? null : 'Calendars unavailable');
@@ -1282,25 +1399,26 @@
             if (p) { p.textContent = message; }
         }
 
-        function render(g, demo) {
+        function render(g) {
             var data = g || {};
             state.status = StatusBadge.normalize(data.connection_status);
-            state.demo = !!demo;
             state.saved = data;
 
             StatusBadge.set(badge, state.status);
             var connected = state.status === 'connected';
-            email.textContent = connected && data.google_account_email ? data.google_account_email : 'No Google account connected';
+            email.textContent = data.google_account_email && state.status !== 'disconnected' ? data.google_account_email : 'Not connected';
             accountHint.textContent = connected
-                ? 'Signed in with Google. The access is stored on the server, never in this page.'
-                : (data.oauth_configured === false && !state.demo
-                    ? 'Google sign-in is not set up on the server yet: add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env.'
-                    : 'You\'ll sign in on Google\'s own page. This app never sees your Google password.');
-            oauthLabel.textContent = connected ? 'Switch account' : 'Connect Google Account';
+                ? 'Connected. Your Google access is stored securely on the server, never in this page.'
+                : (data.oauth_configured === false
+                    ? 'Google sign-in is not set up yet: add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env.'
+                    : 'Sign in on Google\'s own page. This app never sees your Google password.');
+            oauthLabel.textContent = connected ? 'Switch account' : (state.status === 'error' ? 'Connect again' : 'Connect Google account');
             buttons.oauth.classList.toggle('primary-btn', !connected);
             buttons.oauth.classList.toggle('secondary-btn', connected);
-            buttons.test.disabled = !connected;
-            buttons.disconnect.disabled = state.status === 'disconnected';
+            buttons.oauth.disabled = data.oauth_configured === false;
+            buttons.disconnect.hidden = state.status === 'disconnected';
+            keepNote.hidden = state.status === 'disconnected';
+            $('[data-gcal-account]', form).classList.toggle('is-connected', connected);
 
             if (state.status === 'error') {
                 showResult(result, 'error', 'Google Calendar needs attention',
@@ -1309,21 +1427,16 @@
         }
 
         function values(data) {
-            var duration = String(data.default_appointment_duration_minutes || 30);
             var zone = data.timezone || 'Asia/Kuala_Lumpur';
             ensureTimezone(zone);
-            return {
-                calendar_id: data.calendar_id || '',
-                default_appointment_duration_minutes: DURATIONS.indexOf(duration) === -1 ? '30' : duration,
-                timezone: zone
-            };
+            return { calendar_id: data.calendar_id || '', timezone: zone };
         }
 
-        function fill(g, demo) {
-            render(g, demo);
+        function fill(g) {
+            render(g);
             return loadCalendars().then(function () {
                 ctrl.load(values(g || {}));
-                ctrl.setSavedMeta(savedMetaText((g || {}).updated_at, demo));
+                ctrl.setSavedMeta(savedMetaText((g || {}).updated_at));
             });
         }
 
@@ -1333,7 +1446,7 @@
             return Api.calendar.get().then(function (data) {
                 clearResult(result);
                 setView(section, 'ready');
-                return fill(data.google_calendar, !!data.demo);
+                return fill(data.google_calendar);
             }).catch(function (error) {
                 showLoadError(section, error);
             });
@@ -1344,17 +1457,11 @@
                 calendar_id: [function (value) {
                     return state.status === 'connected' && trimmed(value) === '' ? 'Choose the calendar for new appointments.' : null;
                 }],
-                default_appointment_duration_minutes: [Rules.required('Duration'), Rules.oneOf(DURATIONS, 'Choose one of the listed durations.')],
                 timezone: [Rules.required('Timezone'), Rules.oneOf(selectOptions(timezoneSelect), 'Choose a timezone from the list.')]
             };
         }
 
         buttons.oauth.addEventListener('click', function () {
-            if (state.demo) {
-                showResult(result, 'warning', 'Not connected (demo mode)',
-                    'Google sign-in needs the server\'s OAuth endpoint, which is not available yet. No account was connected.');
-                return;
-            }
             setBusy(buttons.oauth, true, 'Opening Google…');
             Api.calendar.oauthStart().then(function (data) {
                 var url = String(data.auth_url || '');
@@ -1364,7 +1471,7 @@
                 window.location.assign(url);
             }).catch(function (error) {
                 setBusy(buttons.oauth, false);
-                showResult(result, error.kind === 'demo' ? 'warning' : 'error', 'Could not start Google sign-in', error.message);
+                showResult(result, 'error', 'Could not open Google sign-in', error.message);
             });
         });
 
@@ -1388,12 +1495,11 @@
             ctrl.setBusy(true);
             Api.calendar.save({
                 calendar_id: v.calendar_id,
-                default_appointment_duration_minutes: v.default_appointment_duration_minutes,
                 timezone: v.timezone
             }).then(function (data) {
                 ctrl.busy = false;
-                return fill(data.google_calendar, !!data.demo).then(function () {
-                    toast(data.demo ? 'Duration and timezone saved in this browser only (demo mode).' : 'Google Calendar settings saved.', data.demo ? 'info' : 'success');
+                return fill(data.google_calendar).then(function () {
+                    toast('Booking settings saved.', 'success');
                 });
             }).catch(function (error) {
                 ctrl.saveFailed(error);
@@ -1402,42 +1508,18 @@
             });
         });
 
-        buttons.test.addEventListener('click', function () {
-            var v = ctrl.values();
-            setBusy(buttons.test, true, 'Checking…');
-            showResult(result, 'loading', 'Checking availability…', 'Looking for free slots in the selected calendar.');
-            Api.calendar.testAvailability({
-                calendar_id: v.calendar_id,
-                default_appointment_duration_minutes: v.default_appointment_duration_minutes,
-                timezone: v.timezone
-            }).then(function (data) {
-                var slots = (data.slots || []).slice(0, 5).map(function (slot) {
-                    return formatDateTime(slot.start, v.timezone) + (slot.end ? ' – ' + formatDateTime(slot.end, v.timezone).replace(/^.*,\s*/, '') : '');
-                });
-                if (data.available) {
-                    showResult(result, 'success', 'Calendar is reachable', data.message || 'These are the next free slots:', slots);
-                } else {
-                    showResult(result, 'warning', 'No free slots found', data.message || 'The calendar was reached, but no free slot matched.');
-                }
-            }).catch(function (error) {
-                showResult(result, error.kind === 'demo' ? 'warning' : 'error', 'Availability test failed', error.message);
-            }).then(function () {
-                setBusy(buttons.test, false);
-            });
-        });
-
         buttons.disconnect.addEventListener('click', function () {
             confirmAction({
                 title: 'Disconnect Google Calendar?',
-                message: 'New bookings will no longer be added to Google Calendar and the stored Google access will be removed. Appointment records already saved in this app are kept.',
+                message: 'New bookings will stop going to Google Calendar, and the saved Google access is deleted. Appointments already saved in this app are kept.',
                 confirmLabel: 'Disconnect'
             }).then(function (ok) {
                 if (!ok) { return; }
                 setBusy(buttons.disconnect, true, 'Disconnecting…');
                 Api.calendar.disconnect().then(function (data) {
                     setBusy(buttons.disconnect, false);
-                    return fill(data.google_calendar, !!data.demo).then(function () {
-                        showResult(result, 'success', 'Google Calendar disconnected', 'Existing appointments were kept.');
+                    return fill(data.google_calendar).then(function () {
+                        showResult(result, 'success', 'Google Calendar disconnected', 'Appointments already saved in this app were kept.');
                     });
                 }).catch(function (error) {
                     setBusy(buttons.disconnect, false);
@@ -1451,17 +1533,17 @@
             selectPageTab('calendar');
             if (outcome === 'connected') {
                 if (state.status === 'connected') {
-                    showResult(result, 'success', 'Google Calendar connected', 'Choose the calendar for appointments, then save.');
+                    showResult(result, 'success', 'Google account connected', 'Now choose the calendar for bookings in step 2, then click Save booking settings.');
                     toast('Google Calendar connected.', 'success');
                 } else {
-                    showResult(result, 'warning', 'Not confirmed', 'Google sign-in finished, but the server has not confirmed the connection. Please try again.');
+                    showResult(result, 'warning', 'Not connected yet', 'Google sign-in finished, but the connection was not saved. Please try again.');
                 }
             } else {
-                showResult(result, 'error', 'Google sign-in did not complete', message || 'The connection was cancelled or refused.');
+                showResult(result, 'error', 'Google sign-in did not finish', message || 'The sign-in was cancelled or Google refused it. Please try again.');
             }
         }
 
-        $('[data-retry]', section).addEventListener('click', function () { load().then(updateDemoState); });
+        $('[data-retry]', section).addEventListener('click', function () { load(); });
 
         return { load: load, handleOAuthReturn: handleOAuthReturn };
     })();
@@ -1489,7 +1571,6 @@
     });
 
     Promise.all([Company.load(), Assistant.load(), Telegram.load(), Calendar.load()]).then(function () {
-        updateDemoState();
         if (oauthOutcome === 'connected' || oauthOutcome === 'error') {
             Calendar.handleOAuthReturn(oauthOutcome, oauthMessage);
         }

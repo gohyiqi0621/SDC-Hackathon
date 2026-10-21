@@ -22,7 +22,8 @@ final class TelegramIntegration extends UserSettingsRow
     protected function writable(): array
     {
         return ['bot_username', 'bot_token_encrypted', 'staff_telegram_chat_id', 'connection_status', 'is_enabled',
-                'webhook_secret', 'webhook_url', 'webhook_set_at'];
+                'webhook_secret', 'webhook_url', 'webhook_set_at',
+                'bot_name', 'staff_link_code', 'staff_link_expires_at', 'staff_linked_name'];
     }
 
     /** The integration a webhook call is for (the id is in the webhook URL). */

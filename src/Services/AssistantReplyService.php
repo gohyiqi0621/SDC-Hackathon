@@ -18,6 +18,7 @@ declare(strict_types=1);
 namespace Src\Services;
 
 use Src\Models\ChatMessage;
+use Src\Support\FlowLog;
 use Throwable;
 
 final class AssistantReplyService
@@ -37,12 +38,28 @@ final class AssistantReplyService
 
         $this->log($messages, $userId, $channel, $chatId, 'customer', $message, 'ok');
 
+        FlowLog::write('system.config', [
+            'channel'   => $channel,
+            'user_id'   => $userId,
+            'chat_id'   => $chatId,
+            'message'   => $message,
+            'enabled'   => $config['enabled'],
+            'model'     => $config['ai_model'],
+            'provider'  => $config['provider'],
+            'temperature' => $config['temperature'],
+            'has_api_key' => !empty($config['api_key']),
+            'problems'  => $config['problems'],
+        ]);
+
         if (!$config['enabled']) {
             $this->log($messages, $userId, $channel, $chatId, 'assistant', '(assistant is switched off - no reply sent)', 'skipped');
+            FlowLog::write('system.skipped', ['reason' => in_array('AI assistant settings are not saved yet.', $config['problems'], true)
+                ? 'AI assistant settings are not saved yet: open AI Settings > AI Assistant Settings and click Save.'
+                : 'The AI assistant is switched off (AI Assistant Settings > Enabled).']);
             return ['status' => 'skipped', 'reply' => null, 'error' => 'The AI assistant is switched off in AI Settings.', 'problems' => $config['problems']];
         }
 
-        $systemMessage = (new SystemMessageBuilder())->build($config);
+        $systemMessage = (new SystemMessageBuilder())->build($config, $message);
         $sessionId     = $channel . ':' . $userId . ':' . $chatId;
         $context      += ['channel' => $channel, 'customer_chat_id' => $chatId];
 
@@ -52,6 +69,11 @@ final class AssistantReplyService
             error_log('[assistant] ' . $e->getMessage());
             $result = ['ok' => false, 'reply' => '', 'error' => 'Unexpected error while asking Flowise.'];
         }
+
+        FlowLog::write($result['ok'] ? 'system.reply' : 'system.fallback', [
+            'reply' => $result['ok'] ? $result['reply'] : self::FALLBACK_REPLY,
+            'error' => $result['error'],
+        ]);
 
         if ($result['ok']) {
             $this->log($messages, $userId, $channel, $chatId, 'assistant', $result['reply'], 'ok');
