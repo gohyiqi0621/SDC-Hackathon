@@ -3,13 +3,25 @@
  * ai_settings/_ai_assistant_settings_form.php - AIAssistantSettingsForm.
  *
  * Table: ai_assistant_settings (assistant_name, personality, tone_description,
- * system_instructions, is_enabled).
+ * system_instructions, is_enabled, ai_model, api_key_encrypted, temperature).
  *
- * The four instruction sections (general behaviour and three SOPs) are edited
- * separately but saved together in the single `system_instructions` field,
- * each under a "### <Section>" heading. ai-settings.js splits the stored text
- * back into the four boxes when it loads. No extra columns are needed.
+ * The three SOP sections are edited separately but saved together in the
+ * single `system_instructions` field, each under a "### <Section>" heading.
+ * ai-settings.js splits the stored text back into the boxes when it loads.
+ *
+ * "Generate SOPs with AI" asks Agnes AI (POST ai_settings/generate_sops) for
+ * three SOPs written from the saved company information, five steps each,
+ * and fills the three boxes. Nothing is saved until the owner clicks Save.
+ *
+ * The secret key is sent once and stored encrypted; the page is only told
+ * whether one is saved (has_api_key), never the key itself.
+ *
+ * Expects: $aiModels (AiSettingsController::AI_MODELS: id => [label, provider]).
  */
+$byProvider = [];
+foreach ($aiModels as $id => [$label, $provider]) {
+    $byProvider[$provider][$id] = $label;
+}
 $personalities = [
     'friendly'     => ['Friendly',     'fa-regular fa-face-smile',  'Casual, upbeat and easy to talk to.'],
     'professional' => ['Professional', 'fa-solid fa-briefcase',     'Clear, polite and to the point.'],
@@ -19,7 +31,6 @@ $personalities = [
 ];
 
 $sections = [
-    'general'  => ['General AI behavior',   'fa-solid fa-sliders',        'How the assistant should behave in every conversation: language, what it must never say, when to hand over to a person.'],
     'service'  => ['Customer Service SOP',  'fa-solid fa-headset',        'Steps for complaints, order checks, refunds and returns.'],
     'booking'  => ['Booking SOP',           'fa-regular fa-calendar-plus','How to take an appointment: what to ask, opening hours, how far ahead, cancellations.'],
     'sales'    => ['Salesman SOP',          'fa-solid fa-hand-holding-dollar', 'How to recommend products, upsell, quote prices and close a sale.'],
@@ -34,7 +45,7 @@ $sections = [
                 <section class="panel">
                     <div class="panel-header">
                         <div>
-                            <h2>Assistant <span class="demo-chip" data-demo-chip hidden>Demo</span></h2>
+                            <h2>Assistant</h2>
                             <p>Its name and personality, as customers will experience it.</p>
                         </div>
                         <label class="switch">
@@ -79,6 +90,61 @@ $sections = [
                             <p class="field-hint" id="hint-tone_description" data-tone-hint>Optional. Fine-tunes the personality above. Required when you choose Custom.</p>
                             <p class="field-error" id="err-tone_description" data-error-for="tone_description"></p>
                         </div>
+
+                        <div class="form-row">
+                            <div class="field">
+                                <label for="ai_model">AI model *</label>
+                                <select id="ai_model" name="ai_model" required aria-describedby="hint-ai_model err-ai_model">
+                                    <?php foreach ($byProvider as $provider => $models): ?>
+                                        <optgroup label="<?= e($provider) ?>">
+                                            <?php foreach ($models as $id => $label): ?>
+                                                <option value="<?= e($id) ?>" data-provider="<?= e($provider) ?>"><?= e($label) ?></option>
+                                            <?php endforeach; ?>
+                                        </optgroup>
+                                    <?php endforeach; ?>
+                                </select>
+                                <p class="field-hint" id="hint-ai_model">The model that writes the assistant's replies.</p>
+                                <p class="field-error" id="err-ai_model" data-error-for="ai_model"></p>
+                            </div>
+
+                            <div class="field">
+                                <div class="field-label-row">
+                                    <label for="temperature">Temperature</label>
+                                    <output class="temperature-value" for="temperature" data-temperature-value>0.7</output>
+                                </div>
+                                <input id="temperature" name="temperature" type="range" min="0" max="1" step="0.1" value="0.7"
+                                       class="temperature-range" aria-describedby="hint-temperature err-temperature">
+                                <div class="temperature-scale" aria-hidden="true"><span>0 · precise</span><span>1 · creative</span></div>
+                                <p class="field-hint" id="hint-temperature">Lower gives steadier, more consistent answers. Higher gives more varied wording.</p>
+                                <p class="field-error" id="err-temperature" data-error-for="temperature"></p>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label for="reply_language">Reply language</label>
+                            <select id="reply_language" name="reply_language" aria-describedby="hint-reply_language err-reply_language">
+                                <?php foreach (\Src\Controllers\AiSettingsController::REPLY_LANGUAGES as $code => $label): ?>
+                                    <option value="<?= e($code) ?>"><?= e($label) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <p class="field-hint" id="hint-reply_language">"Same language as the customer" answers Malay with Malay, English with English, Chinese with Chinese. Choose a fixed language to always reply in it.</p>
+                            <p class="field-error" id="err-reply_language" data-error-for="reply_language"></p>
+                        </div>
+
+                        <div class="field">
+                            <label for="api_key">Secret key <span data-api-key-provider>(Anthropic)</span></label>
+                            <div class="input-wrap">
+                                <input id="api_key" name="api_key" type="password" autocomplete="new-password"
+                                       spellcheck="false" autocapitalize="off" maxlength="300"
+                                       placeholder="sk-ant-..." data-api-key
+                                       aria-describedby="hint-api_key err-api_key">
+                                <button class="input-btn" type="button" data-toggle-password="api_key" aria-label="Show key" aria-controls="api_key">
+                                    <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <p class="field-hint" id="hint-api_key" data-api-key-hint>Hidden by default. Sent to the server once and stored encrypted. It is never shown again.</p>
+                            <p class="field-error" id="err-api_key" data-error-for="api_key"></p>
+                        </div>
                     </div>
                 </section>
 
@@ -86,10 +152,19 @@ $sections = [
                     <div class="panel-header">
                         <div>
                             <h2>System instructions</h2>
-                            <p>Rules the assistant follows. All four sections are saved together as one set of instructions.</p>
+                            <p>Rules the assistant follows. All sections are saved together as one set of instructions.</p>
                         </div>
+                        <button class="primary-btn sop-generate-btn" type="button" data-sop-generate>
+                            <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Generate SOPs with AI
+                        </button>
                     </div>
                     <div class="panel-body">
+                        <div class="sop-ai-note" data-sop-ai-note>
+                            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                            <p>Agnes AI reads your saved <strong>Company Information</strong> and products, picks the three SOPs your
+                                business needs most and writes 5 simple steps for each. Review and edit them, then click Save.</p>
+                        </div>
+                        <div class="sop-ai-result" data-sop-ai-result hidden aria-live="polite"></div>
                         <div class="sop-editor" data-sop-editor>
                             <div class="sop-tabs" role="tablist" aria-label="Instruction sections">
                                 <?php $first = true; foreach ($sections as $key => [$label, $icon]): ?>
@@ -112,9 +187,6 @@ $sections = [
                                     <div class="field">
                                         <div class="field-label-row">
                                             <label for="sop-<?= e($key) ?>"><?= e($label) ?></label>
-                                            <button class="link-btn" type="button" data-sop-template="<?= e($key) ?>">
-                                                <i class="fa-solid fa-file-lines" aria-hidden="true"></i> Insert starter template
-                                            </button>
                                         </div>
                                         <textarea id="sop-<?= e($key) ?>" rows="10" class="sop-textarea" data-sop="<?= e($key) ?>"
                                                   data-sop-label="<?= e($label) ?>" spellcheck="true"

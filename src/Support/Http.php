@@ -43,7 +43,9 @@ final class Http
         ];
 
         if ($body !== null) {
-            $options[CURLOPT_POSTFIELDS] = is_array($body) ? http_build_query($body) : $body;
+            // An array with a file (CURLFile) is sent as multipart/form-data (e.g. a photo to Telegram).
+            $hasFile = is_array($body) && array_filter($body, static fn ($v) => $v instanceof \CURLFile) !== [];
+            $options[CURLOPT_POSTFIELDS] = is_array($body) && !$hasFile ? http_build_query($body) : $body;
         }
 
         $ca = ca_bundle_path();

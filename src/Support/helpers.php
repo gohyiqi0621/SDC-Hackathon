@@ -275,9 +275,9 @@ function nav_items(): array
             'group'    => 'Workspace',
             'children' => [
                 ['key' => 'financial/invoice',    'label' => 'Invoice',        'icon' => 'fa-solid fa-file-invoice',        'url' => url('financial', ['action' => 'invoice'])],
-                ['key' => 'financial/claims',     'label' => 'Claims',         'icon' => 'fa-solid fa-receipt',             'url' => url('financial', ['action' => 'claims'])],
+                ['key' => 'financial/upload',     'label' => 'Upload Invoice', 'icon' => 'fa-solid fa-cloud-arrow-up',      'url' => url('financial', ['action' => 'upload']), 'match' => ['financial/upload', 'financial/edit']],
+                ['key' => 'financial/claims',     'label' => 'Claims',         'icon' => 'fa-solid fa-receipt',             'url' => url('financial', ['action' => 'claims']), 'match' => ['financial/claims', 'financial/claim_new', 'financial/claim_edit']],
                 ['key' => 'financial/settlement', 'label' => 'Settlement',     'icon' => 'fa-solid fa-scale-balanced',      'url' => url('financial', ['action' => 'settlement'])],
-                ['key' => 'financial/upload',     'label' => 'Upload Invoice', 'icon' => 'fa-solid fa-cloud-arrow-up',      'url' => url('financial', ['action' => 'upload'])],
             ],
         ],
         [
@@ -287,11 +287,12 @@ function nav_items(): array
             'icon'     => 'fa-solid fa-robot',
             'group'    => 'Workspace',
             // Pages that keep this group open and highlighted.
-            'match'    => ['customer', 'staff', 'products', 'categories'],
+            'match'    => ['customer', 'staff', 'products', 'categories', 'orders'],
             'children' => [
                 ['heading' => 'Customer'],
                 ['key' => 'customer/settings', 'label' => 'Setting & Integration', 'icon' => 'fa-solid fa-sliders',       'url' => url('customer', ['action' => 'settings'])],
                 ['key' => 'products',          'label' => 'Product & Service',     'icon' => 'fa-solid fa-box-open',      'url' => url('products'), 'match' => ['products', 'categories']],
+                ['key' => 'orders',            'label' => 'Orders',                'icon' => 'fa-solid fa-bag-shopping',  'url' => url('orders'), 'match' => ['orders', 'orders/receipt']],
                 ['key' => 'customer/chat',     'label' => 'Chat Interface',        'icon' => 'fa-regular fa-comments',    'url' => url('customer', ['action' => 'chat'])],
                 ['heading' => 'Staff'],
                 ['key' => 'staff/settings',    'label' => 'Setting & Integration', 'icon' => 'fa-solid fa-sliders',       'url' => url('staff', ['action' => 'settings'])],
@@ -357,6 +358,9 @@ function page_title_for(string $key): string
         'financial/claims'    => 'Claims',
         'financial/settlement'=> 'Settlement',
         'financial/upload'    => 'Upload Invoice',
+        'financial/edit'      => 'Edit Invoice',
+        'financial/claim_new' => 'New Claim',
+        'financial/claim_edit'=> 'Edit Claim',
         'customer/settings'   => 'AI Settings & Integration',
         'customer/chat'       => 'Customer Chat Interface',
         'staff/settings'      => 'Staff Setting & Integration',

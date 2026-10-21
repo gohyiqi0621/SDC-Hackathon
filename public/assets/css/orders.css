@@ -1,0 +1,81 @@
+/* orders.css - AI Chatbot > Customer > Orders */
+
+.order-stat { text-decoration: none; color: inherit; transition: transform .15s ease, box-shadow .15s ease; }
+.order-stat:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+
+.order-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 22px 14px;
+}
+.order-tabs a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text-soft);
+    font-size: 12.5px;
+    font-weight: 600;
+    text-decoration: none;
+    background: #fff;
+}
+.order-tabs a span {
+    min-width: 20px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: #f1f2f8;
+    color: var(--muted);
+    font-size: 11px;
+    text-align: center;
+}
+.order-tabs a.active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+.order-tabs a.active span { background: var(--primary); color: #fff; }
+
+.order-table td { vertical-align: top; }
+.order-table small { display: block; margin-top: 2px; font-size: 11.5px; }
+.order-no { white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; letter-spacing: .2px; }
+.order-items { margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.order-items li + li { margin-top: 2px; }
+.order-row--review { background: #fffaf0; }
+.order-receipt { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
+
+.order-actions { white-space: nowrap; }
+.order-actions > form, .order-actions > details { display: inline-block; vertical-align: middle; margin-left: 4px; }
+.order-actions .btn-sm,
+.order-reject summary.btn-sm {
+    padding: 7px 12px;
+    font-size: 12.5px;
+    border-radius: 10px;
+}
+.order-reject { position: relative; }
+.order-reject summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.order-reject summary::-webkit-details-marker { display: none; }
+.order-reject form {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 20;
+    display: grid;
+    gap: 8px;
+    width: 260px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: var(--shadow);
+    white-space: normal;
+    text-align: left;
+}
+.order-reject label { font-size: 12px; font-weight: 600; }
+.order-reject input { width: 100%; }
+
+@media (max-width: 760px) {
+    .order-tabs { padding: 0 16px 12px; }
+    .order-actions { white-space: normal; }
+    .order-reject form { position: static; width: auto; margin-top: 8px; }
+}
+.order-table td[data-label="Items"] { min-width: 180px; }
+.order-table td[data-label="Order"] small { white-space: nowrap; }

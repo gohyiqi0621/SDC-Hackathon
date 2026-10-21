@@ -13,11 +13,12 @@
  * by the Router:
  *
  *   GET  ai_settings/company_profile            POST ai_settings/company_profile_save
- *   GET  ai_settings/assistant                  POST ai_settings/assistant_save
- *   GET  ai_settings/telegram                   POST ai_settings/telegram_test | telegram_connect | telegram_disconnect
+ *   GET  ai_settings/assistant                  POST ai_settings/assistant_save | generate_sops
+ *   GET  ai_settings/telegram                   POST ai_settings/telegram_connect | telegram_disconnect | telegram_forget
+ *                                               POST ai_settings/telegram_staff_link | telegram_staff_unlink
  *   GET  ai_settings/google_calendar            GET  ai_settings/google_calendar_oauth_start
  *   GET  ai_settings/google_calendar_oauth_callback   (browser redirect from Google)
- *   GET  ai_settings/google_calendar_calendars  POST ai_settings/google_calendar_save | google_calendar_test | google_calendar_disconnect
+ *   GET  ai_settings/google_calendar_calendars  POST ai_settings/google_calendar_save | google_calendar_disconnect
  */
 declare(strict_types=1);
 
@@ -32,7 +33,9 @@ use Src\Models\GoogleCalendarIntegration;
 use Src\Models\TelegramIntegration;
 use Src\Services\GoogleAuthRevoked;
 use Src\Services\GoogleCalendarService;
+use Src\Services\SopGeneratorService;
 use Src\Services\TelegramService;
+use Src\Services\TelegramWebhookService;
 use Src\Support\Crypto;
 use Throwable;
 
@@ -43,11 +46,55 @@ final class AiSettingsController
     private const LOGO_TYPES     = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
 
     private const PERSONALITIES  = ['friendly', 'professional', 'warm', 'persuasive', 'custom'];
+
+    /**
+     * Models the assistant can run on: id => [label, provider]. The id is what
+     * the provider's API expects. Add a row here to offer another model.
+     */
+    public const AI_MODELS = [
+        'claude-haiku-5-5'    => ['Claude Haiku 5.5',    'Anthropic'],
+        'agnes-2.5-flash'     => ['Agnes 2.5 Flash',     'Agnes'],
+        'gpt-6-luna'          => ['GPT-6 Luna',          'OpenAI'],
+        'deepseek-v4.1-flash' => ['DeepSeek V4.1 Flash', 'DeepSeek'],
+    ];
+    public const DEFAULT_AI_MODEL    = 'claude-haiku-5-5';
+
+    /** Reply language choices (ai_assistant_settings.reply_language, migration 010). */
+    public const REPLY_LANGUAGES = [
+        'auto' => 'Same language as the customer (recommended)',
+        'en'   => 'Always English',
+        'ms'   => 'Always Bahasa Melayu',
+        'zh'   => 'Always Chinese (简体中文)',
+        'ta'   => 'Always Tamil',
+    ];
+    public const DEFAULT_TEMPERATURE = 0.7;
+
+    /**
+     * Models offered before, mapped to the nearest model still on the list, so
+     * a row saved earlier keeps working with the same provider and key.
+     */
+    private const LEGACY_MODELS = [
+        'claude-sonnet-5-5' => 'claude-haiku-5-5',
+        'claude-opus-5-5'   => 'claude-haiku-5-5',
+        'deepseek-v4-flash' => 'deepseek-v4.1-flash',
+        'deepseek-v4-pro'   => 'deepseek-v4.1-flash',
+    ];
+
+    /** What each provider's secret keys start with (a quick sanity check, not a real test). Agnes keys have no fixed prefix. */
+    private const KEY_PREFIXES = ['Anthropic' => 'sk-ant-', 'OpenAI' => 'sk-', 'DeepSeek' => 'sk-'];
+
+    /** A saved model id as one of AI_MODELS (old ids are mapped, unknown ones fall back to the default). */
+    public static function resolveModel(?string $model): string
+    {
+        $model = (string) $model;
+        if (isset(self::AI_MODELS[$model])) {
+            return $model;
+        }
+        return self::LEGACY_MODELS[$model] ?? self::DEFAULT_AI_MODEL;
+    }
     private const DURATIONS      = [15, 30, 45, 60, 90];
     private const MAX_INSTRUCTIONS = 20000;
 
-    private const TG_USERNAME = '/^[A-Za-z][A-Za-z0-9_]{1,29}bot$/i';
-    private const TG_CHAT_ID  = '/^-?\d{5,20}$/';
     private const TG_TOKEN    = '/^\d{5,12}:[A-Za-z0-9_-]{30,64}$/';
 
     private const OAUTH_SESSION_KEY = 'gcal_oauth';
@@ -67,7 +114,7 @@ final class AiSettingsController
     public function companyProfileSave(): void
     {
         $this->run(function (int $userId): void {
-            $input  = $this->strings($_POST, ['company_name', 'business_category', 'company_description', 'company_background']);
+            $input  = $this->strings($_POST, ['company_name', 'business_category', 'company_background', 'payment_instructions']);
             $errors = [];
 
             if ($input['company_name'] === '' ) {
@@ -80,22 +127,24 @@ final class AiSettingsController
                 $errors['business_category'] = $input['business_category'] === '' ? 'Business category is required.' : 'Choose a category from the list.';
             }
 
-            if ($input['company_description'] === '') {
-                $errors['company_description'] = 'Company description is required.';
-            } elseif (mb_strlen($input['company_description']) < 20) {
-                $errors['company_description'] = 'Company description needs at least 20 characters.';
-            } elseif (mb_strlen($input['company_description']) > 2000) {
-                $errors['company_description'] = 'Company description must be 2000 characters or fewer.';
-            }
-
             if (mb_strlen($input['company_background']) > 3000) {
                 $errors['company_background'] = 'Company background must be 3000 characters or fewer.';
+            }
+
+            if (mb_strlen($input['payment_instructions']) > 1000) {
+                $errors['payment_instructions'] = 'Payment instructions must be 1000 characters or fewer.';
             }
 
             $file = $_FILES['company_logo'] ?? null;
             $logoError = $this->logoError($file);
             if ($logoError !== null) {
                 $errors['company_logo'] = $logoError;
+            }
+
+            $qrFile  = $_FILES['payment_qr'] ?? null;
+            $qrError = $this->logoError($qrFile);
+            if ($qrError !== null) {
+                $errors['payment_qr'] = str_replace('The logo', 'The QR image', $qrError);
             }
 
             if ($errors !== []) {
@@ -106,6 +155,12 @@ final class AiSettingsController
             $existing = $model->find($userId);
             $oldLogo  = $existing['company_logo_url'] ?? null;
             $newLogo  = $this->hasUpload($file) ? $this->storeLogo($userId, $file) : null;
+            $oldQr    = $existing['payment_qr_url'] ?? null;
+            $newQr    = $this->hasUpload($qrFile) ? $this->storeLogo($userId, $qrFile) : null;
+            $qr       = !empty($_POST['remove_payment_qr']) ? null : $oldQr;
+            if ($newQr !== null) {
+                $qr = $newQr;
+            }
 
             $logo = $oldLogo;
             if (!empty($_POST['remove_logo'])) {
@@ -119,18 +174,23 @@ final class AiSettingsController
                 $row = $model->save($userId, [
                     'company_name'        => $input['company_name'],
                     'business_category'   => $input['business_category'],
-                    'company_description' => $input['company_description'],
                     'company_background'  => $input['company_background'] !== '' ? $input['company_background'] : null,
+                    'payment_instructions' => $input['payment_instructions'] !== '' ? $input['payment_instructions'] : null,
+                    'payment_qr_url'      => $qr,
                     'company_logo_url'    => $logo,
                 ]);
             } catch (Throwable $e) {
                 $this->deleteLogo($userId, $newLogo);
+                $this->deleteLogo($userId, $newQr);
                 throw $e;
             }
 
             // The old file goes only once the database no longer points at it.
             if ($oldLogo !== null && $oldLogo !== $logo) {
                 $this->deleteLogo($userId, $oldLogo);
+            }
+            if ($oldQr !== null && $oldQr !== $qr) {
+                $this->deleteLogo($userId, $oldQr);
             }
 
             json_response(true, ['company_profile' => $this->presentCompany($row)], 'Company information saved.');
@@ -171,6 +231,40 @@ final class AiSettingsController
                 $errors['tone_description'] = 'Tone description must be 500 characters or fewer.';
             }
 
+            $model    = new AiAssistantSetting();
+            $existing = $model->find($userId);
+
+            $aiModel = trim((string) ($_POST['ai_model'] ?? ''));
+            if (!isset(self::AI_MODELS[$aiModel])) {
+                $errors['ai_model'] = 'Choose an AI model from the list.';
+            }
+
+            $temperatureRaw = trim((string) ($_POST['temperature'] ?? ''));
+            if (!is_numeric($temperatureRaw) || (float) $temperatureRaw < 0 || (float) $temperatureRaw > 1) {
+                $errors['temperature'] = 'Temperature must be a number from 0 to 1.';
+            }
+
+            // Secret key: optional when one is already saved for the same provider.
+            $apiKey   = trim((string) ($_POST['api_key'] ?? ''));
+            $provider = self::AI_MODELS[$aiModel][1] ?? null;
+            $oldModel = !empty($existing['ai_model']) ? self::resolveModel((string) $existing['ai_model']) : '';
+            $oldProvider = self::AI_MODELS[$oldModel][1] ?? null;
+
+            if ($apiKey !== '') {
+                if (strlen($apiKey) < 20 || strlen($apiKey) > 300 || preg_match('/\s/', $apiKey)) {
+                    $errors['api_key'] = 'That does not look like a secret key. Copy it again from the provider.';
+                } elseif ($provider !== null && isset(self::KEY_PREFIXES[$provider]) && !str_starts_with($apiKey, self::KEY_PREFIXES[$provider])) {
+                    $errors['api_key'] = $provider . ' keys start with "' . self::KEY_PREFIXES[$provider] . '". Check you copied the key for ' . $provider . '.';
+                }
+            } elseif (!empty($existing['api_key_encrypted']) && $provider !== null && $oldProvider !== null && $provider !== $oldProvider) {
+                $errors['api_key'] = 'You switched to a ' . $provider . ' model. Enter the ' . $provider . ' secret key.';
+            }
+
+            $replyLanguage = trim((string) ($_POST['reply_language'] ?? 'auto'));
+            if (!isset(self::REPLY_LANGUAGES[$replyLanguage])) {
+                $errors['reply_language'] = 'Choose a reply language from the list.';
+            }
+
             if (mb_strlen($instructions) > self::MAX_INSTRUCTIONS) {
                 $errors['system_instructions'] = 'System instructions must be ' . number_format(self::MAX_INSTRUCTIONS) . ' characters or fewer.';
             }
@@ -179,103 +273,273 @@ final class AiSettingsController
                 $this->invalid($errors);
             }
 
-            $row = (new AiAssistantSetting())->save($userId, [
+            $values = [
                 'assistant_name'      => $input['assistant_name'],
                 'personality'         => $input['personality'],
                 'tone_description'    => $input['tone_description'] !== '' ? $input['tone_description'] : null,
                 'system_instructions' => trim($instructions) !== '' ? $instructions : null,
                 'is_enabled'          => $this->bool($_POST['is_enabled'] ?? '0'),
-            ]);
+                'ai_model'            => $aiModel,
+                'temperature'         => number_format((float) $temperatureRaw, 2, '.', ''),
+                'reply_language'      => $replyLanguage,
+            ];
+            if ($apiKey !== '') {
+                $values['api_key_encrypted'] = Crypto::encrypt($apiKey);   // otherwise the saved key is kept
+            }
+
+            $row = $model->save($userId, $values);
 
             json_response(true, ['ai_settings' => $this->presentAssistant($row)], 'AI assistant settings saved.');
         });
     }
 
-    /* ========================================================== telegram === */
-
-    /** GET ai_settings/telegram */
-    public function telegram(): void
+    /**
+     * POST ai_settings/generate_sops
+     *
+     * Agnes AI reads the saved company information (and the active products)
+     * and writes three SOPs for this business, five short steps each. One
+     * goes into each SOP box (customer service / booking-or-order process /
+     * sales); the titles are chosen for the business. Nothing is saved here:
+     * the page fills the boxes and the owner reviews them, then saves.
+     */
+    public function generateSops(): void
     {
         $this->run(function (int $userId): void {
-            json_response(true, ['telegram' => $this->presentTelegram((new TelegramIntegration())->find($userId))]);
+            // A short pause between runs, so a double click does not pay twice.
+            $last = (int) ($_SESSION['sop_generated_at'] ?? 0);
+            if ($last > time() - 10) {
+                json_response(false, null, 'Please wait a few seconds before generating again.', 429);
+            }
+
+            $company = (new CompanyProfile())->find($userId);
+            if ($company === null || trim((string) ($company['company_name'] ?? '')) === '') {
+                json_response(false, null, 'Save your Company Information first (name, category and background). The SOPs are written from it.', 422);
+            }
+            if (trim((string) ($company['company_background'] ?? '')) === '' && trim((string) ($company['company_description'] ?? '')) === '') {
+                json_response(false, null, 'Add a company background or description in Company Information first, so the SOPs fit your business.', 422);
+            }
+
+            $_SESSION['sop_generated_at'] = time();
+
+            $assistant = (new AiAssistantSetting())->find($userId);
+            $result = (new SopGeneratorService())->generate($company, SopGeneratorService::productsFor($userId), $assistant);
+
+            json_response(true, $result, 'Three SOPs generated. Review them, then save.');
         });
     }
 
-    /** POST ai_settings/telegram_test - checks only, saves nothing (except marking a broken stored token). */
-    public function telegramTest(): void
+    /* ========================================================== telegram === */
+
+    /**
+     * GET ai_settings/telegram
+     *
+     * The bot saved for this account (if any), whether it is connected, the
+     * staff chat link, Telegram's own view of the webhook (last error,
+     * pending messages), and name suggestions for creating a new bot.
+     */
+    public function telegram(): void
     {
         $this->run(function (int $userId): void {
-            $model = new TelegramIntegration();
-            $row   = $model->find($userId);
-            [$input, $token, $usingStored] = $this->telegramInput($row);
-
-            $result = (new TelegramService())->verify($token, $input['bot_username'], $input['staff_telegram_chat_id']);
-
-            // The saved token stopped working: show that on the status badge.
-            if (!$result['ok'] && $usingStored && ($row['connection_status'] ?? '') === 'connected') {
-                $row = $model->save($userId, ['connection_status' => 'error']);
-            }
+            $row = (new TelegramIntegration())->find($userId);
 
             json_response(true, [
-                'ok'           => $result['ok'],
-                'message'      => $result['message'],
-                'bot_username' => $result['bot_username'] ?? null,
-                'telegram'     => $this->presentTelegram($row),
+                'telegram'    => $this->presentTelegram($row),
+                'webhook'     => $this->webhookStatus($row),
+                'suggestions' => $this->botSuggestions($userId),
             ]);
         });
     }
 
-    /** POST ai_settings/telegram_connect */
+    /**
+     * POST ai_settings/telegram_connect
+     *
+     *   use_saved=1               reconnect the bot already saved for this account
+     *   bot_token=123:AA...       or connect a new bot (created in @BotFather)
+     *   bot_name=Aisyah           optional: the chatbot name customers see
+     *
+     * The username comes from Telegram (getMe), so it is never typed. Then the
+     * name is set (setMyName) and the webhook is registered, so customer
+     * messages reach this app.
+     */
     public function telegramConnect(): void
     {
         $this->run(function (int $userId): void {
-            $model = new TelegramIntegration();
-            $row   = $model->find($userId);
-            [$input, $token] = $this->telegramInput($row);
+            $model    = new TelegramIntegration();
+            $row      = $model->find($userId);
+            $useSaved = $this->bool($_POST['use_saved'] ?? '0');
+            $token    = trim((string) ($_POST['bot_token'] ?? ''));
+            $botName  = trim((string) preg_replace('/\s+/', ' ', (string) ($_POST['bot_name'] ?? '')));
+            $errors   = [];
+
+            if ($useSaved) {
+                if (empty($row['bot_token_encrypted'])) {
+                    json_response(false, ['errors' => ['bot_token' => 'No saved chatbot on this account. Create a new one.']], 'No saved chatbot on this account.', 422);
+                }
+                $token = Crypto::decrypt((string) $row['bot_token_encrypted']);
+            } elseif ($token === '') {
+                $errors['bot_token'] = 'Paste the bot token that @BotFather sent you.';
+            } elseif (!preg_match(self::TG_TOKEN, $token)) {
+                $errors['bot_token'] = 'That doesn\'t look like a bot token. It looks like 123456789:AA… (from @BotFather).';
+            }
+
+            if ($botName !== '' && (mb_strlen($botName) > 64)) {
+                $errors['bot_name'] = 'The chatbot name must be 64 characters or fewer.';
+            }
+            if ($errors !== []) {
+                $this->invalid($errors);
+            }
 
             $telegram = new TelegramService();
-            $result   = $telegram->verify($token, $input['bot_username'], $input['staff_telegram_chat_id']);
-
+            $result   = $telegram->verify($token, null, null);
             if (!$result['ok']) {
                 json_response(false, [
-                    'errors'   => [$result['field'] ?? 'bot_token' => $result['message']],
+                    'errors'   => [$result['field'] === 'form' ? 'form' : 'bot_token' => $result['message']],
                     'telegram' => $this->presentTelegram($row),
                 ], $result['message'], 422);
             }
 
-            $row = $model->save($userId, [
-                'bot_username'           => $result['bot_username'],
-                'staff_telegram_chat_id' => $input['staff_telegram_chat_id'] !== '' ? $input['staff_telegram_chat_id'] : null,
-                'bot_token_encrypted'    => Crypto::encrypt($token),
-                'connection_status'      => 'connected',
-                'is_enabled'             => true,
-            ]);
-
-            if ($input['staff_telegram_chat_id'] !== '') {
-                $telegram->sendMessage($token, $input['staff_telegram_chat_id'],
-                    '✅ ' . APP_NAME . ': @' . $result['bot_username'] . ' is now connected. Staff alerts will arrive in this chat.');
+            // A different bot replaces the old one: stop the old webhook first.
+            if (!$useSaved && !empty($row['bot_token_encrypted']) && strcasecmp((string) $row['bot_username'], (string) $result['bot_username']) !== 0) {
+                try {
+                    (new TelegramWebhookService())->unregister($row, Crypto::decrypt((string) $row['bot_token_encrypted']));
+                } catch (RuntimeException $e) {
+                    // old token unreadable: nothing to unregister
+                }
+                $row = $model->save($userId, ['staff_telegram_chat_id' => null, 'staff_linked_name' => null]);
             }
 
-            json_response(true, ['telegram' => $this->presentTelegram($row)], 'Telegram connected.');
+            $nameResult = ['ok' => true, 'message' => ''];
+            if ($botName !== '') {
+                $nameResult = $telegram->setMyName($token, $botName);
+            } else {
+                $botName = $telegram->myName($token) ?: (string) ($row['bot_name'] ?? '');
+            }
+
+            $row = $model->save($userId, [
+                'bot_username'        => $result['bot_username'],
+                'bot_name'            => $botName !== '' ? mb_substr($botName, 0, 64) : null,
+                'bot_token_encrypted' => Crypto::encrypt($token),
+                'connection_status'   => 'connected',
+                'is_enabled'          => true,
+            ]);
+
+            // Send customer messages to this app (Telegram -> website -> Flowise).
+            try {
+                $webhook = (new TelegramWebhookService())->register($row, $token);
+            } catch (PDOException $e) {
+                error_log('[telegram] webhook columns missing: ' . $e->getMessage());
+                $webhook = ['ok' => false, 'message' => 'Run the database migrations (C:\\xampp\\php\\php.exe bin\\migrate.php) first, then connect again.'];
+            }
+            $row = $model->find($userId) ?? $row;
+
+            $message = '@' . $result['bot_username'] . ' is connected.';
+            $message .= $webhook['ok'] ? ' Customer messages will be answered by the AI assistant.' : ' But customer messages are not linked yet: ' . $webhook['message'];
+            if (!$nameResult['ok']) {
+                $message .= ' (' . $nameResult['message'] . ')';
+            }
+
+            json_response(true, [
+                'telegram' => $this->presentTelegram($row),
+                'webhook'  => $this->webhookStatus($row, $token),
+            ], $message);
         });
     }
 
-    /** POST ai_settings/telegram_disconnect - deletes the stored token. */
+    /**
+     * POST ai_settings/telegram_disconnect - the bot stops answering, but it
+     * stays saved (encrypted) so it can be selected again later.
+     */
     public function telegramDisconnect(): void
     {
         $this->run(function (int $userId): void {
             $model = new TelegramIntegration();
             $row   = $model->find($userId);
 
+            if ($row !== null && !empty($row['bot_token_encrypted'])) {
+                try {
+                    // Stop Telegram from sending customer messages here.
+                    (new TelegramWebhookService())->unregister($row, Crypto::decrypt((string) $row['bot_token_encrypted']));
+                } catch (RuntimeException | PDOException $e) {
+                    // Unreadable token: nothing to unregister with.
+                }
+            }
+
+            if ($row !== null) {
+                $row = $model->save($userId, ['connection_status' => 'disconnected', 'is_enabled' => false]);
+            }
+
+            json_response(true, ['telegram' => $this->presentTelegram($row), 'webhook' => null], 'The chatbot is still saved on this account, so you can connect it again.');
+        });
+    }
+
+    /** POST ai_settings/telegram_forget - delete the saved bot token completely. */
+    public function telegramForget(): void
+    {
+        $this->run(function (int $userId): void {
+            $model = new TelegramIntegration();
+            $row   = $model->find($userId);
+
+            if ($row !== null && !empty($row['bot_token_encrypted'])) {
+                try {
+                    (new TelegramWebhookService())->unregister($row, Crypto::decrypt((string) $row['bot_token_encrypted']));
+                } catch (RuntimeException | PDOException $e) {
+                    // nothing to unregister with
+                }
+            }
             if ($row !== null) {
                 $row = $model->save($userId, [
-                    'bot_token_encrypted' => null,
-                    'connection_status'   => 'disconnected',
-                    'is_enabled'          => false,
+                    'bot_username' => null, 'bot_name' => null, 'bot_token_encrypted' => null,
+                    'staff_telegram_chat_id' => null, 'staff_linked_name' => null,
+                    'staff_link_code' => null, 'staff_link_expires_at' => null,
+                    'connection_status' => 'disconnected', 'is_enabled' => false,
                 ]);
             }
 
-            json_response(true, ['telegram' => $this->presentTelegram($row)], 'Telegram disconnected.');
+            json_response(true, ['telegram' => $this->presentTelegram($row), 'webhook' => null], 'The saved chatbot was removed from this account.');
+        });
+    }
+
+    /**
+     * POST ai_settings/telegram_staff_link
+     *
+     * A one-time link (valid 15 minutes): t.me/<bot>?start=staff_<code>. When
+     * the signed-in owner opens it and presses Start, the webhook saves that
+     * Telegram chat as this account's staff chat (TelegramWebhookController).
+     */
+    public function telegramStaffLink(): void
+    {
+        $this->run(function (int $userId): void {
+            $model = new TelegramIntegration();
+            $row   = $model->find($userId);
+
+            if ($row === null || ($row['connection_status'] ?? '') !== 'connected' || empty($row['bot_username'])) {
+                json_response(false, null, 'Connect a chatbot first.', 422);
+            }
+
+            $code = bin2hex(random_bytes(12));
+            $model->save($userId, [
+                'staff_link_code'       => $code,
+                'staff_link_expires_at' => date('c', time() + 900),
+            ]);
+
+            json_response(true, [
+                'link'       => 'https://t.me/' . rawurlencode((string) $row['bot_username']) . '?start=staff_' . $code,
+                'expires_in' => 900,
+            ], 'Open the link in Telegram and press Start.');
+        });
+    }
+
+    /** POST ai_settings/telegram_staff_unlink */
+    public function telegramStaffUnlink(): void
+    {
+        $this->run(function (int $userId): void {
+            $model = new TelegramIntegration();
+            $row   = $model->find($userId);
+            if ($row !== null) {
+                $row = $model->save($userId, ['staff_telegram_chat_id' => null, 'staff_linked_name' => null,
+                                              'staff_link_code' => null, 'staff_link_expires_at' => null]);
+            }
+            json_response(true, ['telegram' => $this->presentTelegram($row)], 'Staff chat unlinked.');
         });
     }
 
@@ -431,31 +695,7 @@ final class AiSettingsController
 
             $row = $model->save($userId, $values);
 
-            json_response(true, ['google_calendar' => $this->presentCalendar($row)], 'Google Calendar settings saved.');
-        });
-    }
-
-    /** POST ai_settings/google_calendar_test -> {available, message, slots} */
-    public function googleCalendarTest(): void
-    {
-        $this->run(function (int $userId): void {
-            [$model, $row, $google] = $this->connectedCalendar($userId);
-            [$input, $errors] = $this->calendarInput($row);
-
-            if ($errors !== []) {
-                $this->invalid($errors);
-            }
-
-            $slots = $this->withAccess($userId, $model, $row,
-                static fn (string $token): array => $google->freeSlots($token, $input['calendar_id'], $input['timezone'], $input['duration']));
-
-            json_response(true, [
-                'available' => $slots !== [],
-                'slots'     => $slots,
-                'message'   => $slots !== []
-                    ? 'Google Calendar is reachable. Next free ' . $input['duration'] . '-minute slots (9am–6pm):'
-                    : 'Google Calendar is reachable, but there is no free ' . $input['duration'] . '-minute slot between 9am and 6pm in the next 7 days.',
-            ]);
+            json_response(true, ['google_calendar' => $this->presentCalendar($row)], 'Booking settings saved.');
         });
     }
 
@@ -505,7 +745,7 @@ final class AiSettingsController
             error_log('[ai_settings] ' . $e->getMessage());
             $state = (string) $e->getCode();
             $message = match ($state) {
-                '42P01' => 'The AI settings tables do not exist yet. Run: C:\\xampp\\php\\php.exe bin\\migrate.php',
+                '42P01', '42703' => 'The database is missing the latest AI settings tables or columns. Run: C:\\xampp\\php\\php.exe bin\\migrate.php',
                 '42501' => 'The database user has no permission on the AI settings tables. Make the DB_USER in .env the owner of these tables.',
                 default => 'A database error stopped this request.' . (APP_DEBUG ? ' ' . $e->getMessage() : ''),
             };
@@ -563,6 +803,8 @@ final class AiSettingsController
             'company_background'  => (string) ($row['company_background'] ?? ''),
             'company_description' => (string) ($row['company_description'] ?? ''),
             'business_category'   => (string) ($row['business_category'] ?? ''),
+            'payment_instructions' => (string) ($row['payment_instructions'] ?? ''),
+            'payment_qr_url'      => !empty($row['payment_qr_url']) ? asset((string) $row['payment_qr_url']) : null,
             'created_at'          => $this->iso($row['created_at'] ?? null),
             'updated_at'          => $this->iso($row['updated_at'] ?? null),
         ];
@@ -580,6 +822,10 @@ final class AiSettingsController
             'tone_description'    => (string) ($row['tone_description'] ?? ''),
             'system_instructions' => (string) ($row['system_instructions'] ?? ''),
             'is_enabled'          => $this->bool($row['is_enabled']),
+            'ai_model'            => self::resolveModel($row['ai_model'] ?? null),
+            'temperature'         => isset($row['temperature']) ? (float) $row['temperature'] : self::DEFAULT_TEMPERATURE,
+            'reply_language'      => (string) ($row['reply_language'] ?? 'auto'),
+            'has_api_key'         => !empty($row['api_key_encrypted']),   // the key itself never leaves the server
             'updated_at'          => $this->iso($row['updated_at'] ?? null),
         ];
     }
@@ -588,10 +834,15 @@ final class AiSettingsController
     {
         return [
             'bot_username'           => $row['bot_username'] ?? '',
+            'bot_name'               => $row['bot_name'] ?? '',
+            'bot_link'               => !empty($row['bot_username']) ? 'https://t.me/' . $row['bot_username'] : null,
             'staff_telegram_chat_id' => $row['staff_telegram_chat_id'] ?? '',
+            'staff_linked_name'      => $row['staff_linked_name'] ?? '',
             'connection_status'      => $row['connection_status'] ?? 'disconnected',
             'is_enabled'             => $this->bool($row['is_enabled'] ?? false),
             'has_bot_token'          => !empty($row['bot_token_encrypted']),
+            // Customer messages reach this app (Telegram webhook registered).
+            'webhook_linked'         => !empty($row['webhook_url']),
             'updated_at'             => $this->iso($row['updated_at'] ?? null),
         ];
     }
@@ -676,48 +927,64 @@ final class AiSettingsController
     /* ---- telegram -------------------------------------------------------- */
 
     /**
-     * Validates the form; uses the stored token when none was typed.
-     *
-     * @return array{0: array{bot_username: string, staff_telegram_chat_id: string}, 1: string, 2: bool}
+     * Telegram's own view of the webhook: is it pointing here, and the last
+     * delivery error (e.g. ngrok offline). Null when no bot is connected.
      */
-    private function telegramInput(?array $row): array
+    private function webhookStatus(?array $row, ?string $token = null): ?array
     {
-        $input = $this->strings($_POST, ['bot_username', 'staff_telegram_chat_id', 'bot_token']);
-        $input['bot_username'] = ltrim($input['bot_username'], '@');
-        $errors = [];
-
-        if ($input['bot_username'] === '') {
-            $errors['bot_username'] = 'Bot username is required.';
-        } elseif (!preg_match(self::TG_USERNAME, $input['bot_username'])) {
-            $errors['bot_username'] = 'Bot usernames are 5–32 letters, numbers or underscores and end in "bot".';
+        if ($row === null || ($row['connection_status'] ?? '') !== 'connected' || empty($row['bot_token_encrypted'])) {
+            return null;
+        }
+        try {
+            $token ??= Crypto::decrypt((string) $row['bot_token_encrypted']);
+        } catch (RuntimeException $e) {
+            return ['ok' => false, 'message' => 'The saved bot token cannot be read. Connect the chatbot again.'];
         }
 
-        // Optional: when empty, no staff chat is checked or messaged.
-        if ($input['staff_telegram_chat_id'] !== '' && !preg_match(self::TG_CHAT_ID, $input['staff_telegram_chat_id'])) {
-            $errors['staff_telegram_chat_id'] = 'Chat IDs are numbers only (groups start with a minus sign).';
+        $info     = (new TelegramService())->webhookInfo($token, 6);
+        $expected = TelegramWebhookService::urlFor((int) $row['id']);
+
+        if ($info === null) {
+            return ['ok' => null, 'message' => 'Could not ask Telegram about the webhook right now.'];
         }
 
-        $token = $input['bot_token'];
-        $usingStored = false;
+        $url       = (string) ($info['url'] ?? '');
+        $lastError = (string) ($info['last_error_message'] ?? '');
+        $errorAt   = isset($info['last_error_date']) ? date(DATE_ATOM, (int) $info['last_error_date']) : null;
+        $recent    = $errorAt !== null && (int) $info['last_error_date'] > time() - 3600;
 
-        if ($token === '') {
-            if (!empty($row['bot_token_encrypted'])) {
-                $token = Crypto::decrypt((string) $row['bot_token_encrypted']);
-                $usingStored = true;
-            } else {
-                $errors['bot_token'] = 'Bot token is required.';
-            }
-        } elseif (!preg_match(self::TG_TOKEN, $token)) {
-            $errors['bot_token'] = 'That doesn\'t look like a bot token. It looks like 123456789:AA… (from @BotFather).';
+        $message = match (true) {
+            $url === ''          => 'Telegram has no webhook for this bot, so messages never reach this app. Click Reconnect.',
+            $url !== $expected   => 'Telegram sends messages to an old address (' . $url . '). Click Reconnect to use ' . $expected . '.',
+            $recent              => 'Telegram could not deliver the last message (' . $lastError . '). Check that ngrok and Apache are running, then click Reconnect.',
+            default              => 'Customer messages reach this app.',
+        };
+
+        return [
+            'ok'              => $url === $expected && !$recent,
+            'message'         => $message,
+            'url'             => $url,
+            'expected_url'    => $expected,
+            'pending'         => (int) ($info['pending_update_count'] ?? 0),
+            'last_error'      => $lastError !== '' ? $lastError : null,
+            'last_error_at'   => $errorAt,
+        ];
+    }
+
+    /** Name ideas for a new bot, from the assistant and company names. */
+    private function botSuggestions(int $userId): array
+    {
+        $assistant = (new AiAssistantSetting())->find($userId);
+        $company   = (new CompanyProfile())->find($userId);
+
+        $name = trim((string) ($assistant['assistant_name'] ?? '')) ?: trim((string) ($company['company_name'] ?? '')) ?: 'My Shop Assistant';
+        $base = strtolower(trim((string) preg_replace('/[^A-Za-z0-9]+/', '_', (string) ($company['company_name'] ?? $name)), '_'));
+        if ($base === '' || !preg_match('/^[a-z]/', $base)) {
+            $base = 'my_shop';
         }
+        $username = substr($base, 0, 26) . '_bot';
 
-        if ($errors !== []) {
-            $this->invalid($errors);
-        }
-
-        unset($input['bot_token']);
-
-        return [$input, $token, $usingStored];
+        return ['bot_name' => mb_substr($name, 0, 64), 'bot_username' => $username];
     }
 
     /* ---- google calendar ------------------------------------------------- */
@@ -728,13 +995,16 @@ final class AiSettingsController
         $input  = $this->strings($_POST, ['calendar_id', 'default_appointment_duration_minutes', 'timezone']);
         $errors = [];
 
-        $duration = (int) $input['default_appointment_duration_minutes'];
+        // The page no longer edits the duration: keep the saved one (30 minutes by default).
+        $duration = $input['default_appointment_duration_minutes'] !== ''
+            ? (int) $input['default_appointment_duration_minutes']
+            : (int) ($row['default_appointment_duration_minutes'] ?? 30);
         if (!in_array($duration, self::DURATIONS, true)) {
-            $errors['default_appointment_duration_minutes'] = 'Choose one of the listed durations.';
+            $duration = 30;
         }
 
         if (!in_array($input['timezone'], DateTimeZone::listIdentifiers(), true)) {
-            $errors['timezone'] = 'Choose a timezone from the list.';
+            $errors['timezone'] = 'Choose your timezone from the list.';
         }
 
         $calendarId = $input['calendar_id'] !== '' ? $input['calendar_id'] : (string) ($row['calendar_id'] ?? '');

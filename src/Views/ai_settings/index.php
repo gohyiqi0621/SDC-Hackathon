@@ -14,7 +14,7 @@
  * through assets/js/ai-settings-api.js. $endpoints comes from
  * ChatbotController::aiSettingsEndpoints(), so every URL lives in one place.
  *
- * Expects: $user, $userId, $endpoints, $businessCategories, $timezones,
+ * Expects: $user, $userId, $endpoints, $businessCategories, $timezones, $aiModels,
  *          $chatUrl.
  */
 $tabs = [
@@ -46,17 +46,6 @@ view('layouts/header', [
      data-user-id="<?= (int) $userId ?>"
      data-endpoints="<?= e(json_encode($endpoints, JSON_UNESCAPED_SLASHES)) ?>">
 
-    <div class="flash flash--warning ai-demo-banner" role="status" data-demo-banner hidden>
-        <i class="fa-solid fa-flask"></i>
-        <div>
-            <strong>Demo mode</strong>
-            <span data-demo-banner-text>
-                The server endpoints for these settings are not available yet. Changes are kept in this browser only,
-                and no Telegram or Google account is actually connected.
-            </span>
-        </div>
-    </div>
-
     <div class="ai-tabs page-tabs" role="tablist" aria-label="AI settings sections">
         <?php foreach ($tabs as $key => [$label, $icon]): ?>
             <button class="page-tab<?= $key === 'company' ? ' active' : '' ?>" type="button" role="tab"
@@ -75,7 +64,7 @@ view('layouts/header', [
     </section>
 
     <section class="ai-panel" role="tabpanel" id="ai-panel-assistant" aria-labelledby="ai-tab-assistant" tabindex="0" data-panel="assistant" hidden>
-        <?php view('ai_settings/_ai_assistant_settings_form'); ?>
+        <?php view('ai_settings/_ai_assistant_settings_form', ['aiModels' => $aiModels]); ?>
     </section>
 
     <section class="ai-panel" role="tabpanel" id="ai-panel-telegram" aria-labelledby="ai-tab-telegram" tabindex="0" data-panel="telegram" hidden>

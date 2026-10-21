@@ -71,6 +71,46 @@ final class GmailController
         json_response(true, ['emails' => $result['emails']], count($result['emails']) . ' emails loaded.');
     }
 
+    /**
+ * Return the full body of a Gmail message.
+ */
+public function message(): void
+{
+    $user = require_login();
+
+    $messageId = $_GET['id'] ?? '';
+
+    if (!is_string($messageId) || !preg_match('/^[A-Za-z0-9]+$/', $messageId)) {
+        json_response(
+            false,
+            null,
+            'Invalid Gmail message ID.',
+            400
+        );
+    }
+
+    $result = (new GmailService())->message(
+        (int) $user['id'],
+        $messageId
+    );
+
+    if (!$result['ok']) {
+        json_response(
+            false,
+            ['reconnect' => $result['reconnect'] ?? false],
+            $result['error'] ?? 'Unable to load email.',
+            502
+        );
+    }
+
+    json_response(
+        true,
+        ['body' => $result['body']],
+        'Email content loaded.'
+    );
+}
+
+
     public function disconnect(): void
     {
         $user = require_login();

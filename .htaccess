@@ -25,8 +25,10 @@
     RewriteRule ^(config|db|helpers|setup)\.php$ - [F,L]
     RewriteRule ^(database\.sql|Dockerfile|\.dockerignore|.*\.md)$ - [F,L]
 
-    # Environment files and Git metadata.
+    # Environment files and Git metadata. "env" (no dot) is a stray copy of
+    # .env that can hold real keys: never serve it.
     RewriteRule ^\.env - [F,L]
+    RewriteRule ^env$ - [F,L]
     RewriteRule ^\.git - [F,L]
 </IfModule>
 

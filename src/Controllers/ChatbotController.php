@@ -13,8 +13,14 @@ declare(strict_types=1);
 
 namespace Src\Controllers;
 
+use Src\Models\ChatMessage;
 use Src\Models\Product;
+use Src\Services\AssistantConfigService;
+use Src\Services\AssistantReplyService;
 use Src\Services\BrevoMailer;
+use Src\Services\FlowiseService;
+use Src\Services\SystemMessageBuilder;
+use Throwable;
 
 final class ChatbotController
 {
@@ -54,6 +60,7 @@ final class ChatbotController
             'endpoints'          => self::aiSettingsEndpoints(),
             'businessCategories' => self::BUSINESS_CATEGORIES,
             'timezones'          => \DateTimeZone::listIdentifiers(),
+            'aiModels'           => AiSettingsController::AI_MODELS,
             'chatUrl'            => url('customer', ['action' => 'chat']),
         ]);
     }
@@ -65,7 +72,7 @@ final class ChatbotController
      * Router (GET/POST only, addressed as ?page=&action=), so the same
      * operations are mapped onto that convention. PUT becomes POST. They are
      * registered in routes.php and handled by AiSettingsController. If one is
-     * ever missing (404), the page falls back to a clearly labelled demo mode.
+     * ever missing (404), the page shows an error for that section.
      *
      * @return array<string, string>
      */
@@ -80,17 +87,19 @@ final class ChatbotController
             // AI assistant (ai_assistant_settings)
             'assistantGet'        => $to('assistant'),                  // GET
             'assistantSave'       => $to('assistant_save'),             // POST
+            'assistantGenerateSops' => $to('generate_sops'),            // POST -> {sops: [...]}
             // Telegram (telegram_integrations)
             'telegramGet'         => $to('telegram'),                   // GET
             'telegramConnect'     => $to('telegram_connect'),           // POST
-            'telegramTest'        => $to('telegram_test'),              // POST
             'telegramDisconnect'  => $to('telegram_disconnect'),        // POST
+            'telegramForget'      => $to('telegram_forget'),            // POST
+            'telegramStaffLink'   => $to('telegram_staff_link'),        // POST -> {link}
+            'telegramStaffUnlink' => $to('telegram_staff_unlink'),      // POST
             // Google Calendar (google_calendar_integrations)
             'calendarGet'         => $to('google_calendar'),            // GET
             'calendarOauthStart'  => $to('google_calendar_oauth_start'),// GET -> {auth_url}
             'calendarCalendars'   => $to('google_calendar_calendars'),  // GET
             'calendarSave'        => $to('google_calendar_save'),       // POST
-            'calendarTest'        => $to('google_calendar_test'),       // POST
             'calendarDisconnect'  => $to('google_calendar_disconnect'), // POST
         ];
     }
@@ -112,7 +121,88 @@ final class ChatbotController
                 ['fa-solid fa-server', 'Server decides', 'The browser never chooses which records are read'],
             ],
             'settingsUrl' => url('customer', ['action' => 'settings']),
+            // Real AI pipeline (same as Telegram): see customerChatSend().
+            'sendUrl'     => url('customer', ['action' => 'chat_send']),
+            'previewUrl'  => url('customer', ['action' => 'system_message']),
+            'history'     => $this->webHistory((int) current_user()['id']),
         ]);
+    }
+
+    /**
+     * POST /?page=customer&action=chat_send  (JSON)
+     *
+     * Runs one message through the same pipeline as Telegram (configuration
+     * from PostgreSQL -> system message -> Flowise), as conversation
+     * "web-<user id>". Also tells the page why there was no AI answer
+     * (e.g. Flowise not set up yet), which Telegram customers never see.
+     */
+    public function customerChatSend(): void
+    {
+        $user    = require_login();
+        $message = trim((string) ($_POST['message'] ?? ''));
+
+        if ($message === '') {
+            json_response(false, ['errors' => ['message' => 'Type a message first.']], 'Type a message first.', 422);
+        }
+        if (mb_strlen($message) > 4000) {
+            json_response(false, ['errors' => ['message' => 'Keep the message under 4,000 characters.']], 'Message is too long.', 422);
+        }
+
+        $result = (new AssistantReplyService())->reply((int) $user['id'], 'web', 'web-' . $user['id'], $message, [
+            'customer_name' => (string) $user['name'],
+        ]);
+
+        json_response(true, [
+            'status'   => $result['status'],
+            'reply'    => $result['reply'],
+            'error'    => $result['error'],
+            'problems' => $result['problems'],
+        ]);
+    }
+
+    /**
+     * GET /?page=customer&action=system_message  (JSON)
+     *
+     * The exact system message and Flowise request this business would send,
+     * with the provider key and tool token masked. For checking the setup.
+     */
+    public function customerSystemMessage(): void
+    {
+        $user    = require_login();
+        $config  = (new AssistantConfigService())->forUser((int) $user['id']);
+        $system  = (new SystemMessageBuilder())->build($config);
+        $flowise = new FlowiseService();
+        $payload = $flowise->payload($config, $system, '<customer message>', 'web:' . $user['id'] . ':web-' . $user['id']);
+
+        if (isset($payload['overrideConfig']['vars']['provider_api_key'])) {
+            $key = (string) $payload['overrideConfig']['vars']['provider_api_key'];
+            $payload['overrideConfig']['vars']['provider_api_key'] = substr($key, 0, 7) . '…' . substr($key, -4);
+        }
+        if (!empty($payload['overrideConfig']['vars']['tool_token'])) {
+            $payload['overrideConfig']['vars']['tool_token'] = '(signed, valid 30 minutes)';
+        }
+        $payload['overrideConfig']['systemMessage'] = '(the system message above)';
+
+        json_response(true, [
+            'system_message'     => $system,
+            'payload'            => $payload,
+            'enabled'            => $config['enabled'],
+            'problems'           => $config['problems'],
+            'flowise_configured' => $flowise->isConfigured($config['provider']),
+            'model'              => $config['ai_model'],
+            'provider'           => $config['provider'],
+            'temperature'        => $config['temperature'],
+        ]);
+    }
+
+    /** Last web test messages, so the chat keeps its history on reload. */
+    private function webHistory(int $userId): array
+    {
+        try {
+            return (new ChatMessage())->recent($userId, 'web', 'web-' . $userId, 20);
+        } catch (Throwable $e) {
+            return []; // migration 007 not run yet
+        }
     }
 
     /** GET /?page=staff&action=settings */

@@ -10,6 +10,10 @@
  *
  * CSRF is enforced centrally for every POST, so a controller can never forget
  * it. Route-specific guards (AuthMiddleware, GuestMiddleware) run after that.
+ *
+ * The only exception is a route registered with $csrf = false: calls from
+ * other servers (Telegram webhook, Flowise tools) that cannot carry a browser
+ * CSRF token. Those controllers verify their own secret instead.
  */
 declare(strict_types=1);
 
@@ -19,7 +23,7 @@ use Src\Middleware\CsrfMiddleware;
 
 final class Router
 {
-    /** @var array<string, array<string, array{handler: callable|array{0:class-string,1:string}, middleware: array<int,class-string>}>> */
+    /** @var array<string, array<string, array{handler: callable|array{0:class-string,1:string}, middleware: array<int,class-string>, csrf: bool}>> */
     private array $routes = [];
 
     /** @param callable|array{0:class-string,1:string} $handler */
@@ -28,18 +32,22 @@ final class Router
         return $this->add('GET', $route, $handler, $middleware);
     }
 
-    /** @param callable|array{0:class-string,1:string} $handler */
-    public function post(string $route, callable|array $handler, array $middleware = []): self
+    /**
+     * @param callable|array{0:class-string,1:string} $handler
+     * @param bool $csrf false only for server-to-server endpoints that check their own secret
+     */
+    public function post(string $route, callable|array $handler, array $middleware = [], bool $csrf = true): self
     {
-        return $this->add('POST', $route, $handler, $middleware);
+        return $this->add('POST', $route, $handler, $middleware, $csrf);
     }
 
     /** @param callable|array{0:class-string,1:string} $handler */
-    private function add(string $method, string $route, callable|array $handler, array $middleware): self
+    private function add(string $method, string $route, callable|array $handler, array $middleware, bool $csrf = true): self
     {
         $this->routes[$method][trim($route, '/')] = [
             'handler'    => $handler,
             'middleware' => $middleware,
+            'csrf'       => $csrf,
         ];
 
         return $this;
@@ -67,7 +75,7 @@ final class Router
         $middleware = $definition['middleware'];
 
         // One CSRF gate for every POST - forms and fetch() calls both land here.
-        if ($method === 'POST' && !in_array(CsrfMiddleware::class, $middleware, true)) {
+        if ($method === 'POST' && $definition['csrf'] && !in_array(CsrfMiddleware::class, $middleware, true)) {
             array_unshift($middleware, CsrfMiddleware::class);
         }
 

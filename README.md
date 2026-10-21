@@ -181,6 +181,18 @@ so no Composer package is needed. Tokens are stored per user in the
    app is in "Testing", add your Google account under **Test users**.
 4. Run `C:\xampp\php\php.exe bin\migrate.php` to create `gmail_connections`.
 
+## AI replies: Telegram → Website → Flowise
+
+Customer messages to a business's Telegram bot are answered by its AI
+assistant: the website loads the company profile and AI settings from
+PostgreSQL, fills `src/Prompts/system_message.md`, asks Flowise and sends the
+reply back to the chat. The Customer **Chat Interface** page runs the same
+pipeline for testing. Setup, the exact Flowise request and the custom tool
+code are in [`docs/FLOWISE.md`](docs/FLOWISE.md).
+
+New `.env` settings: `PUBLIC_APP_URL`, `FLOWISE_API_URL`, `FLOWISE_CHATFLOW_ID`,
+`FLOWISE_API_KEY` (see `.env.example`). New table migration: `007`.
+
 ## Product & Service (AI Chatbot → Customer)
 
 Each signed-in user manages their own products and services at
