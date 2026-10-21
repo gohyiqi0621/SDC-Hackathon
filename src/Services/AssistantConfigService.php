@@ -117,8 +117,8 @@ final class AssistantConfigService
         $out     = ['customer_service' => '', 'booking_sop' => '', 'salesman_sop' => '', 'general' => ''];
         $current = 'general';
 
-        foreach (preg_split('/\R/', str_replace("\r\n", "\n", $instructions)) ?: [] as $line) {
-            if (preg_match('/^###\s+(.+?)\s*$/', $line, $m)) {
+        foreach (preg_split('/\R/u', str_replace("\r\n", "\n", $instructions)) ?: [] as $line) {
+            if (preg_match('/^###\s+(.+?)\s*$/u', $line, $m)) {
                 $current = self::SOP_HEADINGS[mb_strtolower($m[1])] ?? 'general';
                 continue;
             }

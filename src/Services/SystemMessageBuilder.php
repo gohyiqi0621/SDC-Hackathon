@@ -23,6 +23,37 @@ final class SystemMessageBuilder
         'company_background' => 'No company background has been provided.',
     ];
 
+    /** How an order's status is described to the AI. */
+    private const ORDER_STATUS = [
+        'pending_payment'   => 'UNPAID, waiting for the customer to pay and send the receipt',
+        'payment_submitted' => 'receipt received, staff are checking the payment',
+        'paid'              => 'PAID (payment successful), being prepared for shipping',
+        'shipped'           => 'PAID and SHIPPED',
+        'payment_rejected'  => 'payment rejected by staff, waiting for a new receipt',
+        'cancelled'         => 'cancelled',
+    ];
+
+    /** The "This customer's orders" section, newest first. */
+    private static function ordersSection(array $orders): string
+    {
+        $lines = [];
+        foreach ($orders as $order) {
+            $items = implode(', ', array_map(
+                static fn (array $i): string => $i['product_name'] . ' x' . (int) $i['quantity'],
+                $order['items'] ?? []
+            ));
+            $lines[] = '- ' . $order['order_no'] . ' (' . date('j M, g:i a', strtotime((string) $order['created_at'])) . '): '
+                . $items . ' - ' . format_money($order['total'], $order['currency']) . ' - '
+                . (self::ORDER_STATUS[$order['status']] ?? $order['status']);
+        }
+
+        return "## This customer's orders (newest first)\n" . implode("\n", $lines) . "\n\n"
+            . "- PAID, cancelled and receipt-received orders are finished: never put their items into a new order.\n"
+            . "- \"One more X\" or \"add X\" after a finished order means a NEW order with ONLY X (quantity as asked, 1 if not said).\n"
+            . "- If the newest order is UNPAID and the customer wants to change or add items, call buy_product once with the complete new list: the new order replaces the unpaid one.\n"
+            . "- When unsure what the customer wants in the new order, ask before calling buy_product.\n\n";
+    }
+
     /** reply_language => [name used in the prompt, how to write it] */
     public const LANGUAGES = [
         'en' => ['English', 'English'],
@@ -115,7 +146,7 @@ final class SystemMessageBuilder
      *        "same as customer" mode its language is stated in the prompt, which
      *        keeps the model from carrying on in the previous language.
      */
-    public function build(array $config, string $latestMessage = ''): string
+    public function build(array $config, string $latestMessage = '', array $recentOrders = []): string
     {
         $template = is_file(self::TEMPLATE) ? (string) file_get_contents(self::TEMPLATE) : '';
 
@@ -133,6 +164,14 @@ final class SystemMessageBuilder
         $setting = (string) ($config['reply_language'] ?? 'auto');
         [$values['language_rule'], $values['language_check']] = self::languageRules($setting);
 
+        // "Today" for bookings: the AI has no clock of its own.
+        $zone = new \DateTimeZone(date_default_timezone_get());
+        $now  = new \DateTimeImmutable('now', $zone);
+        $values['current_datetime'] = $now->format('l, j F Y, g:i A') . ' (' . $zone->getName() . ', UTC' . $now->format('P') . ')';
+        $values['timezone']         = $zone->getName();
+        $values['datetime_example'] = $now->setTime(15, 0)->modify('+1 day')->format('Y-m-d\TH:i:sP')
+                                    . ' for 3:00 PM tomorrow';
+
         $detected = !isset(self::LANGUAGES[$setting]) ? self::detectLanguage($latestMessage) : null;
         if ($detected !== null) {
             [$name, $write] = self::LANGUAGES[$detected];
@@ -147,10 +186,18 @@ final class SystemMessageBuilder
         }
 
         $message = (string) preg_replace_callback(
-            '/\{\{\s*([a-z_]+)\s*\}\}/',
+            '/\{\{\s*([a-z_]+)\s*\}\}/u',
             static fn (array $m): string => (string) ($values[$m[1]] ?? $m[0]),
             str_replace("\r\n", "\n", $template)
         );
+
+        // This customer's orders, before the final check.
+        if ($recentOrders !== []) {
+            $section = self::ordersSection($recentOrders);
+            $message = str_contains($message, '## Final check before every reply')
+                ? str_replace('## Final check before every reply', $section . '## Final check before every reply', $message)
+                : rtrim($message) . "\n\n" . $section;
+        }
 
         // Extra instructions go before the final language check, so it stays last.
         if (trim((string) $config['general']) !== '') {

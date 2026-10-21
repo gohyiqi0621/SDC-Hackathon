@@ -73,6 +73,11 @@
             btn.setAttribute('title', label);
         }
 
+        var brand = document.querySelector('[data-sidebar-brand]');
+        if (brand) {
+            brand.setAttribute('title', collapsed ? 'Open sidebar' : brand.dataset.brandTitle || 'Home');
+        }
+
         // With the labels hidden, a hover tooltip names each icon.
         document.querySelectorAll('.sidebar .nav-link').forEach(function (link) {
             var text = link.querySelector('span');
@@ -87,6 +92,13 @@
     if (root.classList.contains('sidebar-collapsed')) { setCollapsed(true); }
 
     document.addEventListener('click', function (e) {
+        var brand = e.target.closest('[data-sidebar-brand]');
+        if (brand && root.classList.contains('sidebar-collapsed') && window.matchMedia('(min-width: 901px)').matches) {
+            e.preventDefault();
+            setCollapsed(false);
+            return;
+        }
+
         if (e.target.closest('[data-sidebar-collapse]')) {
             setCollapsed(!root.classList.contains('sidebar-collapsed'));
             return;

@@ -7,8 +7,16 @@
  * Optional (Customer): $sendUrl, $previewUrl, $history - messages then go
  * through the real pipeline (PostgreSQL settings -> Flowise), the same one
  * Telegram uses. Without $sendUrl (Staff) replies are a frontend demo.
+ * Optional (Customer): $tab ('test' | 'conversations'), $tabUrls,
+ * $conversations, $thread - the view-only history of the AI with each
+ * customer (chat_messages), with that customer's orders.
  */
-view('layouts/header', ['title' => $title]);
+$sendUrl    = $sendUrl ?? null;
+$previewUrl = $previewUrl ?? null;
+$history    = $history ?? [];
+$tab        = $tab ?? null;
+$tabUrls = $tabUrls ?? [];
+view('layouts/header', ['title' => $title, 'styles' => $tab !== null ? ['assets/css/conversations.css'] : []]);
 ?>
 <section class="welcome-banner welcome-banner--compact">
     <div class="welcome-text">
@@ -23,6 +31,20 @@ view('layouts/header', ['title' => $title]);
 </section>
 
 <div class="page-body">
+    <?php if ($tabUrls !== []): ?>
+        <nav class="chat-tabs" aria-label="Chat interface sections">
+            <a href="<?= e($tabUrls['test']) ?>"<?= $tab === 'test' ? ' class="active" aria-current="page"' : '' ?>>
+                <i class="fa-regular fa-comments"></i> Test chat
+            </a>
+            <a href="<?= e($tabUrls['conversations']) ?>"<?= $tab === 'conversations' ? ' class="active" aria-current="page"' : '' ?>>
+                <i class="fa-solid fa-users"></i> Customer conversations
+            </a>
+        </nav>
+    <?php endif; ?>
+
+    <?php if ($tab === 'conversations'): ?>
+        <?php require __DIR__ . '/_conversations.php'; ?>
+    <?php else: ?>
     <div class="grid-main-side">
 
         <section class="panel chat-panel" data-chat<?= $sendUrl ? ' data-chat-endpoint="' . e($sendUrl) . '"' : '' ?>>
@@ -110,5 +132,6 @@ view('layouts/header', ['title' => $title]);
         </aside>
 
     </div>
+    <?php endif; ?>
 </div>
 <?php view('layouts/footer'); ?>

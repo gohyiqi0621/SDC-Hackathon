@@ -12,7 +12,9 @@ namespace Src\Controllers;
 use PDOException;
 use Src\Models\Category;
 use Src\Models\Product;
+use Src\Services\ProductImportService;
 use Src\Services\ProductService;
+use Throwable;
 
 final class ProductController
 {
@@ -158,6 +160,137 @@ final class ProductController
 
         flash('success', '"' . $product['name'] . '" was removed.', 'Product removed');
         redirect($this->backUrl());
+    }
+
+    /* ------------------------------------------------------------ import --- */
+
+    /**
+     * POST /?page=products&action=import_preview  (fetch, multipart "file")
+     *
+     * Reads the file, detects the columns and checks every row. Nothing is saved yet:
+     * the checked rows wait in the session until import_commit.
+     */
+    public function importPreview(): void
+    {
+        $user    = require_login();
+        $userId  = (int) $user['id'];
+        $service = new ProductImportService();
+        $file    = $_FILES['file'] ?? null;
+
+        $error = $service->fileError($file);
+        if ($error !== null) {
+            json_response(false, ['errors' => ['file' => $error]], $error, 422);
+        }
+
+        try {
+            $analysis = $service->analyse($userId, (string) $file['tmp_name'], $service->extension($file));
+        } catch (\RuntimeException $e) {
+            json_response(false, ['errors' => ['file' => $e->getMessage()]], $e->getMessage(), 422);
+        } catch (Throwable $e) {
+            error_log('[products import] ' . $e->getMessage());
+            json_response(false, null, 'The file could not be read. Save it as .csv or .xlsx and try again.', 422);
+        }
+
+        $token = bin2hex(random_bytes(16));
+        $_SESSION['product_import'] = [
+            'token'    => $token,
+            'user_id'  => $userId,
+            'analysis' => $analysis,
+        ];
+
+        $fields = [];
+        foreach (ProductImportService::DISPLAY_ORDER as $field) {
+            $fields[] = [
+                'field'    => $field,
+                'label'    => ProductImportService::FIELDS[$field]['label'],
+                'required' => ProductImportService::FIELDS[$field]['required'],
+                'column'   => $analysis['columns'][$field],
+            ];
+        }
+
+        $sample = array_map(static fn (array $row): array => $row['input'] + ['line' => $row['line']], array_slice($analysis['rows'], 0, 5));
+
+        json_response(true, [
+            'token'          => $token,
+            'file'           => (string) ($file['name'] ?? ''),
+            'fields'         => $fields,
+            'missing'        => $analysis['missing'],
+            'total'          => $analysis['total'],
+            'valid'          => count($analysis['rows']),
+            'skipped'        => array_slice($analysis['skipped'], 0, 100),
+            'skipped_count'  => count($analysis['skipped']),
+            'new_categories' => $analysis['new_categories'],
+            'sample'         => $sample,
+        ], 'File checked.');
+    }
+
+    /** POST /?page=products&action=import_commit  (token, create_categories=1) */
+    public function importCommit(): void
+    {
+        $user    = require_login();
+        $userId  = (int) $user['id'];
+        $pending = $_SESSION['product_import'] ?? null;
+        $token   = (string) ($_POST['token'] ?? '');
+
+        if (!is_array($pending) || (int) $pending['user_id'] !== $userId || !hash_equals((string) $pending['token'], $token)) {
+            json_response(false, null, 'This import has expired. Please upload the file again.', 409);
+        }
+
+        unset($_SESSION['product_import']);
+        $analysis = $pending['analysis'];
+
+        if ($analysis['rows'] === []) {
+            json_response(false, null, 'There are no valid rows to import.', 422);
+        }
+
+        try {
+            $result = (new ProductImportService())->commit($userId, $analysis, ($_POST['create_categories'] ?? '') === '1');
+        } catch (\RuntimeException $e) {
+            json_response(false, null, $e->getMessage(), 422);
+        } catch (Throwable $e) {
+            error_log('[products import] ' . $e->getMessage());
+            json_response(false, null, 'The import failed and nothing was saved. Please try again.', 500);
+        }
+
+        $message = $result['imported'] . ' product' . ($result['imported'] === 1 ? '' : 's') . ' imported';
+        if ($result['categories'] > 0) {
+            $message .= ', ' . $result['categories'] . ' new categor' . ($result['categories'] === 1 ? 'y' : 'ies') . ' added';
+        }
+        $skipped = count($analysis['skipped']) + count($result['skipped']);
+        if ($skipped > 0) {
+            $message .= '. ' . $skipped . ' row' . ($skipped === 1 ? ' was' : 's were') . ' skipped';
+        }
+        $message .= '.';
+
+        flash('success', $message, 'Import complete');
+        json_response(true, ['redirect' => url('products'), 'result' => $result], $message);
+    }
+
+    /** POST /?page=products&action=import_cancel - drop a checked file that will not be imported. */
+    public function importCancel(): void
+    {
+        require_login();
+        unset($_SESSION['product_import']);
+
+        json_response(true, null, 'Import cancelled. No products were added.');
+    }
+
+    /** GET /?page=products&action=import_template - a CSV with the expected columns. */
+    public function importTemplate(): void
+    {
+        require_login();
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="product-import-template.csv"');
+        header('Cache-Control: no-store');
+
+        $out = fopen('php://output', 'w');
+        fwrite($out, "\xEF\xBB\xBF"); // so Excel opens it as UTF-8
+        foreach ((new ProductImportService())->templateRows() as $row) {
+            fputcsv($out, $row, ',', '"', '');
+        }
+        fclose($out);
+        exit;
     }
 
     /* ---------------------------------------------------------- private ---- */

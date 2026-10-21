@@ -1,6 +1,6 @@
 <?php
 /**
- * dashboard/index.php - the home screen: the Smart SME AI email dashboard.
+ * dashboard/index.php - the home screen: the SME Smart AI email dashboard.
  *
  * Expects: $user, $brevoReady, $gmailReady, $gmailTable, $gmailEmail.
  *

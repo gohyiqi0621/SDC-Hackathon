@@ -19,7 +19,7 @@ $pageTitle = $pageTitle ?? 'Dashboard';
 <link rel="apple-touch-icon" href="<?= e(asset('icons/apple-touch-icon.png')) ?>">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="SDC">
+<meta name="apple-mobile-web-app-title" content="SME Smart">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="format-detection" content="telephone=no">
 <!-- Google Search Console ownership verification. Do not remove, even after

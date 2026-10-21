@@ -96,6 +96,29 @@ final class FlowiseService
 
         $reply = $this->parseReply($response['json'], $response['raw']);
         if ($reply === '') {
+            // Some models end with an empty answer after calling tools. The
+            // tools may already have done the work (order placed, slot booked),
+            // so answer from their results rather than "not available".
+            $usedTools = is_array($response['json']) ? (array) ($response['json']['usedTools'] ?? []) : [];
+            $fromTools = $this->replyFromTools($usedTools);
+            if ($fromTools !== '') {
+                FlowLog::write('flowise.empty_reply_recovered', ['source' => 'tool results', 'tools' => array_column($usedTools, 'tool')]);
+                return ['ok' => true, 'reply' => $fromTools, 'error' => null];
+            }
+
+            // Nothing usable: ask once more in the same conversation.
+            if (empty($context['_retry'])) {
+                FlowLog::write('flowise.empty_reply_retry', ['tools' => array_column($usedTools, 'tool')]);
+                $retry = $this->ask($config, $systemMessage,
+                    '(Note from the system: your previous answer to the customer was empty. Answer the customer\'s last message now, '
+                    . 'in their language, using the tool results you already have. Do not repeat buy_product or make_booking.) '
+                    . 'Customer\'s last message: ' . $question,
+                    $sessionId, $context + ['_retry' => '1']);
+                if ($retry['ok']) {
+                    return $retry;
+                }
+            }
+
             error_log('[flowise] empty reply');
             return ['ok' => false, 'reply' => '', 'error' => 'Flowise returned an empty reply.'];
         }
@@ -139,6 +162,46 @@ final class FlowiseService
                 'vars'          => $vars,
             ],
         ];
+    }
+
+    /**
+     * A customer reply built from the last successful tool call, used when the
+     * model returned no text. Only actions with a clear result are covered.
+     */
+    private function replyFromTools(array $usedTools): string
+    {
+        for ($i = count($usedTools) - 1; $i >= 0; $i--) {
+            $tool = (string) ($usedTools[$i]['tool'] ?? '');
+            $out  = $usedTools[$i]['toolOutput'] ?? null;
+            $data = is_string($out) ? json_decode($out, true) : (is_array($out) ? $out : null);
+            if (!is_array($data) || empty($data['success'])) {
+                continue;
+            }
+
+            if ($tool === 'buy_product' && !empty($data['order_no'])) {
+                $lines = array_map(static fn (array $l): string => '• ' . $l['quantity'] . ' × ' . $l['name'] . ' (' . $l['line_total'] . ')', (array) ($data['items'] ?? []));
+                $qr    = str_contains((string) ($data['payment_qr'] ?? ''), 'already been sent') ? "\nThe payment QR code has been sent in this chat." : '';
+                return "Your order {$data['order_no']} has been placed:\n" . implode("\n", $lines)
+                    . "\nTotal: {$data['total']}\n\nHow to pay: " . ($data['payment_instructions'] ?? '-') . $qr
+                    . "\n\nAfter paying, please send a photo or PDF of the payment receipt here. Our staff will verify it.";
+            }
+            if ($tool === 'make_booking' && !empty($data['booking_no'])) {
+                return "Your booking is confirmed! ✅\nBooking no.: {$data['booking_no']}\nWhen: {$data['when']}\nPax: {$data['pax']}"
+                    . (!empty($data['name']) ? "\nName: {$data['name']}" : '');
+            }
+            if ($tool === 'check_availability') {
+                if (!empty($data['free_times'])) {
+                    return "These times are available:\n• " . implode("\n• ", (array) $data['free_times']) . "\n\nWhich one would you like?";
+                }
+                if (isset($data['available'])) {
+                    return $data['available']
+                        ? "{$data['requested']} is available. Shall I book it for you?"
+                        : 'Sorry, ' . ($data['reason'] ?? 'that time is not available.')
+                            . (!empty($data['alternatives']) ? "\nAvailable instead:\n• " . implode("\n• ", (array) $data['alternatives']) : '');
+                }
+            }
+        }
+        return '';
     }
 
     /** Flowise usually answers {"text": "..."}; some flows answer a plain string or {"json": ...}. */

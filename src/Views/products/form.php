@@ -135,14 +135,6 @@ view('layouts/header', ['title' => $title]);
                             <p class="field-error" data-error-for="price"><?= e($errors['price'] ?? '') ?></p>
                         </div>
 
-                        <div class="field">
-                            <label for="promotion_price">Promotional price</label>
-                            <input id="promotion_price" name="promotion_price" type="text" inputmode="decimal"
-                                   placeholder="Optional" value="<?= e($v('promotion_price')) ?>"<?= $err('promotion_price') ?>>
-                            <p class="field-hint">Leave empty when there is no promotion. Cannot be higher than the selling price.</p>
-                            <p class="field-error" data-error-for="promotion_price"><?= e($errors['promotion_price'] ?? '') ?></p>
-                        </div>
-
                         <fieldset class="field">
                             <legend>Status</legend>
                             <div class="segmented">
