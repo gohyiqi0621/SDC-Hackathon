@@ -27,7 +27,8 @@ final class SystemMessageBuilder
     private const ORDER_STATUS = [
         'pending_payment'   => 'UNPAID, waiting for the customer to pay and send the receipt',
         'payment_submitted' => 'receipt received, staff are checking the payment',
-        'paid'              => 'PAID and finished',
+        'paid'              => 'PAID (payment successful), being prepared for shipping',
+        'shipped'           => 'PAID and SHIPPED',
         'payment_rejected'  => 'payment rejected by staff, waiting for a new receipt',
         'cancelled'         => 'cancelled',
     ];

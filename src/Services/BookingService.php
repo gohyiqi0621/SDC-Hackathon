@@ -175,7 +175,8 @@ final class BookingService
             $db->prepare('SELECT pg_advisory_xact_lock(?, ?)')->execute([$userId, 7_000_001]);
 
             // The AI repeating the same call: return the booking already made.
-            $same = $bookings->findSame($userId, $customer['channel'], $customer['customer_chat_id'], $start->format(DATE_ATOM));
+            $same = $bookings->findSame($userId, $customer['channel'], $customer['customer_chat_id'], $start->format(DATE_ATOM),
+                $pax, (string) $customer['customer_name']);
             if ($same !== null) {
                 $db->commit();
                 return ['ok' => true, 'booking' => $same, 'duplicate' => true, 'message' => 'This booking already exists.'];
@@ -223,8 +224,7 @@ final class BookingService
         $this->alertStaff($userId, $row, "📅 New booking {$row['booking_no']}\n"
             . 'Customer: ' . self::customerLabel($row) . "\n"
             . "When: {$when}\nPax: {$pax}"
-            . ($row['note'] ? "\nNote: {$row['note']}" : '')
-            . "\nSee all: " . PUBLIC_APP_URL . '/bookings');
+            . ($row['note'] ? "\nNote: {$row['note']}" : ''));
 
         return ['ok' => true, 'booking' => $row, 'message' => 'Booked.'];
     }
@@ -351,6 +351,41 @@ final class BookingService
                 : 'Only ' . $left . ($s['capacity_unit'] === 'pax' ? ' seat(s)' : ' booking(s)') . ' left at that time.'];
         }
         return [true, $used, ''];
+    }
+
+    /**
+     * Free start times from a date on (that day first, then the next open days),
+     * for "any time is fine" / "what times do you have?". Real slots only:
+     * opening hours, slot length, capacity and the Google Calendar.
+     *
+     * @return list<string> e.g. "Thursday 22 Oct, 4:00 PM"
+     */
+    public function freeTimes(int $userId, array $s, DateTimeImmutable $from, int $pax, int $limit = 6): array
+    {
+        $now    = new DateTimeImmutable('now', $s['zone']);
+        $google = new GoogleCalendarService();
+        $step   = new DateInterval('PT' . $s['minutes'] . 'M');
+        [$oh, $om] = array_map('intval', explode(':', $s['open_time']));
+        $out = [];
+
+        for ($day = 0; $day < 14 && count($out) < $limit; $day++) {
+            $date = $from->setTime(0, 0)->add(new DateInterval('P' . $day . 'D'));
+            if (!in_array((int) $date->format('N'), $s['open_days'], true)) {
+                continue;
+            }
+            $events = $google->events($this->accessToken($userId, $s), (string) $s['calendar_id'], $date, $date->add(new DateInterval('P1D')));
+            for ($slot = $date->setTime($oh, $om); $slot->format('Y-m-d') === $date->format('Y-m-d') && $slot->format('H:i') < $s['close_time'] && count($out) < $limit; $slot = $slot->add($step)) {
+                $end = $slot->add($step);
+                if ($this->ruleProblem($s, $slot, $end, $now, $pax) !== null) {
+                    continue;
+                }
+                [$ok] = $this->fits($s, $events, $slot, $end, $pax);
+                if ($ok) {
+                    $out[] = $slot->format('l j M, g:i A');
+                }
+            }
+        }
+        return $out;
     }
 
     /** Up to 3 free start times closest to the wanted time: same day first, then the next days. */

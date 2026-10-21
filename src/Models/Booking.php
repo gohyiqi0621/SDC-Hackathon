@@ -42,14 +42,21 @@ final class Booking
         return $stmt->fetch() ?: null;
     }
 
-    /** A confirmed booking of this customer at exactly this start time (a repeated tool call). */
-    public function findSame(int $userId, string $channel, string $chatId, string $startsAt): ?array
+    /**
+     * The AI repeating the same make_booking call: the same chat, start time,
+     * pax and name, made in the last 10 minutes. A different name or pax at
+     * the same time is a real second booking (e.g. booking for a friend).
+     */
+    public function findSame(int $userId, string $channel, string $chatId, string $startsAt, int $pax, string $name): ?array
     {
         $stmt = Database::connection()->prepare(
             "SELECT * FROM bookings WHERE user_id = ? AND channel = ? AND customer_chat_id = ?
-                AND status = 'confirmed' AND starts_at = ?::timestamptz LIMIT 1"
+                AND status = 'confirmed' AND starts_at = ?::timestamptz AND pax = ?
+                AND LOWER(COALESCE(customer_name, '')) = LOWER(?)
+                AND created_at > CURRENT_TIMESTAMP - INTERVAL '10 minutes'
+              ORDER BY id DESC LIMIT 1"
         );
-        $stmt->execute([$userId, $channel, $chatId, $startsAt]);
+        $stmt->execute([$userId, $channel, $chatId, $startsAt, $pax, trim($name)]);
         return $stmt->fetch() ?: null;
     }
 

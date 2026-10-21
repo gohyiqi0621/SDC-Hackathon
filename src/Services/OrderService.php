@@ -93,19 +93,58 @@ final class OrderService
         // Staff alert with the approve link: never into the customer's own chat
         // (when you test with the same Telegram account that is linked as staff).
         $staff = (string) ($integration['staff_telegram_chat_id'] ?? '');
-        if ($staff !== '' && $staff !== $chatId) {
+        if ($staff === '' || $staff === $chatId) {
+            FlowLog::write('staff.alert_skipped', ['order_no' => $order['order_no'],
+                'reason' => $staff === '' ? 'no staff chat linked' : 'staff chat is the same Telegram account as the customer']);
+        } else {
             $caption = "🧾 Payment receipt to review\n"
                 . "Order: {$order['order_no']}\n"
                 . 'Customer: ' . $this->customerLabel($order) . "\n"
                 . "Total: {$total}\n"
-                . $this->itemSummary((int) $order['id']) . "\n"
-                . 'Approve or reject: ' . PUBLIC_APP_URL . '/orders?status=payment_submitted';
+                . $this->itemSummary((int) $order['id']);
             if (!$telegram->copyMessage($token, $staff, $chatId, (int) $message['message_id'], $caption)) {
                 $telegram->sendText($token, $staff, $caption);
             }
         }
 
         return true;
+    }
+
+    /**
+     * Tell the staff chat that a customer placed a new order (buy_product).
+     * Never sent into the customer's own chat. Returns true when sent.
+     */
+    public function alertStaffNewOrder(int $userId, array $order): bool
+    {
+        if ($order['channel'] !== 'telegram') {
+            return false;
+        }
+        $integration = (new TelegramIntegration())->find($userId);
+        $staff       = (string) ($integration['staff_telegram_chat_id'] ?? '');
+        if ($integration === null || empty($integration['bot_token_encrypted']) || $staff === ''
+            || $staff === (string) $order['customer_chat_id']) {
+            FlowLog::write('staff.alert_skipped', ['order_no' => $order['order_no'],
+                'reason' => $staff === '' ? 'no staff chat linked'
+                    : ($staff === (string) $order['customer_chat_id'] ? 'staff chat is the same Telegram account as the customer' : 'no bot token')]);
+            return false;
+        }
+        try {
+            $token = Crypto::decrypt((string) $integration['bot_token_encrypted']);
+        } catch (RuntimeException $e) {
+            return false;
+        }
+
+        $text = "🛒 New order {$order['order_no']}\n"
+            . 'Customer: ' . $this->customerLabel($order) . "\n"
+            . 'Total: ' . format_money($order['total'], $order['currency']) . "\n"
+            . $this->itemSummary((int) $order['id'])
+            . (!empty($order['delivery_note']) ? "\nNote: {$order['delivery_note']}" : '') . "\n"
+            . "Waiting for the customer's payment receipt. You will get another message when it arrives.\n"
+            . 'Orders: ' . PUBLIC_APP_URL . '/?page=orders';
+        $sent = (new TelegramService())->sendText($token, $staff, $text);
+        FlowLog::write('staff.new_order_alert', ['order_no' => $order['order_no'], 'sent' => $sent]);
+
+        return $sent;
     }
 
     /**
@@ -143,8 +182,9 @@ final class OrderService
     /** Staff approved the receipt. */
     public function approve(int $userId, array $order): array
     {
-        if (!in_array($order['status'], ['payment_submitted', 'payment_rejected', 'pending_payment'], true)) {
-            throw new RuntimeException('Only orders awaiting payment can be approved.');
+        // Only after the customer sent a receipt.
+        if ($order['status'] !== 'payment_submitted' || empty($order['receipt_path'])) {
+            throw new RuntimeException('The customer has not sent a payment receipt for this order yet.');
         }
 
         $order = (new Order())->update($userId, (int) $order['id'], [
@@ -164,7 +204,7 @@ final class OrderService
     /** Staff rejected the receipt: the customer can send a new one. */
     public function reject(int $userId, array $order, string $reason): array
     {
-        if (!in_array($order['status'], ['payment_submitted', 'pending_payment'], true)) {
+        if ($order['status'] !== 'payment_submitted') {
             throw new RuntimeException('Only orders with a receipt to review can be rejected.');
         }
 
@@ -185,11 +225,28 @@ final class OrderService
         return ['order' => $order, 'notified' => $sent];
     }
 
+    /** Staff sent the order out: "Shipped", the customer is told on Telegram. */
+    public function ship(int $userId, array $order): array
+    {
+        if ($order['status'] !== 'paid') {
+            throw new RuntimeException('Only orders with a successful payment can be marked as shipped.');
+        }
+
+        $order = (new Order())->update($userId, (int) $order['id'], ['status' => 'shipped', 'shipped_at' => date('c')]) ?? $order;
+        $text  = "📦 Your order {$order['order_no']} has been shipped!\nThank you for shopping with us. Reply here if you have any questions.";
+        $sent  = $this->notifyCustomer($userId, $order, $text);
+        $this->remember($userId, $order, 'assistant', $text);
+
+        FlowLog::write('order.shipped', ['order_no' => $order['order_no'], 'customer_notified' => $sent]);
+
+        return ['order' => $order, 'notified' => $sent];
+    }
+
     /** Staff cancelled the order. */
     public function cancel(int $userId, array $order): array
     {
-        if (in_array($order['status'], ['paid', 'cancelled'], true)) {
-            throw new RuntimeException('Paid or cancelled orders cannot be cancelled.');
+        if (in_array($order['status'], ['paid', 'shipped', 'cancelled'], true)) {
+            throw new RuntimeException('Paid, shipped or cancelled orders cannot be cancelled.');
         }
 
         $order = (new Order())->update($userId, (int) $order['id'], ['status' => 'cancelled', 'reviewed_at' => date('c')]) ?? $order;

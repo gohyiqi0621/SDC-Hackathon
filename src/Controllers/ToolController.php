@@ -62,7 +62,7 @@ final class ToolController
         $limit    = max(1, min(20, (int) ($input['limit'] ?? 10)));
 
         $sql    = "SELECT p.name, p.sku, c.name AS category, p.description, p.characteristics,
-                          p.price, p.promotion_price, p.currency
+                          p.price, p.currency
                      FROM products p
                      JOIN product_categories c ON c.id = p.category_id AND c.user_id = p.user_id
                     WHERE p.user_id = ? AND p.status = 'active'";
@@ -82,8 +82,6 @@ final class ToolController
         $stmt->execute($params);
 
         $products = array_map(static function (array $row): array {
-            $onPromo = $row['promotion_price'] !== null;
-
             return [
                 'name'            => $row['name'],
                 'sku'             => $row['sku'],
@@ -91,8 +89,6 @@ final class ToolController
                 'description'     => $row['description'],
                 'characteristics' => $row['characteristics'],
                 'price'           => format_money($row['price'], $row['currency']),
-                'promotion_price' => $onPromo ? format_money($row['promotion_price'], $row['currency']) : null,
-                'price_to_pay'    => format_money($onPromo ? $row['promotion_price'] : $row['price'], $row['currency']),
                 // There is no stock column yet; every active product counts as available.
                 'stock_status'    => 'available',
             ];
@@ -149,7 +145,7 @@ final class ToolController
                 'product_id'   => (int) $product['id'],
                 'product_name' => (string) $product['name'],
                 'sku'          => $product['sku'],
-                'unit_price'   => (string) ($product['promotion_price'] ?? $product['price']),
+                'unit_price'   => (string) $product['price'],
                 'quantity'     => $qty,
             ];
         }
@@ -172,7 +168,7 @@ final class ToolController
         }
         if ($locked !== null) {
             [$remaining, $contained, $sameItems] = $this->subtractItems($items, $locked['items']);
-            $lockedLabel = $locked['order_no'] . ($locked['status'] === 'paid' ? ' (already paid)' : ' (receipt sent, being checked)');
+            $lockedLabel = $locked['order_no'] . (in_array($locked['status'], ['paid', 'shipped'], true) ? ' (already paid)' : ' (receipt sent, being checked)');
 
             if ($sameItems && strtotime((string) $locked['created_at']) > time() - 600) {
                 $this->fail('The order was NOT created: these are exactly the items of order ' . $lockedLabel . '. '
@@ -288,6 +284,11 @@ final class ToolController
         $input = $this->input();
         FlowLog::write('tool.check_availability', ['user_id' => $auth['user_id'], 'input' => $input]);
 
+        // No time given ("any time is fine", "what times do you have?"): list real free times.
+        if (trim((string) ($input['time'] ?? '')) === '') {
+            $this->freeTimesAnswer($auth['user_id'], $input);
+        }
+
         [$service, $s, $start, $pax] = $this->bookingRequest($auth['user_id'], $input);
 
         try {
@@ -386,6 +387,39 @@ final class ToolController
 
     /* ---------------------------------------------------------- private ---- */
 
+    /** check_availability without a time: the next free start times from that date (or tomorrow). */
+    private function freeTimesAnswer(int $userId, array $input): never
+    {
+        $service = new BookingService();
+        try {
+            $s = $service->settings($userId);
+        } catch (Throwable $e) {
+            $this->bookingError($e);
+        }
+
+        $date = trim((string) ($input['date'] ?? ''));
+        $from = preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)
+            ? (\DateTimeImmutable::createFromFormat('!Y-m-d', $date, $s['zone']) ?: new \DateTimeImmutable('today', $s['zone']))
+            : new \DateTimeImmutable('today', $s['zone']);
+        $pax  = max(1, min(1000, (int) ($input['pax'] ?? 1)));
+
+        try {
+            $times = $service->freeTimes($userId, $s, $from, $pax);
+        } catch (Throwable $e) {
+            $this->bookingError($e);
+        }
+
+        FlowLog::write('tool.check_availability_list', ['from' => $from->format('Y-m-d'), 'count' => count($times)]);
+        $this->json(200, [
+            'success'    => true,
+            'free_times' => $times,
+            'rules'      => BookingService::rulesText($s),
+            'next_step'  => $times === []
+                ? 'There are no free times in the next 2 weeks. Tell the customer and offer to pass the request to staff.'
+                : 'Offer the customer ONLY these free times (do not add other times). When they choose one, confirm it, then call make_booking.',
+        ]);
+    }
+
     /** @return array{0: BookingService, 1: array, 2: \DateTimeImmutable, 3: int} */
     private function bookingRequest(int $userId, array $input): array
     {
@@ -400,9 +434,9 @@ final class ToolController
         $time  = trim((string) ($input['time'] ?? ''));
         $start = $service->parseStart($date, $time, $s['zone']);
         if ($start === null) {
-            $this->fail('Give the date as YYYY-MM-DD and the time as HH:MM (24-hour), e.g. date "'
-                . (new \DateTimeImmutable('tomorrow', $s['zone']))->format('Y-m-d') . '", time "19:30". '
-                . 'Today is ' . (new \DateTimeImmutable('now', $s['zone']))->format('l, Y-m-d H:i') . ' (' . $s['zone']->getName() . ').');
+            $this->fail('Give the date as YYYY-MM-DD and the time in 12-hour format with AM/PM, e.g. date "'
+                . (new \DateTimeImmutable('tomorrow', $s['zone']))->format('Y-m-d') . '", time "7:30 PM". '
+                . 'Today is ' . (new \DateTimeImmutable('now', $s['zone']))->format('l, Y-m-d g:i A') . ' (' . $s['zone']->getName() . ').');
         }
 
         $pax = (int) ($input['pax'] ?? $input['people'] ?? $input['guests'] ?? 1);
@@ -493,7 +527,7 @@ final class ToolController
     private function closestProduct(int $userId, string $name): ?array
     {
         $stmt = Database::connection()->prepare(
-            "SELECT id, name, sku, price, promotion_price, currency FROM products WHERE user_id = ? AND status = 'active'"
+            "SELECT id, name, sku, price, currency FROM products WHERE user_id = ? AND status = 'active'"
         );
         $stmt->execute([$userId]);
 
@@ -609,23 +643,46 @@ final class ToolController
 
     /**
      * Find one active product by SKU, exact name, or a unique partial name.
+     * A SKU anywhere in the text wins ("Single Subject Tuition (PL-00002)"),
+     * so products that share a name can still be told apart.
      *
      * @return array{0: ?array, 1: string} [product row or null, problem message]
      */
     private function matchProduct(int $userId, string $name): array
     {
         $db   = Database::connection();
-        $base = "SELECT id, name, sku, price, promotion_price, currency FROM products WHERE user_id = ? AND status = 'active'";
+        $base = "SELECT p.id, p.name, p.sku, p.price, p.currency, c.name AS category
+                   FROM products p LEFT JOIN product_categories c ON c.id = p.category_id
+                  WHERE p.user_id = ? AND p.status = 'active'";
 
-        $stmt = $db->prepare($base . ' AND (LOWER(sku) = LOWER(?) OR LOWER(name) = LOWER(?)) ORDER BY id LIMIT 2');
+        // 1. A SKU written anywhere in the item text.
+        $stmt = $db->prepare($base . " AND COALESCE(p.sku, '') <> ''");
+        $stmt->execute([$userId]);
+        $bySku = [];
+        foreach ($stmt->fetchAll() as $p) {
+            if (preg_match('/(?<![\p{L}\p{N}])' . preg_quote((string) $p['sku'], '/') . '(?![\p{L}\p{N}])/iu', $name)) {
+                $bySku[(int) $p['id']] = $p;
+            }
+        }
+        if (count($bySku) === 1) {
+            return [reset($bySku), ''];
+        }
+
+        // 2. Exact name (or SKU on its own).
+        $stmt = $db->prepare($base . ' AND (LOWER(p.sku) = LOWER(?) OR LOWER(p.name) = LOWER(?)) ORDER BY p.id LIMIT 6');
         $stmt->execute([$userId, $name, $name]);
         $exact = $stmt->fetchAll();
         if (count($exact) === 1) {
             return [$exact[0], ''];
         }
+        if (count($exact) > 1) {
+            return [null, $this->ambiguous($name, $exact)];
+        }
 
-        $like = '%' . addcslashes(mb_strtolower($name), '%_\\') . '%';
-        $stmt = $db->prepare($base . ' AND LOWER(name) LIKE ? ORDER BY LOWER(name) LIMIT 6');
+        // 3. Part of a name, without anything in brackets ("Nasi Lemak (special)").
+        $plain = trim(preg_replace('/\s*[\(\[].*?[\)\]]\s*/u', ' ', $name) ?? $name) ?: $name;
+        $like  = '%' . addcslashes(mb_strtolower($plain), '%_\\') . '%';
+        $stmt  = $db->prepare($base . ' AND LOWER(p.name) LIKE ? ORDER BY LOWER(p.name) LIMIT 6');
         $stmt->execute([$userId, $like]);
         $found = $stmt->fetchAll();
 
@@ -634,15 +691,34 @@ final class ToolController
         }
         if ($found === []) {
             // Small spelling differences ("Teh O Ais Limau" vs "TEH OH AIS LIMAU").
-            $close = $this->closestProduct($userId, $name);
+            $close = $this->closestProduct($userId, $plain);
             if ($close !== null) {
                 return [$close, ''];
             }
             return [null, 'No active product matches "' . $name . '" (use check_product to see what is available).'];
         }
 
-        return [null, '"' . $name . '" matches several products: '
-            . implode(', ', array_map(static fn (array $p): string => $p['name'], $found)) . '. Ask which one.'];
+        return [null, $this->ambiguous($name, $found)];
+    }
+
+    /** Several products fit: list them with SKU, category and price so the AI can ask and then order by SKU. */
+    private function ambiguous(string $name, array $products): string
+    {
+        $list = array_map(static function (array $p): string {
+            $bits = array_filter([
+                !empty($p['sku']) ? 'SKU ' . $p['sku'] : null,
+                !empty($p['category']) ? $p['category'] : null,
+                format_money($p['price'], $p['currency']),
+            ]);
+            return $p['name'] . ' (' . implode(', ', $bits) . ')';
+        }, $products);
+
+        $withSku = array_values(array_filter($products, static fn (array $p): bool => !empty($p['sku'])));
+        $hint    = $withSku !== []
+            ? ' Ask the customer which one, then put its SKU in items, e.g. "' . $withSku[0]['sku'] . ' x1".'
+            : ' Ask the customer which one.';
+
+        return '"' . $name . '" matches several products: ' . implode('; ', $list) . '.' . $hint;
     }
 
     private function input(): array

@@ -188,9 +188,7 @@ TXT;
         if ($products !== []) {
             $lines[] = 'Products and services (active):';
             foreach ($products as $p) {
-                $price = $p['promotion_price'] !== null && $p['promotion_price'] !== ''
-                    ? $p['currency'] . ' ' . $p['promotion_price'] . ' (promo, normally ' . $p['price'] . ')'
-                    : $p['currency'] . ' ' . $p['price'];
+                $price = $p['currency'] . ' ' . $p['price'];
                 $lines[] = '- ' . $p['name'] . ' [' . $p['category'] . '] ' . $price;
             }
         } else {

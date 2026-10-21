@@ -107,7 +107,7 @@ $to        = min($total, $page * $perPage);
             <div class="empty-state">
                 <div class="empty-icon"><i class="fa-solid fa-box-open"></i></div>
                 <h3>No products or services yet</h3>
-                <p>Add what you sell, with prices, promotions and details, so the customer assistant can answer questions about it.</p>
+                <p>Add what you sell, with prices and details, so the customer assistant can answer questions about it.</p>
                 <a class="primary-btn" href="<?= e($categories === [] ? url('categories') : url('products', ['action' => 'create'])) ?>">
                     <i class="fa-solid fa-plus"></i> <?= $categories === [] ? 'Create a category first' : 'Add your first product' ?>
                 </a>
@@ -130,7 +130,6 @@ $to        = min($total, $page * $perPage);
                             <th>SKU</th>
                             <th>Category</th>
                             <th class="num">Price</th>
-                            <th class="num">Promo price</th>
                             <th>Status</th>
                             <th class="actions"><span class="sr-only">Actions</span></th>
                         </tr>
@@ -158,12 +157,7 @@ $to        = min($total, $page * $perPage);
                                     <a class="badge" href="<?= e(url('products', ['category' => $product['category_id']])) ?>"><?= e($product['category_name']) ?></a>
                                 </td>
                                 <td data-label="Price" class="num">
-                                    <span class="<?= $product['promotion_price'] !== null ? 'price-old' : '' ?>"><?= e(format_money($product['price'], $product['currency'])) ?></span>
-                                </td>
-                                <td data-label="Promo price" class="num">
-                                    <?= $product['promotion_price'] !== null
-                                        ? '<strong class="price-promo">' . e(format_money($product['promotion_price'], $product['currency'])) . '</strong>'
-                                        : '<span class="muted">—</span>' ?>
+                                    <?= e(format_money($product['price'], $product['currency'])) ?>
                                 </td>
                                 <td data-label="Status">
                                     <?php if ($product['status'] === 'active'): ?>
