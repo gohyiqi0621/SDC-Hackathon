@@ -23,3 +23,5 @@ composer.lock
 
 # User-uploaded product images
 public/uploads/products/
+
+.workbuddy-ai/
