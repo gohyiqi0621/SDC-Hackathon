@@ -209,6 +209,44 @@ function require_login(): array
     return \Src\Services\AuthService::requireUser();
 }
 
+/* -------------------------------------------------------- finance role ---- */
+
+/**
+ * The role used on the Financial pages: "user" (view and submit) or
+ * "supervisor" (also edit, approve, reject, mark paid and delete).
+ *
+ * This is a demo switch kept in the session - anyone signed in can flip it
+ * from the Financial pages - so the hackathon demo can show both views.
+ */
+function finance_role(): string
+{
+    return ($_SESSION['finance_role'] ?? 'user') === 'supervisor' ? 'supervisor' : 'user';
+}
+
+function is_supervisor(): bool
+{
+    return finance_role() === 'supervisor';
+}
+
+/** Stop the request unless the Financial role is Supervisor. */
+function require_supervisor(string $doing = 'do that'): void
+{
+    if (is_supervisor()) {
+        return;
+    }
+
+    $message = 'Only a supervisor can ' . $doing . '. Switch to Supervisor to continue.';
+
+    if (wants_json()) {
+        json_response(false, ['errors' => ['form' => $message]], $message, 403);
+    }
+
+    flash('error', $message, 'Supervisor only');
+
+    $back = (string) ($_POST['return'] ?? $_SERVER['HTTP_REFERER'] ?? '');
+    redirect(str_starts_with($back, APP_URL . '/') ? $back : url('financial', ['action' => 'invoice']));
+}
+
 /** Up to two initials for the avatar circle: "Goh Yi Qi" -> "GY". */
 function initials_of(?array $user): string
 {
@@ -275,9 +313,7 @@ function nav_items(): array
             'group'    => 'Workspace',
             'children' => [
                 ['key' => 'financial/invoice',    'label' => 'Invoice',        'icon' => 'fa-solid fa-file-invoice',        'url' => url('financial', ['action' => 'invoice'])],
-                ['key' => 'financial/upload',     'label' => 'Upload Invoice', 'icon' => 'fa-solid fa-cloud-arrow-up',      'url' => url('financial', ['action' => 'upload']), 'match' => ['financial/upload', 'financial/edit']],
-                ['key' => 'financial/claims',     'label' => 'Claims',         'icon' => 'fa-solid fa-receipt',             'url' => url('financial', ['action' => 'claims']), 'match' => ['financial/claims', 'financial/claim_new', 'financial/claim_edit']],
-                ['key' => 'financial/settlement', 'label' => 'Settlement',     'icon' => 'fa-solid fa-scale-balanced',      'url' => url('financial', ['action' => 'settlement'])],
+                ['key' => 'financial/claims',     'label' => 'Claims',         'icon' => 'fa-solid fa-receipt',             'url' => url('financial', ['action' => 'claims'])],
             ],
         ],
         [
@@ -356,11 +392,6 @@ function page_title_for(string $key): string
         'profile'             => 'Profile',
         'financial/invoice'   => 'Invoice',
         'financial/claims'    => 'Claims',
-        'financial/settlement'=> 'Settlement',
-        'financial/upload'    => 'Upload Invoice',
-        'financial/edit'      => 'Edit Invoice',
-        'financial/claim_new' => 'New Claim',
-        'financial/claim_edit'=> 'Edit Claim',
         'customer/settings'   => 'AI Settings & Integration',
         'customer/chat'       => 'Customer Chat Interface',
         'staff/settings'      => 'Staff Setting & Integration',

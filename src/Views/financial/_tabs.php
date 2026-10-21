@@ -1,26 +1,37 @@
 <?php
 /**
- * financial/_tabs.php - switcher between the four Financial pages.
- * The sidebar lists them too; this keeps them one tap away on phones.
+ * financial/_tabs.php - Invoice / Claims switcher, plus the role switch.
+ *
+ * The sidebar lists both pages too; this keeps them one tap away on phones.
+ * The role switch (User / Supervisor) only exists on the Financial pages:
+ * a Supervisor can edit, approve, reject, mark paid and delete; a User can
+ * view and submit.
  */
 $current = page_key();
-// Pages reached from a tab keep that tab lit (editing an invoice, the claim form).
-$current = [
-    'financial/edit'       => 'financial/upload',
-    'financial/claim_new'  => 'financial/claims',
-    'financial/claim_edit' => 'financial/claims',
-][$current] ?? $current;
-$tabs = [
-    'financial/invoice'    => ['Invoice',        'fa-solid fa-file-invoice',   url('financial', ['action' => 'invoice'])],
-    'financial/upload'     => ['Upload Invoice', 'fa-solid fa-cloud-arrow-up', url('financial', ['action' => 'upload'])],
-    'financial/claims'     => ['Claims',         'fa-solid fa-receipt',        url('financial', ['action' => 'claims'])],
-    'financial/settlement' => ['Settlement',     'fa-solid fa-scale-balanced', url('financial', ['action' => 'settlement'])],
+$role    = finance_role();
+$tabs    = [
+    'financial/invoice' => ['Invoice', 'fa-solid fa-file-invoice', url('financial', ['action' => 'invoice'])],
+    'financial/claims'  => ['Claims',  'fa-solid fa-receipt',      url('financial', ['action' => 'claims'])],
 ];
 ?>
-<nav class="page-tabs" aria-label="Financial sections">
-    <?php foreach ($tabs as $key => [$label, $icon, $href]): ?>
-        <a class="page-tab<?= $current === $key ? ' active' : '' ?>" href="<?= e($href) ?>"<?= $current === $key ? ' aria-current="page"' : '' ?>>
-            <i class="<?= e($icon) ?>"></i> <?= e($label) ?>
-        </a>
-    <?php endforeach; ?>
-</nav>
+<div class="page-tabs-row">
+    <nav class="page-tabs" aria-label="Financial sections">
+        <?php foreach ($tabs as $key => [$label, $icon, $href]): ?>
+            <a class="page-tab<?= $current === $key ? ' active' : '' ?>" href="<?= e($href) ?>"<?= $current === $key ? ' aria-current="page"' : '' ?>>
+                <i class="<?= e($icon) ?>"></i> <?= e($label) ?>
+            </a>
+        <?php endforeach; ?>
+    </nav>
+
+    <form class="role-switch" method="post" action="<?= e(url('financial', ['action' => 'role'])) ?>" aria-label="Viewing as">
+        <?= csrf_field() ?>
+        <input type="hidden" name="return" value="<?= e(url('financial', ['action' => $current === 'financial/claims' ? 'claims' : 'invoice'])) ?>">
+        <span class="role-switch-label">Viewing as</span>
+        <button type="submit" name="role" value="user" class="<?= $role === 'user' ? 'active' : '' ?>"<?= $role === 'user' ? ' aria-pressed="true"' : ' aria-pressed="false"' ?>>
+            <i class="fa-solid fa-user"></i> User
+        </button>
+        <button type="submit" name="role" value="supervisor" class="<?= $role === 'supervisor' ? 'active' : '' ?>"<?= $role === 'supervisor' ? ' aria-pressed="true"' : ' aria-pressed="false"' ?>>
+            <i class="fa-solid fa-user-shield"></i> Supervisor
+        </button>
+    </form>
+</div>
