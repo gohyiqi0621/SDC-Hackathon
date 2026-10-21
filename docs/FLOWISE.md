@@ -158,7 +158,7 @@ buy_product
 
 **Tool Description**
 ```
-Place an order for the customer in this chat. Only call it after the customer has clearly confirmed the exact products and quantities (check them with check_product first). It creates an order that is awaiting payment and returns the order number, the items, the total and the payment instructions. Tell the customer all of these and ask them to send a photo or PDF of the payment receipt in this chat. Never say the order is paid or confirmed: staff verify the receipt first. If it returns success=false, explain the message to the customer and ask again.
+Place an order for the customer in this chat. Call it ONCE per order, and only after the customer has clearly confirmed the exact products and quantities (check them with check_product first). Never call it again after it succeeded. Include only the items of this order, not items from earlier paid orders. It creates an order that is awaiting payment and returns the order number, the items, the total and the payment instructions. Tell the customer all of these and ask them to send a photo or PDF of the payment receipt in this chat. Never say the order is paid or confirmed: staff verify the receipt first. If it returns success=false, explain the message to the customer and ask again.
 ```
 
 **Input Schema**

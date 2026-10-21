@@ -18,6 +18,7 @@ declare(strict_types=1);
 namespace Src\Services;
 
 use Src\Models\ChatMessage;
+use Src\Models\Order;
 use Src\Support\FlowLog;
 use Throwable;
 
@@ -59,7 +60,15 @@ final class AssistantReplyService
             return ['status' => 'skipped', 'reply' => null, 'error' => 'The AI assistant is switched off in AI Settings.', 'problems' => $config['problems']];
         }
 
-        $systemMessage = (new SystemMessageBuilder())->build($config, $message);
+        // This customer's latest orders, so "one more roti" is not mixed up
+        // with an order that was already paid.
+        try {
+            $recentOrders = (new Order())->recentForChat($userId, $channel, $chatId, 3);
+        } catch (Throwable $e) {
+            $recentOrders = []; // orders table not created yet
+        }
+
+        $systemMessage = (new SystemMessageBuilder())->build($config, $message, $recentOrders);
         $sessionId     = $channel . ':' . $userId . ':' . $chatId;
         $context      += ['channel' => $channel, 'customer_chat_id' => $chatId];
 

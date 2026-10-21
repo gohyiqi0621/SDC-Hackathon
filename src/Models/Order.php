@@ -45,8 +45,11 @@ final class Order
             $total = self::addMoney($total, $line);
         }
 
-        $db = Database::connection();
-        $db->beginTransaction();
+        $db  = Database::connection();
+        $own = !$db->inTransaction(); // the caller may already hold a transaction (and a lock)
+        if ($own) {
+            $db->beginTransaction();
+        }
 
         try {
             $row = null;
@@ -79,9 +82,13 @@ final class Order
                                     $item['unit_price'], $item['quantity'], $item['line_total']]);
             }
 
-            $db->commit();
+            if ($own) {
+                $db->commit();
+            }
         } catch (\Throwable $e) {
-            $db->rollBack();
+            if ($own) {
+                $db->rollBack();
+            }
             throw $e;
         }
 
@@ -94,6 +101,77 @@ final class Order
         $stmt->execute([$userId, $id]);
 
         return $stmt->fetch() ?: null;
+    }
+
+    /**
+     * This customer's latest orders, newest first, each with its items
+     * (used to tell the AI what was already ordered and paid).
+     *
+     * @return list<array> orders rows with an extra 'items' list
+     */
+    public function recentForChat(int $userId, string $channel, string $chatId, int $limit = 3): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT * FROM orders WHERE user_id = ? AND channel = ? AND customer_chat_id = ?
+              ORDER BY created_at DESC, id DESC LIMIT ' . max(1, min(10, $limit))
+        );
+        $stmt->execute([$userId, $channel, $chatId]);
+        $orders = $stmt->fetchAll();
+
+        $items = $this->itemsFor(array_map(static fn (array $o): int => (int) $o['id'], $orders));
+        foreach ($orders as $i => $order) {
+            $orders[$i]['items'] = $items[(int) $order['id']] ?? [];
+        }
+        return $orders;
+    }
+
+    /**
+     * An unpaid order of this customer with exactly these items, placed in the
+     * last $minutes (the AI sometimes calls buy_product twice for one order).
+     *
+     * @param list<array{product_id:int, quantity:int}> $items
+     */
+    public function findSamePending(int $userId, string $channel, string $chatId, array $items, int $minutes = 15): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT * FROM orders
+              WHERE user_id = ? AND channel = ? AND customer_chat_id = ? AND status = 'pending_payment'
+                AND created_at > CURRENT_TIMESTAMP - (? * INTERVAL '1 minute')
+              ORDER BY created_at DESC"
+        );
+        $stmt->execute([$userId, $channel, $chatId, $minutes]);
+        $candidates = $stmt->fetchAll();
+        if ($candidates === []) {
+            return null;
+        }
+
+        $want = self::signature($items);
+        $all  = $this->itemsFor(array_map(static fn (array $o): int => (int) $o['id'], $candidates));
+        foreach ($candidates as $order) {
+            if (self::signature($all[(int) $order['id']] ?? []) === $want) {
+                return $order;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Cancel this customer's other unpaid orders (no receipt sent yet): a
+     * new order replaces them, so there is only one order to pay.
+     *
+     * @return list<string> the order numbers that were cancelled
+     */
+    public function cancelOtherUnpaid(int $userId, string $channel, string $chatId, int $keepId, string $note): array
+    {
+        $stmt = Database::connection()->prepare(
+            "UPDATE orders SET status = 'cancelled', review_note = ?, reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+              WHERE user_id = ? AND channel = ? AND customer_chat_id = ? AND id <> ?
+                AND status = 'pending_payment' AND receipt_path IS NULL
+              RETURNING order_no"
+        );
+        $stmt->execute([mb_substr($note, 0, 300), $userId, $channel, $chatId, $keepId]);
+
+        return array_column($stmt->fetchAll(), 'order_no');
     }
 
     /** The newest order of this customer that still needs a receipt. */
@@ -198,6 +276,17 @@ final class Order
     }
 
     /* ---------------------------------------------------------- private ---- */
+
+    /** "productId:qty|..." sorted, so the same items in another order compare equal. */
+    private static function signature(array $items): string
+    {
+        $parts = [];
+        foreach ($items as $item) {
+            $parts[] = (int) ($item['product_id'] ?? 0) . ':' . (int) $item['quantity'];
+        }
+        sort($parts);
+        return implode('|', $parts);
+    }
 
     /** Money maths in whole cents, so 0.1 + 0.2 never becomes 0.30000001. */
     private static function lineTotal(string $amount, string $qty): string

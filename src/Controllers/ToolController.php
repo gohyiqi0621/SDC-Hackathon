@@ -148,8 +148,24 @@ final class ToolController
         $phone = mb_substr(trim((string) ($input['phone'] ?? $input['customer_phone'] ?? '')), 0, 30);
         $note  = mb_substr(trim((string) ($input['note'] ?? $input['delivery_note'] ?? '')), 0, 500);
 
+        // One order at a time per customer chat: the lock makes two calls that
+        // arrive together (the AI sometimes repeats a tool call) wait for each
+        // other, so the second one finds the first order instead of making a copy.
+        $orders    = new Order();
+        $db        = Database::connection();
+        $duplicate = false;
+        $replaced  = [];
+
         try {
-            $order = (new Order())->create($userId, [
+            $db->beginTransaction();
+            $db->prepare('SELECT pg_advisory_xact_lock(?, ?)')
+               ->execute([$userId, crc32($auth['channel'] . ':' . $auth['chat_id']) & 0x7fffffff]);
+
+            $order = $orders->findSamePending($userId, $auth['channel'], $auth['chat_id'], $items);
+            $duplicate = $order !== null;
+
+            if (!$duplicate) {
+                $order = $orders->create($userId, [
                 'channel'           => $auth['channel'],
                 'customer_chat_id'  => $auth['chat_id'],
                 'customer_name'     => mb_substr(trim((string) ($input['customer_name'] ?? '')), 0, 150),
@@ -158,7 +174,17 @@ final class ToolController
                 'delivery_note'     => $note,
                 'currency'          => $currency ?? 'MYR',
             ], $items);
+
+                // The new order replaces this customer's other unpaid orders.
+                $replaced = $orders->cancelOtherUnpaid($userId, $auth['channel'], $auth['chat_id'], (int) $order['id'],
+                    'Replaced by ' . $order['order_no']);
+            }
+
+            $db->commit();
         } catch (Throwable $e) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
             error_log('[tools] buy_product: ' . $e->getMessage());
             FlowLog::write('tool.buy_product_error', ['error' => $e->getMessage()]);
             $this->json(500, ['success' => false, 'error' => 'The order could not be saved. Run the database migrations (009) and try again.']);
@@ -166,8 +192,13 @@ final class ToolController
 
         $company      = (new CompanyProfile())->find($userId) ?? [];
         $instructions = trim((string) ($company['payment_instructions'] ?? ''));
-        $qrSent       = (new OrderService())->sendPaymentQr($userId, $order, $company);
+        // The QR goes out once, with the new order (not again for a repeated call).
+        $qrSent       = !$duplicate && (new OrderService())->sendPaymentQr($userId, $order, $company);
         $hasQr        = !empty($company['payment_qr_url']);
+
+        if ($duplicate) {
+            $items = $orders->items((int) $order['id']);
+        }
 
         $lines = array_map(static fn (array $i): array => [
             'name'       => $i['product_name'],
@@ -184,19 +215,64 @@ final class ToolController
             'total'                => format_money($order['total'], $order['currency']),
             'payment_instructions' => $instructions !== '' ? $instructions
                 : ($hasQr ? 'Scan the payment QR code.' : 'No payment details are set up. Tell the customer our staff will send the payment details shortly.'),
-            'payment_qr'           => $qrSent
+            'payment_qr'           => $qrSent || ($duplicate && $hasQr && $order['channel'] === 'telegram')
                 ? 'The payment QR code image has already been sent to the customer in this chat. Tell them to scan it to pay.'
                 : ($hasQr ? 'payment_qr_url: ' . asset((string) $company['payment_qr_url']) : 'none'),
             'next_step'            => 'Tell the customer the order number, the items and the total, give the payment instructions, '
                                     . 'and ask them to send a photo or PDF of the payment receipt in this chat. '
-                                    . 'Do not say the order is paid or confirmed: staff verify the receipt first.',
+                                    . 'Do not say the order is paid or confirmed: staff verify the receipt first. '
+                                    . 'The order is done: do NOT call buy_product again for it.',
         ];
-        FlowLog::write('tool.buy_product_ok', ['order_no' => $order['order_no'], 'total' => $order['total']]);
+        if ($duplicate) {
+            $result['note'] = 'This exact order already exists (created a moment ago), so no new order was made. '
+                            . 'Do not call buy_product again; just answer the customer with this order.';
+        }
+        if ($replaced !== []) {
+            $result['replaced_orders'] = $replaced;
+            $result['note'] = 'This order replaces the customer\'s earlier unpaid order(s) ' . implode(', ', $replaced)
+                            . ', which were cancelled. Tell the customer to pay only this order.';
+        }
+        FlowLog::write($duplicate ? 'tool.buy_product_same' : 'tool.buy_product_ok',
+            ['order_no' => $order['order_no'], 'total' => $order['total'], 'replaced' => $replaced]);
 
         $this->json(200, $result);
     }
 
     /* ---------------------------------------------------------- private ---- */
+
+    /**
+     * The one active product whose name is clearly closest to $name (at most
+     * ~20% of the letters different, and clearly better than the next one).
+     */
+    private function closestProduct(int $userId, string $name): ?array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT id, name, sku, price, promotion_price, currency FROM products WHERE user_id = ? AND status = 'active'"
+        );
+        $stmt->execute([$userId]);
+
+        $norm   = static fn (string $v): string => (string) preg_replace('/[^a-z0-9]+/', '', mb_strtolower($v));
+        $target = $norm($name);
+        if (strlen($target) < 3) {
+            return null;
+        }
+
+        $scored = [];
+        foreach ($stmt->fetchAll() as $product) {
+            $candidate = $norm((string) $product['name']);
+            if ($candidate === '' || strlen($candidate) > 255 || strlen($target) > 255) {
+                continue;
+            }
+            $distance = levenshtein($target, $candidate);
+            $scored[] = [$distance / max(strlen($target), strlen($candidate)), $product];
+        }
+        usort($scored, static fn (array $a, array $b): int => $a[0] <=> $b[0]);
+
+        if ($scored === [] || $scored[0][0] > 0.2 || (isset($scored[1]) && $scored[1][0] - $scored[0][0] < 0.1)) {
+            return null;
+        }
+        return $scored[0][1];
+    }
 
     private function authenticate(): int
     {
@@ -311,6 +387,11 @@ final class ToolController
             return [$found[0], ''];
         }
         if ($found === []) {
+            // Small spelling differences ("Teh O Ais Limau" vs "TEH OH AIS LIMAU").
+            $close = $this->closestProduct($userId, $name);
+            if ($close !== null) {
+                return [$close, ''];
+            }
             return [null, 'No active product matches "' . $name . '" (use check_product to see what is available).'];
         }
 
