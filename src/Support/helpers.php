@@ -224,6 +224,76 @@ function initials_of(?array $user): string
     return mb_strtoupper($letters);
 }
 
+/* --------------------------------------------------------------- brand ---- */
+
+/**
+ * The two halves of the brand name: "SME Smart" -> ['SME', 'Smart'].
+ *
+ * The first word is always drawn in the dark blue and the rest in the mid
+ * blue, so renaming the app in .env re-colours the wordmark automatically
+ * instead of leaving hard-coded text in a view.
+ *
+ * @return array{0: string, 1: string}
+ */
+function brand_words(): array
+{
+    $parts = preg_split('/\s+/', trim(APP_NAME)) ?: [];
+    $parts = array_values(array_filter($parts, static fn (string $w): bool => $w !== ''));
+
+    if ($parts === []) {
+        return ['', ''];
+    }
+    if (count($parts) === 1) {
+        return [$parts[0], ''];
+    }
+
+    return [$parts[0], implode(' ', array_slice($parts, 1))];
+}
+
+/**
+ * The brand name as two-tone HTML: "SME" dark blue, "Smart" mid blue.
+ *
+ * Every value is escaped here, so a view echoes the result directly.
+ */
+function brand_wordmark(string $class = 'brand-name'): string
+{
+    [$lead, $tail] = brand_words();
+
+    $html = '<span class="' . e($class) . '">'
+          . '<span class="' . e($class) . '__lead">' . e($lead) . '</span>';
+
+    if ($tail !== '') {
+        $html .= ' <span class="' . e($class) . '__tail">' . e($tail) . '</span>';
+    }
+
+    return $html . '</span>';
+}
+
+/** The one logo file used by the sidebar, the auth screens and every icon. */
+function brand_logo(): string
+{
+    return 'assets/gemini_logo.png';
+}
+
+/**
+ * The company that issues our invoices (src/company.php).
+ *
+ * @return array<string, string>
+ */
+function company(): array
+{
+    static $company = null;
+
+    if ($company === null) {
+        $file    = SRC_ROOT . '/company.php';
+        $company = is_file($file) ? (array) require $file : [];
+    }
+
+    return $company;
+}
+
+/* --------------------------------------------------------------- money ---- */
+
 /** "MYR 1,234.50" from a NUMERIC string. Empty for null. */
 function format_money(mixed $amount, string $currency = 'MYR'): string
 {

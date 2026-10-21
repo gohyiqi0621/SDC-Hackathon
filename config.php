@@ -68,7 +68,7 @@ foreach ($__envLines as $line) {
 unset($__envLines);
 
 // --- App --------------------------------------------------------------------
-define('APP_NAME', (string) env('APP_NAME', 'SDC App'));
+define('APP_NAME', (string) env('APP_NAME', 'SME Smart'));
 define('APP_ENV', (string) env('APP_ENV', 'production'));
 define('APP_DEBUG', filter_var(env('APP_DEBUG', 'false'), FILTER_VALIDATE_BOOL));
 

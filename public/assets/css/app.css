@@ -44,6 +44,9 @@
     --danger-bg: #ffebef;
     --warning: #e5a124;
     --warning-bg: #fff3d9;
+    /* Brand wordmark: "SME" in the dark blue, "Smart" in the mid blue. */
+    --brand-navy: #14205c;
+    --brand-blue: #2b4bd0;
     --radius: 16px;
     --radius-sm: 10px;
     --shadow: 0 8px 25px rgba(49, 60, 123, 0.04);
@@ -198,11 +201,27 @@ code {
     text-decoration: none;
 }
 
+/* The PNG carries ~50% transparent margin, so a 40px box reads as a 20px mark. */
 .brand img {
-    width: 34px;
-    height: 34px;
+    width: 40px;
+    height: 40px;
     border-radius: 10px;
     object-fit: cover;
+}
+
+/* "SME Smart" - the first word dark blue, the rest mid blue. */
+.brand-name {
+    font-weight: 800;
+    letter-spacing: -0.4px;
+    white-space: nowrap;
+}
+
+.brand-name__lead {
+    color: var(--brand-navy);
+}
+
+.brand-name__tail {
+    color: var(--brand-blue);
 }
 
 .sidebar-nav {
@@ -346,7 +365,17 @@ code {
         justify-content: center;
     }
 
-    .sidebar-collapsed .brand,
+    .sidebar-collapsed .sidebar-collapse {
+        display: none;
+    }
+
+    .sidebar-collapsed .brand {
+        justify-content: center;
+        padding: 4px 0;
+    }
+
+    /* The logo stays; only the name goes away. */
+    .sidebar-collapsed .brand-name,
     .sidebar-collapsed .nav-label,
     .sidebar-collapsed .nav-caret,
     .sidebar-collapsed .nav-group.open .nav-sub,

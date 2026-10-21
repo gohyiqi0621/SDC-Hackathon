@@ -38,7 +38,7 @@
 <div class="page">
   <header class="header">
     <a class="logo" href="<?= e(url('home')) ?>" aria-label="<?= e(APP_NAME) ?> home">
-      <img src="<?= e(asset('assets/logo.webp')) ?>" alt="" width="52" height="52">
+      <img src="<?= e(asset('assets/gemini_logo.png')) ?>" alt="" width="52" height="52">
     </a>
 
     <nav class="nav" aria-label="Primary">
