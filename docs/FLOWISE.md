@@ -121,7 +121,7 @@ check_product
 
 **Tool Description**
 ```
-Look up this shop's products and services: name, category, description, normal price, promotion price, the final price to pay and availability. Use it whenever the customer asks about a product, a price, a promotion or what is available, and before placing an order. Only quote prices and products that this tool returns; never invent any.
+Look up this shop's products and services: name, category, description, price and availability. Use it whenever the customer asks about a product, a price, a promotion or what is available, and before placing an order. Only quote prices and products that this tool returns; never invent any.
 ```
 
 **Input Schema**
@@ -225,7 +225,7 @@ check_availability
 
 **Tool Description**
 ```
-Check if a date and time can be booked for a number of people, using the business's Google Calendar and booking rules (opening hours, slot length, how many customers fit in one slot). Use it before every booking. Give the date as YYYY-MM-DD and the time in 12-hour format with AM/PM (e.g. 10:00 AM, 2:30 PM; noon is 12:00 PM, midnight is 12:00 AM) in the business's timezone. It returns available true/false; when false it gives the reason and up to 3 other free times to offer. It does NOT book anything.
+Check if a date and time can be booked for a number of people, using the business's Google Calendar and booking rules (opening hours, slot length, how many customers fit in one slot). Use it before every booking. Give the date as YYYY-MM-DD and the time in 12-hour format with AM/PM (e.g. 10:00 AM, 2:30 PM; noon is 12:00 PM, midnight is 12:00 AM) in the business's timezone. It returns available true/false; when false it gives the reason and up to 3 other free times to offer. If the customer has no preferred time or asks what times are free, leave time empty: it returns the real free times. Never offer a time this tool did not return. It does NOT book anything.
 ```
 
 **Input Schema**
@@ -233,7 +233,7 @@ Check if a date and time can be booked for a number of people, using the busines
 | Property | Type | Description | Required |
 |---|---|---|---|
 | `date` | string | Date in YYYY-MM-DD, e.g. 2026-10-22. | yes |
-| `time` | string | Start time in 12-hour format with AM/PM, e.g. 10:00 AM, 2:30 PM, 12:00 PM (noon). | yes |
+| `time` | string | Start time in 12-hour format with AM/PM, e.g. 10:00 AM, 2:30 PM, 12:00 PM (noon). Leave empty to list the free times. | no |
 | `pax` | number | Number of people. Use 1 if the customer did not say. | yes |
 
 **JavaScript Function**

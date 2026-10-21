@@ -105,63 +105,118 @@ final class ChatbotController
         ];
     }
 
-    /** GET /?page=customer&action=chat */
+    /** GET /?page=customer&action=chat - live, view-only customer conversations. */
     public function customerChat(): void
     {
         $user   = require_login();
         $userId = (int) $user['id'];
 
-        // ?tab=conversations: view-only history of the AI with each customer.
-        $tab = (string) ($_GET['tab'] ?? '') === 'conversations' ? 'conversations' : 'test';
+        view('chatbot/conversations', [
+            'user'        => $user,
+            'title'       => 'Customer Chat Interface',
+            'feed'        => $this->feed($userId, (string) ($_GET['chat'] ?? ''), 0),
+            'feedUrl'     => url('customer', ['action' => 'chat_feed']),
+            'ordersUrl'   => url('orders'),
+            'settingsUrl' => url('customer', ['action' => 'settings']),
+        ]);
+    }
+
+    /**
+     * GET /?page=customer&action=chat_feed&chat=telegram:123&after=456  (JSON)
+     *
+     * Polled by the Chat Interface every few seconds: the conversation list,
+     * the selected chat's messages newer than "after", and its orders today.
+     */
+    public function customerChatFeed(): void
+    {
+        $user = require_login();
+        json_response(true, $this->feed((int) $user['id'], (string) ($_GET['chat'] ?? ''), max(0, (int) ($_GET['after'] ?? 0))));
+    }
+
+    /** Everything the live Chat Interface shows, as plain arrays (also embedded in the first page load). */
+    private function feed(int $userId, string $selected, int $after): array
+    {
+        $model = new ChatMessage();
+        try {
+            $rows = $model->conversations($userId);
+        } catch (Throwable $e) {
+            $rows = []; // migration 007 not run yet
+        }
+
+        $label = static function (array $c): string {
+            if ($c['channel'] === 'web') {
+                return 'Website test chat';
+            }
+            $name = trim((string) ($c['customer_name'] ?? ''));
+            return $name !== '' ? $name : 'Telegram ' . $c['chat_id'];
+        };
+
         $conversations = [];
-        $thread = null;
-        if ($tab === 'conversations') {
-            try {
-                $conversations = (new ChatMessage())->conversations($userId);
-            } catch (Throwable $e) {
-                $conversations = []; // migration 007 not run yet
+        $current = null;
+        foreach ($rows as $c) {
+            $key  = $c['channel'] . ':' . $c['chat_id'];
+            $item = [
+                'key'          => $key,
+                'channel'      => $c['channel'],
+                'chat_id'      => (string) $c['chat_id'],
+                'label'        => $label($c),
+                'username'     => $c['customer_username'] ?? null,
+                'last_message' => mb_strimwidth(preg_replace('/\s+/u', ' ', (string) $c['last_message']) ?? '', 0, 90, '…'),
+                'last_role'    => $c['last_role'],
+                'last_at'      => date(DATE_ATOM, strtotime((string) $c['last_at'])),
+                'messages'     => (int) $c['messages'],
+            ];
+            $conversations[] = $item;
+            if ($key === $selected) {
+                $current = $item;
+            }
+        }
+        if ($current === null && $conversations !== [] && $selected === '') {
+            $current = $conversations[0];
+        }
+
+        $messages = [];
+        $orders   = [];
+        if ($current !== null) {
+            $list = $after > 0
+                ? $model->after($userId, $current['channel'], $current['chat_id'], $after)
+                : $model->recent($userId, $current['channel'], $current['chat_id'], 200);
+            foreach ($list as $m) {
+                $messages[] = [
+                    'id'      => (int) $m['id'],
+                    'role'    => $m['role'],
+                    'content' => (string) $m['content'],
+                    'status'  => $m['status'],
+                    'at'      => date(DATE_ATOM, strtotime((string) $m['created_at'])),
+                    'event'   => preg_match('/^(📎|🖼|🧾|✅|⚠️|📦|📅)/u', (string) $m['content']) === 1,
+                ];
             }
 
-            $selected = (string) ($_GET['chat'] ?? '');
-            if ($selected === '' && $conversations !== []) {
-                $selected = $conversations[0]['channel'] . ':' . $conversations[0]['chat_id'];
-            }
-            foreach ($conversations as $c) {
-                if ($c['channel'] . ':' . $c['chat_id'] === $selected) {
-                    $thread = $c + [
-                        'history'  => (new ChatMessage())->recent($userId, $c['channel'], (string) $c['chat_id'], 200),
-                        'orders'   => $this->ordersFor($userId, $c['channel'], (string) $c['chat_id']),
+            try {
+                foreach ((new Order())->todayForChat($userId, $current['channel'], $current['chat_id']) as $o) {
+                    $orders[] = [
+                        'order_no' => $o['order_no'],
+                        'status'   => $o['status'],
+                        'label'    => Order::STATUSES[$o['status']] ?? $o['status'],
+                        'items'    => implode(', ', array_map(static fn (array $i): string => (int) $i['quantity'] . ' × ' . $i['product_name'], $o['items'])),
+                        'total'    => format_money($o['total'], $o['currency']),
+                        'at'       => date(DATE_ATOM, strtotime((string) $o['created_at'])),
+                        'receipt'  => !empty($o['receipt_path']) ? url('orders', ['action' => 'receipt', 'id' => (int) $o['id']]) : null,
                     ];
                 }
+            } catch (Throwable $e) {
+                $orders = []; // migration 009 not run yet
             }
         }
 
-        view('chatbot/chat', [
-            'user'        => $user,
-            'tab'         => $tab,
-            'tabUrls'     => [
-                'test'          => url('customer', ['action' => 'chat']),
-                'conversations' => url('customer', ['action' => 'chat', 'tab' => 'conversations']),
-            ],
+        return [
             'conversations' => $conversations,
-            'thread'        => $thread,
-            'title'       => 'Customer Chat Interface',
-            'heading'     => 'Customer assistant',
-            'sub'         => 'Answer customer questions about your products, services and orders.',
-            'icon'        => 'fa-solid fa-robot',
-            'intro'       => 'Hi! I can help customers with questions about your products, services, prices and orders.',
-            'suggestions' => ['What products do you sell?', 'Is there any promotion now?', 'How much is delivery?'],
-            'notes'       => [
-                ['fa-solid fa-box-open', 'Uses your catalogue', 'Answers come from Product & Service'],
-                ['fa-solid fa-user-shield', 'Your data only', 'No other business\'s data is reachable'],
-                ['fa-solid fa-server', 'Server decides', 'The browser never chooses which records are read'],
-            ],
-            'settingsUrl' => url('customer', ['action' => 'settings']),
-            // Real AI pipeline (same as Telegram): see customerChatSend().
-            'sendUrl'     => url('customer', ['action' => 'chat_send']),
-            'previewUrl'  => url('customer', ['action' => 'system_message']),
-            'history'     => $this->webHistory((int) current_user()['id']),
-        ]);
+            'current'       => $current,
+            'messages'      => $messages,
+            'orders_today'  => $orders,
+            'reset'         => $after === 0,
+            'now'           => date(DATE_ATOM),
+        ];
     }
 
     /**

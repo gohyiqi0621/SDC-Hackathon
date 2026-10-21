@@ -93,11 +93,24 @@ final class ChatMessage
         return $rows;
     }
 
+    /** Messages of one conversation newer than $afterId, oldest first (live Chat Interface). */
+    public function after(int $userId, string $channel, string $chatId, int $afterId, int $limit = 200): array
+    {
+        $stmt = Database::connection()->prepare(
+            'SELECT id, role, content, status, created_at FROM chat_messages
+              WHERE user_id = ? AND channel = ? AND chat_id = ? AND id > ?
+              ORDER BY id LIMIT ' . max(1, min(500, $limit))
+        );
+        $stmt->execute([$userId, $channel, $chatId, $afterId]);
+
+        return $stmt->fetchAll();
+    }
+
     /** The latest messages of one conversation, oldest first. */
     public function recent(int $userId, string $channel, string $chatId, int $limit = 30): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT role, content, status, created_at
+            'SELECT id, role, content, status, created_at
                FROM (SELECT id, role, content, status, created_at
                        FROM chat_messages
                       WHERE user_id = ? AND channel = ? AND chat_id = ?

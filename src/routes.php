@@ -19,7 +19,6 @@ use Src\Controllers\DashboardController;
 use Src\Controllers\FinancialController;
 use Src\Controllers\GmailController;
 use Src\Controllers\OrderController;
-use Src\Controllers\BookingController;
 use Src\Controllers\ProductController;
 use Src\Controllers\ProfileController;
 use Src\Controllers\TelegramWebhookController;
@@ -86,6 +85,7 @@ $router->post(
     /* -------------------------------------------- AI chatbot: customer --- */
     $router->get('customer/settings', [ChatbotController::class, 'customerSettings'], $auth);
     $router->get('customer/chat', [ChatbotController::class, 'customerChat'], $auth);
+    $router->get('customer/chat_feed', [ChatbotController::class, 'customerChatFeed'], $auth);
 
     // Product & Service (Customer)
     $router->get('products', [ProductController::class, 'index'], $auth);
@@ -104,10 +104,8 @@ $router->post(
     $router->get('orders/receipt', [OrderController::class, 'receipt'], $auth);
     $router->post('orders/approve', [OrderController::class, 'approve'], $auth);
     $router->post('orders/reject', [OrderController::class, 'reject'], $auth);
+    $router->post('orders/ship', [OrderController::class, 'ship'], $auth);
     $router->post('orders/cancel', [OrderController::class, 'cancel'], $auth);
-
-    $router->get('bookings', [BookingController::class, 'index'], $auth);
-    $router->post('bookings/cancel', [BookingController::class, 'cancel'], $auth);
 
     $router->get('categories', [CategoryController::class, 'index'], $auth);
     $router->post('categories/store', [CategoryController::class, 'store'], $auth);
@@ -145,8 +143,7 @@ $router->post(
     $router->post('tools/check_availability', [ToolController::class, 'checkAvailability'], [], false);
     $router->post('tools/make_booking', [ToolController::class, 'makeBooking'], [], false);
 
-    // Website Chat Interface: the same AI pipeline, for testing without Telegram.
-    $router->post('customer/chat_send', [ChatbotController::class, 'customerChatSend'], $auth);
+    // Preview of the system message built from AI Settings.
     $router->get('customer/system_message', [ChatbotController::class, 'customerSystemMessage'], $auth);
 
     /* ----------------------------------------------- AI chatbot: staff --- */

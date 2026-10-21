@@ -62,12 +62,8 @@ final class ProductService
             $errors['price'] = $priceError;
         }
 
-        [$promo, $promoError] = $this->money($input['promotion_price'] ?? '', false);
-        if ($promoError !== null) {
-            $errors['promotion_price'] = $promoError;
-        } elseif ($promo !== null && $price !== null && (float) $promo > (float) $price) {
-            $errors['promotion_price'] = 'The promotional price cannot be higher than the selling price.';
-        }
+        // Promotional prices are no longer used: saving a product clears any old one.
+        $promo = null;
 
         $currency = strtoupper(trim((string) ($input['currency'] ?? 'MYR'))) ?: 'MYR';
         if (!in_array($currency, Product::CURRENCIES, true)) {
