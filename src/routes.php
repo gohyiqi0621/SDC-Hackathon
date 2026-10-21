@@ -120,6 +120,9 @@ $router->post(
     $router->get('ai_settings/assistant', [AiSettingsController::class, 'assistant'], $auth);
     $router->post('ai_settings/assistant_save', [AiSettingsController::class, 'assistantSave'], $auth);
     $router->post('ai_settings/generate_sops', [AiSettingsController::class, 'generateSops'], $auth);
+    $router->get('ai_settings/staff_assistant', [AiSettingsController::class, 'staffAssistant'], $auth);
+    $router->post('ai_settings/staff_assistant_save', [AiSettingsController::class, 'staffAssistantSave'], $auth);
+    $router->post('ai_settings/staff_generate_sops', [AiSettingsController::class, 'staffGenerateSops'], $auth);
     $router->get('ai_settings/telegram', [AiSettingsController::class, 'telegram'], $auth);
     $router->post('ai_settings/telegram_connect', [AiSettingsController::class, 'telegramConnect'], $auth);
     $router->post('ai_settings/telegram_disconnect', [AiSettingsController::class, 'telegramDisconnect'], $auth);

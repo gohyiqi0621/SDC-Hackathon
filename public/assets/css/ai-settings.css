@@ -1037,3 +1037,9 @@
 /* Payment QR upload (Company Information): same layout as the logo field */
 .qr-field { margin-top: 6px; }
 .qr-field__preview img { object-fit: contain; background: #fff; }
+
+/* Staff Setting & Integration: the AI Assistant Settings form below the preview cards */
+.staff-ai-settings { margin-top: 22px; }
+.staff-ai-heading h2 { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 800; }
+.staff-ai-heading h2 i { color: var(--primary); }
+.staff-ai-heading p { margin-top: 4px; color: var(--text-soft); font-size: 13px; }

@@ -325,6 +325,13 @@ final class ChatbotController
                 ['fa-regular fa-envelope',      'Email (Brevo)',    'Send emails such as password resets.',        (new BrevoMailer())->isConfigured() ?: 'setup'],
             ],
             'chatUrl'      => url('staff', ['action' => 'chat']),
+            // AI Assistant Settings (same form as the customer page, own table)
+            'aiModels'     => AiSettingsController::AI_MODELS,
+            'aiEndpoints'  => [
+                'assistantGet'          => url('ai_settings', ['action' => 'staff_assistant']),
+                'assistantSave'         => url('ai_settings', ['action' => 'staff_assistant_save']),
+                'assistantGenerateSops' => url('ai_settings', ['action' => 'staff_generate_sops']),
+            ],
         ]);
     }
 

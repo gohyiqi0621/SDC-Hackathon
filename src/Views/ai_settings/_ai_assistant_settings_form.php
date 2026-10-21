@@ -9,7 +9,7 @@
  * single `system_instructions` field, each under a "### <Section>" heading.
  * ai-settings.js splits the stored text back into the boxes when it loads.
  *
- * "Generate SOPs with AI" asks Agnes AI (POST ai_settings/generate_sops) for
+ * "Generate instruction with AI" asks Agnes AI (POST ai_settings/generate_sops) for
  * three SOPs written from the saved company information, five steps each,
  * and fills the three boxes. Nothing is saved until the owner clicks Save.
  *
@@ -17,7 +17,9 @@
  * whether one is saved (has_api_key), never the key itself.
  *
  * Expects: $aiModels (AiSettingsController::AI_MODELS: id => [label, provider]).
+ * Optional: $audience ('customer' default, or 'staff' on Staff Setting & Integration).
  */
+$audience = ($audience ?? 'customer') === 'staff' ? 'staff' : 'customer';
 $byProvider = [];
 foreach ($aiModels as $id => [$label, $provider]) {
     $byProvider[$provider][$id] = $label;
@@ -46,7 +48,7 @@ $sections = [
                     <div class="panel-header">
                         <div>
                             <h2>Assistant</h2>
-                            <p>Its name and personality, as customers will experience it.</p>
+                            <p>Its name and personality, as <?= $audience === 'staff' ? 'your team' : 'customers' ?> will experience it.</p>
                         </div>
                         <label class="switch">
                             <input type="checkbox" role="switch" id="is_enabled" name="is_enabled" value="1">
@@ -155,7 +157,7 @@ $sections = [
                             <p>Rules the assistant follows. All sections are saved together as one set of instructions.</p>
                         </div>
                         <button class="primary-btn sop-generate-btn" type="button" data-sop-generate>
-                            <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Generate SOPs with AI
+                            <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Generate instruction with AI
                         </button>
                     </div>
                     <div class="panel-body">

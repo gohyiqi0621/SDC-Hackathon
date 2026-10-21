@@ -14,6 +14,8 @@
  *
  *   GET  ai_settings/company_profile            POST ai_settings/company_profile_save
  *   GET  ai_settings/assistant                  POST ai_settings/assistant_save | generate_sops
+ *   GET  ai_settings/staff_assistant            POST ai_settings/staff_assistant_save | staff_generate_sops
+ *        (the same form for the staff assistant, stored in staff_ai_assistant_settings)
  *   GET  ai_settings/telegram                   POST ai_settings/telegram_connect | telegram_disconnect | telegram_forget
  *                                               POST ai_settings/telegram_staff_link | telegram_staff_unlink
  *   GET  ai_settings/google_calendar            GET  ai_settings/google_calendar_oauth_start
@@ -30,6 +32,8 @@ use RuntimeException;
 use Src\Models\AiAssistantSetting;
 use Src\Models\CompanyProfile;
 use Src\Models\GoogleCalendarIntegration;
+use Src\Models\StaffAiAssistantSetting;
+use Src\Models\UserSettingsRow;
 use Src\Models\TelegramIntegration;
 use Src\Services\GoogleAuthRevoked;
 use Src\Services\GoogleCalendarService;
@@ -202,15 +206,37 @@ final class AiSettingsController
     /** GET ai_settings/assistant */
     public function assistant(): void
     {
-        $this->run(function (int $userId): void {
-            json_response(true, ['ai_settings' => $this->presentAssistant((new AiAssistantSetting())->find($userId))]);
+        $this->assistantGetFor(new AiAssistantSetting());
+    }
+
+    /** GET ai_settings/staff_assistant - the staff assistant (staff_ai_assistant_settings). */
+    public function staffAssistant(): void
+    {
+        $this->assistantGetFor(new StaffAiAssistantSetting());
+    }
+
+    private function assistantGetFor(UserSettingsRow $model): void
+    {
+        $this->run(function (int $userId) use ($model): void {
+            json_response(true, ['ai_settings' => $this->presentAssistant($model->find($userId))]);
         });
     }
 
     /** POST ai_settings/assistant_save */
     public function assistantSave(): void
     {
-        $this->run(function (int $userId): void {
+        $this->assistantSaveFor(new AiAssistantSetting());
+    }
+
+    /** POST ai_settings/staff_assistant_save */
+    public function staffAssistantSave(): void
+    {
+        $this->assistantSaveFor(new StaffAiAssistantSetting());
+    }
+
+    private function assistantSaveFor(UserSettingsRow $model): void
+    {
+        $this->run(function (int $userId) use ($model): void {
             $input = $this->strings($_POST, ['assistant_name', 'personality', 'tone_description']);
             $instructions = str_replace("\r\n", "\n", (string) ($_POST['system_instructions'] ?? ''));
             $errors = [];
@@ -231,7 +257,6 @@ final class AiSettingsController
                 $errors['tone_description'] = 'Tone description must be 500 characters or fewer.';
             }
 
-            $model    = new AiAssistantSetting();
             $existing = $model->find($userId);
 
             $aiModel = trim((string) ($_POST['ai_model'] ?? ''));
@@ -304,7 +329,18 @@ final class AiSettingsController
      */
     public function generateSops(): void
     {
-        $this->run(function (int $userId): void {
+        $this->generateSopsFor(new AiAssistantSetting());
+    }
+
+    /** POST ai_settings/staff_generate_sops - same, using the staff assistant's settings. */
+    public function staffGenerateSops(): void
+    {
+        $this->generateSopsFor(new StaffAiAssistantSetting());
+    }
+
+    private function generateSopsFor(UserSettingsRow $model): void
+    {
+        $this->run(function (int $userId) use ($model): void {
             // A short pause between runs, so a double click does not pay twice.
             $last = (int) ($_SESSION['sop_generated_at'] ?? 0);
             if ($last > time() - 10) {
@@ -313,18 +349,18 @@ final class AiSettingsController
 
             $company = (new CompanyProfile())->find($userId);
             if ($company === null || trim((string) ($company['company_name'] ?? '')) === '') {
-                json_response(false, null, 'Save your Company Information first (name, category and background). The SOPs are written from it.', 422);
+                json_response(false, null, 'Save your Company Information first (name, category and background). The instructions are written from it.', 422);
             }
             if (trim((string) ($company['company_background'] ?? '')) === '' && trim((string) ($company['company_description'] ?? '')) === '') {
-                json_response(false, null, 'Add a company background or description in Company Information first, so the SOPs fit your business.', 422);
+                json_response(false, null, 'Add a company background or description in Company Information first, so the instructions fit your business.', 422);
             }
 
             $_SESSION['sop_generated_at'] = time();
 
-            $assistant = (new AiAssistantSetting())->find($userId);
+            $assistant = $model->find($userId);
             $result = (new SopGeneratorService())->generate($company, SopGeneratorService::productsFor($userId), $assistant);
 
-            json_response(true, $result, 'Three SOPs generated. Review them, then save.');
+            json_response(true, $result, 'Instructions generated. Review them, then save.');
         });
     }
 
