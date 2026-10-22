@@ -101,27 +101,6 @@ final class Invoice
         ];
     }
 
-    /**
-     * The file library beside the upload form: newest first, optionally searched.
-     *
-     * @return array<int, array>
-     */
-    public function library(int $userId, string $q, int $limit = 50): array
-    {
-        [$where, $params] = $this->where($userId, ['q' => $q]);
-
-        $stmt = Database::connection()->prepare(
-            'SELECT ' . self::COLUMNS . '
-               FROM invoices
-              WHERE ' . $where . '
-              ORDER BY created_at DESC, id DESC
-              LIMIT ' . max(1, $limit)
-        );
-        $stmt->execute($params);
-
-        return $stmt->fetchAll();
-    }
-
     public function find(int $userId, int $id): ?array
     {
         $stmt = Database::connection()->prepare(
@@ -203,6 +182,19 @@ final class Invoice
             $userId,
             $id,
         ]);
+
+        return $stmt->rowCount() > 0;
+    }
+
+    /** Mark an unpaid or partly paid invoice as fully paid. */
+    public function markPaid(int $userId, int $id): bool
+    {
+        $stmt = Database::connection()->prepare(
+            "UPDATE invoices
+                SET status = 'paid', updated_at = CURRENT_TIMESTAMP
+              WHERE user_id = ? AND id = ? AND status <> 'paid'"
+        );
+        $stmt->execute([$userId, $id]);
 
         return $stmt->rowCount() > 0;
     }

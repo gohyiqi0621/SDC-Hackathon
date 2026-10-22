@@ -11,9 +11,9 @@ $prevSection = null;
 <aside class="sidebar" id="sidebar" aria-label="Main navigation">
 
     <div class="sidebar-head">
-        <a class="brand" href="<?= e(url('dashboard')) ?>">
-            <img src="<?= e(asset('assets/logo.webp')) ?>" alt="" width="34" height="34">
-            <span><?= e(APP_NAME) ?></span>
+        <a class="brand" href="<?= e(url('dashboard')) ?>" data-sidebar-brand data-brand-title="<?= e(APP_NAME) ?>" title="<?= e(APP_NAME) ?>">
+            <img class="brand__logo" src="<?= e(asset(brand_logo())) ?>" alt="<?= e(APP_NAME) ?>" width="34" height="34">
+            <?= brand_wordmark() ?>
         </a>
         <button class="sidebar-collapse" type="button" data-sidebar-collapse
                 aria-controls="sidebar" aria-expanded="true" aria-label="Close sidebar" title="Close sidebar">

@@ -1,6 +1,6 @@
 <?php
 /**
- * EmailController.php - the Smart SME AI email dashboard.
+ * EmailController.php - the SME Smart AI email dashboard.
  *
  * Formerly the standalone email/index.php page; it now runs through the
  * router like every other page, so AuthMiddleware and the central CSRF check

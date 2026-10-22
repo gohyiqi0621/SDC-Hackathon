@@ -27,8 +27,8 @@ $groupLabels = ['main' => 'Main', 'admin' => 'Admin', 'account' => 'Account'];
 
   <aside class="sidenav liquid-glass" id="sidenav">
     <a class="brand" href="<?= e($home) ?>" aria-label="<?= e(APP_NAME) ?> home">
-      <span class="brand__mark" aria-hidden="true"><img src="<?= e(asset('assets/logo.webp')) ?>" alt="" width="52" height="52"></span>
-      <span class="brand__name">SDC <em>App</em></span>
+      <span class="brand__mark" aria-hidden="true"><img src="<?= e(asset('assets/gemini_logo.png')) ?>" alt="" width="52" height="52"></span>
+      <span class="brand__name">SME Smart</span>
     </a>
     <nav class="sidenav__nav" aria-label="Main navigation">
       <?php $prevGroup = null; $seenGroups = []; ?>
@@ -57,7 +57,7 @@ $groupLabels = ['main' => 'Main', 'admin' => 'Admin', 'account' => 'Account'];
     <header class="topbar liquid-glass-strong">
       <div class="topbar__left">
         <span class="topbar__brand">
-          <a class="brand" href="<?= e($home) ?>" aria-label="<?= e(APP_NAME) ?> home"><span class="brand__mark" aria-hidden="true"><img src="<?= e(asset('assets/logo.webp')) ?>" alt="" width="52" height="52"></span><span class="brand__name">SDC <em>App</em></span></a>
+          <a class="brand" href="<?= e($home) ?>" aria-label="<?= e(APP_NAME) ?> home"><span class="brand__mark" aria-hidden="true"><img src="<?= e(asset('assets/gemini_logo.png')) ?>" alt="" width="52" height="52"></span><span class="brand__name">SME Smart</span></a>
         </span>
         <h1 class="topbar__title"><?= e($pageTitle) ?></h1>
       </div>

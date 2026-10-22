@@ -65,22 +65,29 @@ $router->post(
 
 
     /* ------------------------------------------------------- financial --- */
+    // Invoice: list + upload popup (?new=1, ?edit=N). Edit / mark paid / delete are Supervisor only.
     $router->get('financial/invoice', [FinancialController::class, 'invoice'], $auth);
-    $router->get('financial/upload', [FinancialController::class, 'upload'], $auth);
+    $router->post('financial/role', [FinancialController::class, 'role'], $auth);
     $router->post('financial/store', [FinancialController::class, 'store'], $auth);
-    $router->get('financial/edit', [FinancialController::class, 'edit'], $auth);
     $router->post('financial/update', [FinancialController::class, 'update'], $auth);
+    $router->post('financial/mark_paid', [FinancialController::class, 'markPaid'], $auth);
     $router->post('financial/delete', [FinancialController::class, 'delete'], $auth);
     $router->get('financial/file', [FinancialController::class, 'file'], $auth);
+
+    // Claims: list + new-claim popup (?new=1, ?edit=N). Review / edit / delete are Supervisor only.
     $router->get('financial/claims', [ClaimController::class, 'index'], $auth);
-    $router->get('financial/claim_new', [ClaimController::class, 'create'], $auth);
     $router->post('financial/claim_store', [ClaimController::class, 'store'], $auth);
-    $router->get('financial/claim_edit', [ClaimController::class, 'edit'], $auth);
     $router->post('financial/claim_update', [ClaimController::class, 'update'], $auth);
     $router->post('financial/claim_status', [ClaimController::class, 'status'], $auth);
     $router->post('financial/claim_delete', [ClaimController::class, 'delete'], $auth);
     $router->get('financial/claim_file', [ClaimController::class, 'file'], $auth);
-    $router->get('financial/settlement', [FinancialController::class, 'settlement'], $auth);
+
+    // Old addresses: the Upload Invoice and claim-form pages became popups; Settlement was removed.
+    $router->get('financial/upload', [FinancialController::class, 'upload'], $auth);
+    $router->get('financial/edit', [FinancialController::class, 'edit'], $auth);
+    $router->get('financial/claim_new', [ClaimController::class, 'create'], $auth);
+    $router->get('financial/claim_edit', [ClaimController::class, 'edit'], $auth);
+    $router->get('financial/settlement', static fn () => redirect(url('financial', ['action' => 'invoice'])), $auth);
 
     /* -------------------------------------------- AI chatbot: customer --- */
     $router->get('customer/settings', [ChatbotController::class, 'customerSettings'], $auth);
@@ -120,6 +127,9 @@ $router->post(
     $router->get('ai_settings/assistant', [AiSettingsController::class, 'assistant'], $auth);
     $router->post('ai_settings/assistant_save', [AiSettingsController::class, 'assistantSave'], $auth);
     $router->post('ai_settings/generate_sops', [AiSettingsController::class, 'generateSops'], $auth);
+    $router->get('ai_settings/staff_assistant', [AiSettingsController::class, 'staffAssistant'], $auth);
+    $router->post('ai_settings/staff_assistant_save', [AiSettingsController::class, 'staffAssistantSave'], $auth);
+    $router->post('ai_settings/staff_generate_sops', [AiSettingsController::class, 'staffGenerateSops'], $auth);
     $router->get('ai_settings/telegram', [AiSettingsController::class, 'telegram'], $auth);
     $router->post('ai_settings/telegram_connect', [AiSettingsController::class, 'telegramConnect'], $auth);
     $router->post('ai_settings/telegram_disconnect', [AiSettingsController::class, 'telegramDisconnect'], $auth);

@@ -12,9 +12,11 @@
    8. Confirm dialog    <form data-confirm="Message" data-confirm-title data-confirm-ok>
    9. Filter forms      <form data-auto-submit> submits when a select changes
   10. Image picker      [data-image-picker] preview before upload
-  11. Live list filter  <input data-filter-list="#list"> hides [data-filter-item] rows
   12. Field errors      a field's error clears as soon as it is edited
   13. Money inputs      <input data-money> shows 10,000.00 while typing
+  15. Popups            <dialog class="modal"> opened by [data-modal-open="#id"]
+  16. File preview      [data-file-preview] shows the chosen PDF / image
+  17. Submit confirm    <form data-submit-confirm="Message"> asks once before sending
 ===================================== */
 
 (function () {
@@ -71,6 +73,11 @@
             btn.setAttribute('title', label);
         }
 
+        var brand = document.querySelector('[data-sidebar-brand]');
+        if (brand) {
+            brand.setAttribute('title', collapsed ? 'Open sidebar' : brand.dataset.brandTitle || 'Home');
+        }
+
         // With the labels hidden, a hover tooltip names each icon.
         document.querySelectorAll('.sidebar .nav-link').forEach(function (link) {
             var text = link.querySelector('span');
@@ -85,6 +92,13 @@
     if (root.classList.contains('sidebar-collapsed')) { setCollapsed(true); }
 
     document.addEventListener('click', function (e) {
+        var brand = e.target.closest('[data-sidebar-brand]');
+        if (brand && root.classList.contains('sidebar-collapsed') && window.matchMedia('(min-width: 901px)').matches) {
+            e.preventDefault();
+            setCollapsed(false);
+            return;
+        }
+
         if (e.target.closest('[data-sidebar-collapse]')) {
             setCollapsed(!root.classList.contains('sidebar-collapsed'));
             return;
@@ -242,12 +256,13 @@
     /* ---------- 6. Upload picker ---------- */
 
     document.querySelectorAll('[data-file-input]').forEach(function (input) {
-        var label = document.querySelector('[data-file-label]');
         var drop = input.closest('[data-upload-drop]');
+        var label = (drop || document).querySelector('[data-file-label]');
+        var original = label ? label.textContent : '';
 
         input.addEventListener('change', function () {
             var file = input.files && input.files[0];
-            if (label) { label.textContent = file ? file.name : 'Choose a PDF, PNG or JPG'; }
+            if (label) { label.textContent = file ? file.name : original; }
         });
 
         if (drop) {
@@ -393,30 +408,47 @@
 
     var dialog = document.getElementById('confirmDialog');
 
-    document.addEventListener('submit', function (e) {
-        var form = e.target;
-        if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-confirm')) { return; }
-        if (form.dataset.confirmed === '1') { return; }
-
-        var message = form.getAttribute('data-confirm');
-
-        // No <dialog> support: fall back to the browser's own prompt.
+    /**
+     * Ask in the shared confirm dialog; onYes runs only on "confirm".
+     * tone "danger" (default, red) is for destructive actions; anything
+     * else ("primary") shows a calm, non-red dialog.
+     */
+    function askConfirm(opts, onYes) {
         if (!dialog || typeof dialog.showModal !== 'function') {
-            if (!window.confirm(message)) { e.preventDefault(); }
+            if (window.confirm(opts.message)) { onYes(); }
             return;
         }
 
-        e.preventDefault();
-        dialog.querySelector('[data-confirm-title]').textContent = form.getAttribute('data-confirm-title') || 'Are you sure?';
-        dialog.querySelector('[data-confirm-message]').textContent = message;
-        dialog.querySelector('[data-confirm-button]').textContent = form.getAttribute('data-confirm-ok') || 'Confirm';
+        var danger = (opts.tone || 'danger') === 'danger';
+        var button = dialog.querySelector('[data-confirm-button]');
+
+        dialog.classList.toggle('confirm-dialog--primary', !danger);
+        dialog.querySelector('[data-confirm-title]').textContent = opts.title || 'Are you sure?';
+        dialog.querySelector('[data-confirm-message]').textContent = opts.message || '';
+        dialog.querySelector('[data-confirm-cancel]').textContent = opts.cancel || 'Cancel';
+        button.textContent = opts.ok || 'Confirm';
+        button.className = danger ? 'danger-btn' : 'primary-btn';
         dialog.returnValue = '';
         dialog.showModal();
 
         dialog.addEventListener('close', function onClose() {
             dialog.removeEventListener('close', onClose);
-            if (dialog.returnValue !== 'confirm') { return; }
+            if (dialog.returnValue === 'confirm') { onYes(); }
+        });
+    }
 
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-confirm')) { return; }
+        if (form.dataset.confirmed === '1') { return; }
+
+        e.preventDefault();
+        askConfirm({
+            title: form.getAttribute('data-confirm-title'),
+            message: form.getAttribute('data-confirm'),
+            ok: form.getAttribute('data-confirm-ok'),
+            tone: form.getAttribute('data-confirm-tone')
+        }, function () {
             form.dataset.confirmed = '1';
             setLoading(form.querySelector('button[type="submit"]'), true);
             form.submit();
@@ -465,25 +497,6 @@
                 }
             });
         }
-    });
-
-    /* ---------- 11. Live list filter ---------- */
-
-    document.querySelectorAll('[data-filter-list]').forEach(function (input) {
-        var list = document.querySelector(input.getAttribute('data-filter-list'));
-        if (!list) { return; }
-        var empty = list.parentNode.querySelector('[data-filter-empty]');
-
-        input.addEventListener('input', function () {
-            var term = input.value.trim().toLowerCase();
-            var shown = 0;
-            list.querySelectorAll('[data-filter-item]').forEach(function (item) {
-                var match = term === '' || (item.getAttribute('data-filter-item') || '').indexOf(term) !== -1;
-                item.hidden = !match;
-                if (match) { shown++; }
-            });
-            if (empty) { empty.hidden = shown > 0; }
-        });
     });
 
     /* ---------- 12. Field errors ---------- */
@@ -587,4 +600,133 @@
             dialogEl.addEventListener('click', function (e) { if (e.target === dialogEl) { dialogEl.close(); } });
         }
     });
+
+    /* ---------- 15. Popups ---------- */
+
+    // <a href="fallback" data-modal-open="#id"> opens <dialog id="id" class="modal">.
+    // The link still works without JavaScript (the page renders the popup open).
+    function openModal(modal) {
+        if (!modal || typeof modal.showModal !== 'function') { return false; }
+        if (!modal.open) { modal.showModal(); }
+        return true;
+    }
+
+    document.addEventListener('click', function (e) {
+        var opener = e.target.closest('[data-modal-open]');
+        if (opener) {
+            if (openModal(document.querySelector(opener.getAttribute('data-modal-open')))) { e.preventDefault(); }
+            return;
+        }
+
+        var closer = e.target.closest('[data-modal-close]');
+        if (closer && closer.closest('dialog')) { closer.closest('dialog').close(); }
+    });
+
+    document.querySelectorAll('dialog.modal').forEach(function (modal) {
+        if (modal.hasAttribute('data-modal-autoopen')) { openModal(modal); }
+
+        modal.addEventListener('close', function () {
+            // An edit popup belongs to its URL: closing it goes back to the plain list.
+            var back = modal.getAttribute('data-modal-return');
+            if (back) { window.location.replace(back); return; }
+
+            // Drop ?new=1 so a refresh does not reopen the popup.
+            if (/[?&]new=/.test(window.location.search) && window.history.replaceState) {
+                var url = new URL(window.location.href);
+                url.searchParams.delete('new');
+                window.history.replaceState(null, '', url.toString());
+            }
+        });
+    });
+
+    /* ---------- 16. File preview ---------- */
+
+    // Shows the chosen PDF or image next to the form, so details can be checked against it.
+    document.querySelectorAll('[data-file-preview]').forEach(function (pane) {
+        var input = pane.querySelector('[data-file-input]');
+        var frame = pane.querySelector('[data-preview-frame]');
+        var img = pane.querySelector('[data-preview-img]');
+        var pdf = pane.querySelector('[data-preview-pdf]');
+        var empty = pane.querySelector('[data-preview-empty]');
+        var remove = pane.querySelector('input[name="remove_file"], input[name="remove_receipt"]');
+        if (!input || !frame || !img || !pdf) { return; }
+
+        var initial = { shown: !frame.hidden, pdf: !pdf.hidden, src: pdf.hidden ? img.getAttribute('src') : pdf.getAttribute('src') };
+        var objectUrl = null;
+
+        function show(kind, src) {
+            img.hidden = kind !== 'img';
+            pdf.hidden = kind !== 'pdf';
+            if (kind === 'img') { img.src = src; }
+            if (kind === 'pdf') { pdf.src = src; }
+            frame.hidden = !kind;
+            if (empty) { empty.hidden = !!kind; }
+        }
+
+        function restore() {
+            if (initial.shown) { show(initial.pdf ? 'pdf' : 'img', initial.src); } else { show(null); }
+        }
+
+        input.addEventListener('change', function () {
+            var file = input.files && input.files[0];
+            if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+            if (!file) { restore(); return; }
+
+            if (remove) { remove.checked = false; }
+            objectUrl = URL.createObjectURL(file);
+            if (file.type === 'application/pdf') {
+                show('pdf', objectUrl);
+            } else if (/^image\//.test(file.type)) {
+                show('img', objectUrl);
+            } else {
+                show(null);
+            }
+        });
+
+        if (remove) {
+            remove.addEventListener('change', function () {
+                if (remove.checked) {
+                    input.value = '';
+                    show(null);
+                } else {
+                    restore();
+                }
+            });
+        }
+    });
+
+    /* ---------- 17. Submit confirm ---------- */
+
+    // <form data-submit-confirm="Message"> asks once ("Yes, submit" / "Review again")
+    // before sending - used where the sender cannot change the record afterwards.
+    // Runs before the AJAX handler (capture phase) and hands back to it on "yes".
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-submit-confirm')) { return; }
+
+        if (form.dataset.submitConfirmed === '1') {
+            delete form.dataset.submitConfirmed;
+            return;
+        }
+
+        // Required fields still empty: let the server's field errors show first.
+        var missing = Array.prototype.some.call(form.querySelectorAll('[required]'), function (field) {
+            return String(field.value || '').trim() === '';
+        });
+        if (missing) { return; }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        askConfirm({
+            title: form.getAttribute('data-submit-confirm-title') || 'Submit now?',
+            message: form.getAttribute('data-submit-confirm'),
+            ok: 'Yes, submit',
+            cancel: 'Review again',
+            tone: 'primary'
+        }, function () {
+            form.dataset.submitConfirmed = '1';
+            if (typeof form.requestSubmit === 'function') { form.requestSubmit(); } else { form.submit(); }
+        });
+    }, true);
 })();

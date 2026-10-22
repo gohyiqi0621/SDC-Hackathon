@@ -23,7 +23,7 @@
         <h3 id="confirmTitle" data-confirm-title>Are you sure?</h3>
         <p data-confirm-message></p>
         <div class="confirm-actions">
-            <button class="secondary-btn" type="submit" value="cancel">Cancel</button>
+            <button class="secondary-btn" type="submit" value="cancel" data-confirm-cancel>Cancel</button>
             <button class="danger-btn" type="submit" value="confirm" data-confirm-button>Confirm</button>
         </div>
     </form>

@@ -110,7 +110,7 @@ function fail(string $message, string $hint = ''): never
 /* ----------------------------------------------------------- pre-flight --- */
 
 line();
-line('  SDC App - local setup');
+line('  SME Smart - local setup');
 line('  ' . str_repeat('-', 50));
 line();
 

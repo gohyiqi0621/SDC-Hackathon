@@ -93,7 +93,7 @@ unset($__source);
 unset($__envPath, $__envFile, $__key, $__value, $__line);
 
 /* --------------------------------------------------------------- config --- */
-define('APP_NAME', (string) env('APP_NAME', 'Smart SME'));
+define('APP_NAME', (string) env('APP_NAME', 'SME Smart'));
 define('APP_ENV', (string) env('APP_ENV', 'production'));
 define('APP_DEBUG', filter_var(env('APP_DEBUG', 'false'), FILTER_VALIDATE_BOOL));
 define('APP_TIMEZONE', (string) env('APP_TIMEZONE', 'Asia/Kuala_Lumpur'));

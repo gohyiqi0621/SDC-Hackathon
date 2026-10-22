@@ -1,6 +1,6 @@
 # Local development configuration.
 # This file is git-ignored and holds the database password - never commit it.
-APP_NAME="Smart SME"
+APP_NAME="SME Smart"
 APP_URL=http://localhost/SDC-Hackathon/public
 APP_ENV=local
 APP_DEBUG=true
@@ -26,7 +26,7 @@ PASSWORD_MIN_LENGTH=8
 # The sender address must be verified in your Brevo account.
 BREVO_API_KEY=
 BREVO_SENDER_EMAIL=
-BREVO_SENDER_NAME="Smart SME"
+BREVO_SENDER_NAME="SME Smart"
 BREVO_API_URL=https://api.brevo.com/v3/smtp/email
 
 # Optional CA bundle for outgoing HTTPS on Windows.

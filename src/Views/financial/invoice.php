@@ -2,12 +2,19 @@
 /**
  * financial/invoice.php - the signed-in user's invoices.
  *
+ * Anyone can view and upload; a Supervisor also sees edit, mark paid and delete.
+ *
  * Expects: $invoices, $total (matching filters), $allCount, $stats,
- * $filters [q, status, sort], $page, $pages, $perPage.
+ * $filters [q, status, sort], $page, $pages, $perPage, $modal, $modalOpen.
  */
 use Src\Models\Invoice;
 
 view('layouts/header', ['title' => 'Invoice']);
+
+$supervisor = is_supervisor();
+// While the popup is editing an invoice, "Upload invoice" reloads into a blank one.
+$newUrl     = url('financial', ['action' => 'invoice', 'new' => 1]);
+$openNew    = $modal['invoice'] === null ? ' data-modal-open="#invoiceModal"' : '';
 
 $filtered  = $filters['q'] !== '' || $filters['status'] !== '';
 $listQuery = array_filter([
@@ -27,7 +34,7 @@ $today     = date('Y-m-d');
         <p>Track every invoice, its file and whether it has been paid.</p>
     </div>
     <div class="welcome-actions">
-        <a class="primary-btn" href="<?= e(url('financial', ['action' => 'upload'])) ?>">
+        <a class="primary-btn" href="<?= e($newUrl) ?>"<?= $openNew ?>>
             <i class="fa-solid fa-cloud-arrow-up"></i> Upload invoice
         </a>
     </div>
@@ -110,7 +117,7 @@ $today     = date('Y-m-d');
                 <div class="empty-icon"><i class="fa-solid fa-file-invoice"></i></div>
                 <h3>No invoices yet</h3>
                 <p>Upload an invoice file or type one in by hand to start tracking it.</p>
-                <a class="primary-btn" href="<?= e(url('financial', ['action' => 'upload'])) ?>">
+                <a class="primary-btn" href="<?= e($newUrl) ?>"<?= $openNew ?>>
                     <i class="fa-solid fa-cloud-arrow-up"></i> Upload invoice
                 </a>
             </div>
@@ -134,7 +141,9 @@ $today     = date('Y-m-d');
                             <th>Due</th>
                             <th class="num">Amount</th>
                             <th>Status</th>
-                            <th class="actions"><span class="sr-only">Actions</span></th>
+                            <?php if ($supervisor): ?>
+                                <th class="actions"><span class="sr-only">Actions</span></th>
+                            <?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
@@ -164,21 +173,35 @@ $today     = date('Y-m-d');
                                 </td>
                                 <td data-label="Amount" class="num"><?= e(format_money($row['amount'], $row['currency'])) ?></td>
                                 <td data-label="Status"><span class="badge <?= e($statusClass) ?>"><?= e($statusLabel) ?></span></td>
-                                <td class="actions">
-                                    <a class="icon-btn" href="<?= e(url('financial', ['action' => 'edit', 'id' => $row['id']])) ?>" title="Edit" aria-label="Edit <?= e($row['invoice_number']) ?>">
-                                        <i class="fa-regular fa-pen-to-square"></i>
-                                    </a>
-                                    <form method="post" action="<?= e(url('financial', ['action' => 'delete'])) ?>"
-                                          data-confirm="Remove invoice &quot;<?= e($row['invoice_number']) ?>&quot; and its file? This cannot be undone."
-                                          data-confirm-title="Remove invoice?" data-confirm-ok="Remove">
-                                        <?= csrf_field() ?>
-                                        <input type="hidden" name="id" value="<?= (int) $row['id'] ?>">
-                                        <input type="hidden" name="return" value="<?= e($listUrl) ?>">
-                                        <button class="icon-btn icon-btn--danger" type="submit" title="Remove" aria-label="Remove <?= e($row['invoice_number']) ?>">
-                                            <i class="fa-regular fa-trash-can"></i>
-                                        </button>
-                                    </form>
-                                </td>
+                                <?php if ($supervisor): ?>
+                                    <td class="actions">
+                                        <?php if ($row['status'] !== 'paid'): ?>
+                                            <form method="post" action="<?= e(url('financial', ['action' => 'mark_paid'])) ?>"
+                                                  data-confirm="Mark invoice &quot;<?= e($row['invoice_number']) ?>&quot; as fully paid?"
+                                                  data-confirm-title="Mark as paid?" data-confirm-ok="Mark paid" data-confirm-tone="primary">
+                                                <?= csrf_field() ?>
+                                                <input type="hidden" name="id" value="<?= (int) $row['id'] ?>">
+                                                <input type="hidden" name="return" value="<?= e($listUrl) ?>">
+                                                <button class="icon-btn icon-btn--ok" type="submit" title="Mark as paid" aria-label="Mark <?= e($row['invoice_number']) ?> as paid">
+                                                    <i class="fa-solid fa-circle-check"></i>
+                                                </button>
+                                            </form>
+                                        <?php endif; ?>
+                                        <a class="icon-btn" href="<?= e(url('financial', ['action' => 'invoice', 'edit' => $row['id']])) ?>" title="Edit" aria-label="Edit <?= e($row['invoice_number']) ?>">
+                                            <i class="fa-regular fa-pen-to-square"></i>
+                                        </a>
+                                        <form method="post" action="<?= e(url('financial', ['action' => 'delete'])) ?>"
+                                              data-confirm="Remove invoice &quot;<?= e($row['invoice_number']) ?>&quot; and its file? This cannot be undone."
+                                              data-confirm-title="Remove invoice?" data-confirm-ok="Remove">
+                                            <?= csrf_field() ?>
+                                            <input type="hidden" name="id" value="<?= (int) $row['id'] ?>">
+                                            <input type="hidden" name="return" value="<?= e($listUrl) ?>">
+                                            <button class="icon-btn icon-btn--danger" type="submit" title="Remove" aria-label="Remove <?= e($row['invoice_number']) ?>">
+                                                <i class="fa-regular fa-trash-can"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                <?php endif; ?>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -206,4 +229,6 @@ $today     = date('Y-m-d');
     </section>
 
 </div>
+
+<?php require __DIR__ . '/_invoice_modal.php'; ?>
 <?php view('layouts/footer'); ?>

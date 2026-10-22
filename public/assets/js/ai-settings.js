@@ -495,6 +495,7 @@
 
     var Company = (function () {
         var section = $('[data-section="company"]', root);
+        if (!section) { return null; }   // this page does not have this section
         var form = $('[data-form="company"]', section);
         var emptyNote = $('[data-empty-note]', form);
         var category = $('#business_category', form);
@@ -776,7 +777,7 @@
             editors[s.key].addEventListener('input', syncInstructions);
         });
 
-        /* ---- Generate SOPs with AI (Agnes) ------------------------------- */
+        /* ---- Generate instruction with AI (Agnes) ------------------------------- */
 
         var generateBtn = $('[data-sop-generate]', form);
         var aiResult = $('[data-sop-ai-result]', form);
@@ -818,7 +819,7 @@
                 if (!data || !data.sops || !data.sops.length) { throw new Error('Agnes AI returned no SOPs. Please try again.'); }
                 applySops(data.sops);
                 showAiResult(data);
-                toast('3 SOPs generated. Review them, then click Save.', 'success');
+                toast('Instructions generated. Review them, then click Save.', 'success');
             }).catch(function (error) {
                 var message = error && error.kind === 'unavailable'
                     ? 'AI generation is not available right now (the server endpoint could not be reached).'
@@ -834,8 +835,8 @@
                 var hasText = SOP.some(function (s) { return editors[s.key].value.trim() !== ''; });
                 if (!hasText) { generateSops(); return; }
                 confirmAction({
-                    title: 'Replace your SOPs?',
-                    message: 'Agnes AI will write 3 new SOPs and replace the text in all three sections. You can still reset before saving.',
+                    title: 'Replace your instructions?',
+                    message: 'Agnes AI will write new instructions and replace the text in all three sections. You can still reset before saving.',
                     confirmLabel: 'Generate'
                 }).then(function (ok) { if (ok) { generateSops(); } });
             });
@@ -1025,6 +1026,7 @@
      */
     var Telegram = (function () {
         var section = $('[data-section="telegram"]', root);
+        if (!section) { return null; }   // this page does not have this section
         var form = $('[data-form="telegram"]', section);
         var badge = $('[data-status-badge="telegram"]', form);
         var result = $('[data-result]', form);
@@ -1318,6 +1320,7 @@
 
     var Calendar = (function () {
         var section = $('[data-section="calendar"]', root);
+        if (!section) { return null; }   // this page does not have this section
         var form = $('[data-form="calendar"]', section);
         var badge = $('[data-status-badge="calendar"]', form);
         var result = $('[data-result]', form);
@@ -1644,8 +1647,9 @@
         if (SECTION_NAMES[key]) { selectPageTab(key); }
     });
 
-    Promise.all([Company.load(), Assistant.load(), Telegram.load(), Calendar.load()]).then(function () {
-        if (oauthOutcome === 'connected' || oauthOutcome === 'error') {
+    // Pages may show only some sections (Staff Setting & Integration has only the assistant).
+    Promise.all([Company, Assistant, Telegram, Calendar].filter(Boolean).map(function (m) { return m.load(); })).then(function () {
+        if (Calendar && (oauthOutcome === 'connected' || oauthOutcome === 'error')) {
             Calendar.handleOAuthReturn(oauthOutcome, oauthMessage);
         }
     });
