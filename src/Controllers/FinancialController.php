@@ -13,6 +13,7 @@ namespace Src\Controllers;
 
 use PDOException;
 use Src\Models\Invoice;
+use Src\Models\InvoiceItem;
 use Src\Services\InvoiceService;
 
 final class FinancialController
@@ -33,7 +34,8 @@ final class FinancialController
             $modal = $this->newModal();
         } elseif (!empty($_GET['edit']) && is_supervisor()) {
             $invoice = $this->ownedOr404($user, (int) $_GET['edit']);
-            $modal   = ['invoice' => $invoice, 'values' => $invoice, 'errors' => []];
+            $values  = $invoice + ['items' => (new InvoiceItem())->forInvoice((int) $invoice['id'])];
+            $modal   = ['invoice' => $invoice, 'values' => $values, 'errors' => []];
         }
 
         $this->renderList($user, $modal);
@@ -254,7 +256,7 @@ final class FinancialController
     {
         return [
             'invoice' => null,
-            'values'  => ['issue_date' => date('Y-m-d'), 'currency' => 'MYR', 'status' => 'unpaid'],
+            'values'  => ['type' => 'purchase', 'issue_date' => date('Y-m-d'), 'currency' => 'MYR', 'status' => 'unpaid'],
             'errors'  => [],
         ];
     }
@@ -264,10 +266,12 @@ final class FinancialController
     {
         $sort   = (string) ($_GET['sort'] ?? 'newest');
         $status = (string) ($_GET['status'] ?? '');
+        $type   = (string) ($_GET['type'] ?? '');
 
         return [
             'q'      => mb_substr(trim((string) ($_GET['q'] ?? '')), 0, 100),
             'status' => in_array($status, Invoice::STATUSES, true) ? $status : '',
+            'type'   => isset(Invoice::TYPES[$type]) ? $type : '',
             'sort'   => isset(Invoice::SORTS[$sort]) ? $sort : 'newest',
         ];
     }
