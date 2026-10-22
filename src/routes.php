@@ -176,6 +176,8 @@ $router->post(
 
     /* -------------------------------------------- AI chatbot: customer --- */
     $router->get('customer/settings', [ChatbotController::class, 'customerSettings'], $auth);
+    $router->get('customer/connections', [ChatbotController::class, 'customerConnections'], $auth);
+    $router->get('company', [ChatbotController::class, 'companyProfile'], $auth);
     $router->get('customer/chat', [ChatbotController::class, 'customerChat'], $auth);
     $router->get('customer/chat_feed', [ChatbotController::class, 'customerChatFeed'], $auth);
 
@@ -237,19 +239,25 @@ $router->post(
     $router->post('tools/buy_product', [ToolController::class, 'buyProduct'], [], false);
     $router->post('tools/check_availability', [ToolController::class, 'checkAvailability'], [], false);
     $router->post('tools/make_booking', [ToolController::class, 'makeBooking'], [], false);
-    // Staff assistant tools (staff tokens only, read-only).
+    // Staff assistant tools (staff tokens only; send_email_reply needs the staff member's OK).
     $router->post('tools/check_invoice', [ToolController::class, 'checkInvoice'], [], false);
     $router->post('tools/check_claims', [ToolController::class, 'checkClaims'], [], false);
     $router->post('tools/check_orders', [ToolController::class, 'checkOrders'], [], false);
+    $router->post('tools/check_email', [ToolController::class, 'checkEmail'], [], false);
+    $router->post('tools/read_email', [ToolController::class, 'readEmail'], [], false);
+    $router->post('tools/send_email_reply', [ToolController::class, 'sendEmailReply'], [], false);
+    $router->post('tools/send_email', [ToolController::class, 'sendEmail'], [], false);
+    $router->post('tools/review_receipt', [ToolController::class, 'reviewReceipt'], [], false);
 
     // Preview of the system message built from AI Settings.
     $router->get('customer/system_message', [ChatbotController::class, 'customerSystemMessage'], $auth);
 
     /* ----------------------------------------------- AI chatbot: staff --- */
     $router->get('staff/settings', [ChatbotController::class, 'staffSettings'], $auth);
+    $router->get('staff/connections', [ChatbotController::class, 'staffConnections'], $auth);
     $router->get('staff/chat', [ChatbotController::class, 'staffChat'], $auth);
     $router->post('staff/chat_send', [ChatbotController::class, 'staffChatSend'], $auth);
-    $router->get('staff/system_message', [ChatbotController::class, 'staffSystemMessage'], $auth);
+    $router->post('staff/order_decide', [ChatbotController::class, 'staffOrderDecide'], $auth);
 
     /* -------------------------------------------------------- profile --- */
     $router->get('profile', [ProfileController::class, 'index'], $auth);

@@ -24,7 +24,7 @@ view('layouts/header', ['title' => $title, 'styles' => ['assets/css/conversation
                     <h1>Chats</h1>
                     <p><span class="msgr-live" data-live><i></i> Live</span> <span data-count></span></p>
                 </div>
-                <a class="icon-btn" href="<?= e($settingsUrl) ?>" title="Setting &amp; Integration" aria-label="Setting &amp; Integration">
+                <a class="icon-btn" href="<?= e($settingsUrl) ?>" title="Setup" aria-label="Setup">
                     <i class="fa-solid fa-sliders"></i>
                 </a>
             </div>
@@ -55,19 +55,12 @@ view('layouts/header', ['title' => $title, 'styles' => ['assets/css/conversation
 
             <details class="msgr-orders" data-orders hidden>
                 <summary>
-                    <span class="msgr-orders__icon" aria-hidden="true"><i class="fa-solid fa-bag-shopping"></i></span>
-                    <span class="msgr-orders__title">Today's orders</span>
+                    <i class="fa-solid fa-bag-shopping" aria-hidden="true"></i>
+                    <span>Today's orders</span>
                     <span class="msgr-orders__count" data-orders-count>0</span>
-                    <span class="msgr-orders__alert" data-orders-alert hidden></span>
-                    <span class="msgr-orders__toggle"><span class="msgr-orders__show">Show</span><span class="msgr-orders__hide">Hide</span>
-                        <i class="fa-solid fa-chevron-up msgr-orders__chev" aria-hidden="true"></i></span>
+                    <i class="fa-solid fa-chevron-up msgr-orders__chev" aria-hidden="true"></i>
                 </summary>
-                <div class="msgr-orders__panel">
-                    <div class="msgr-orders__cols" aria-hidden="true">
-                        <span>Order</span><span>Items</span><span>Status</span><span class="num">Total</span><span></span>
-                    </div>
-                    <ul data-orders-list role="list"></ul>
-                </div>
+                <ul data-orders-list role="list"></ul>
             </details>
 
             <footer class="msgr-foot" data-foot hidden>

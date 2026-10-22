@@ -56,12 +56,10 @@ final class AiSettingsController
      * the provider's API expects. Add a row here to offer another model.
      */
     public const AI_MODELS = [
-        'claude-haiku-5-5'    => ['Claude Haiku 5.5',    'Anthropic'],
+        'claude-haiku-4-5'    => ['Claude Haiku 4.5',    'Anthropic'],
         'agnes-2.5-flash'     => ['Agnes 2.5 Flash',     'Agnes'],
-        'gpt-6-luna'          => ['GPT-6 Luna',          'OpenAI'],
-        'deepseek-v4.1-flash' => ['DeepSeek V4.1 Flash', 'DeepSeek'],
     ];
-    public const DEFAULT_AI_MODEL    = 'claude-haiku-5-5';
+    public const DEFAULT_AI_MODEL    = 'claude-haiku-4-5';
 
     /** Reply language choices (ai_assistant_settings.reply_language, migration 010). */
     public const REPLY_LANGUAGES = [
@@ -73,15 +71,17 @@ final class AiSettingsController
     ];
     public const DEFAULT_TEMPERATURE = 0.7;
 
+    /** Models that reject a temperature (newer Claude): it is not sent to Flowise for these. */
+    public const NO_TEMPERATURE_MODELS = ['claude-haiku-5-5'];
+
     /**
      * Models offered before, mapped to the nearest model still on the list, so
      * a row saved earlier keeps working with the same provider and key.
      */
     private const LEGACY_MODELS = [
-        'claude-sonnet-5-5' => 'claude-haiku-5-5',
-        'claude-opus-5-5'   => 'claude-haiku-5-5',
-        'deepseek-v4-flash' => 'deepseek-v4.1-flash',
-        'deepseek-v4-pro'   => 'deepseek-v4.1-flash',
+        'claude-haiku-5-5'  => 'claude-haiku-4-5',
+        'claude-sonnet-5-5' => 'claude-haiku-4-5',
+        'claude-opus-5-5'   => 'claude-haiku-4-5',
     ];
 
     /** What each provider's secret keys start with (a quick sanity check, not a real test). Agnes keys have no fixed prefix. */
@@ -234,9 +234,9 @@ final class AiSettingsController
         $this->assistantSaveFor(new StaffAiAssistantSetting());
     }
 
-    /** Staff assistant functions (checkboxes on Staff Setting & Integration): key => [label, icon, hint]. */
+    /** Staff assistant functions (checkboxes on Staff Assistant Setup): key => [label, icon, hint]. */
     public const STAFF_FUNCTIONS = [
-        'check_email'   => ['Check email',    'fa-regular fa-envelope',       'Read and summarise the connected Gmail inbox.'],
+        'check_email'   => ['Check email',    'fa-regular fa-envelope',       'List, summarise and reply to emails in the Gmail connected on the Dashboard.'],
         'check_invoice' => ['Check invoice',  'fa-solid fa-file-invoice',     'Look up invoices, amounts and payment status.'],
         'check_claims'  => ['Check claims',   'fa-solid fa-receipt',          'Look up expense claims and their approval status.'],
         'check_orders'  => ['Check orders',   'fa-solid fa-bag-shopping',     'Look up customer orders, receipts and shipping.'],
@@ -658,7 +658,7 @@ final class AiSettingsController
         unset($_SESSION[self::OAUTH_SESSION_KEY]); // single use
 
         $back = static function (string $outcome, string $message = ''): never {
-            $params = ['action' => 'settings', 'gcal' => $outcome];
+            $params = ['action' => 'connections', 'gcal' => $outcome];
             if ($message !== '') {
                 $params['gcal_message'] = $message;
             }

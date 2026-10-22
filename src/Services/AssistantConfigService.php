@@ -57,7 +57,7 @@ final class AssistantConfigService
     }
 
     /**
-     * The staff assistant (Staff > Setting & Integration): same shape, read
+     * The staff assistant (Staff Assistant > Setup): same shape, read
      * from staff_ai_assistant_settings, plus 'functions' (the ticked checks,
      * e.g. ['check_invoice', 'check_orders']).
      */
@@ -69,7 +69,7 @@ final class AssistantConfigService
             ? array_values(array_filter(explode(',', (string) $row['functions'])))
             : array_keys(AiSettingsController::STAFF_FUNCTIONS);   // migration 016 not run: all on
         $config['problems'] = str_replace('AI assistant settings are not saved yet.',
-            'Staff AI assistant settings are not saved yet (Staff > Setting & Integration).', $config['problems']);
+            'Staff AI assistant settings are not saved yet (Staff Assistant > Setup).', $config['problems']);
         return $config;
     }
 

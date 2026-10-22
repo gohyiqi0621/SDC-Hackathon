@@ -19,10 +19,12 @@ final class GmailController
     {
         require_login();
         $gmail = new GmailService();
+        // Started from Staff Assistant > Connections: come back there afterwards.
+        $_SESSION['gmail_return'] = ($_GET['return'] ?? '') === 'staff' ? 'staff' : 'dashboard';
 
         if (!$gmail->isConfigured()) {
             flash('error', 'Add GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET to the .env file first.', 'Gmail is not set up');
-            redirect(url('dashboard'));
+            redirect($this->back());
         }
 
         $_SESSION['gmail_oauth_state'] = bin2hex(random_bytes(32));
@@ -39,12 +41,12 @@ final class GmailController
 
         if (isset($_GET['error'])) {
             flash('error', 'Gmail was not connected because access was cancelled or denied.', 'Gmail not connected');
-            redirect(url('dashboard'));
+            redirect($this->back());
         }
 
         if ($expected === '' || $state === '' || !hash_equals($expected, $state)) {
             flash('error', 'The Gmail sign-in link expired or was not started here. Please connect again.', 'Gmail not connected');
-            redirect(url('dashboard'));
+            redirect($this->back());
         }
 
         $code  = (string) ($_GET['code'] ?? '');
@@ -52,11 +54,11 @@ final class GmailController
 
         if ($email === null) {
             flash('error', 'Google did not accept the sign-in. Check the client ID, secret and redirect URI, then try again.', 'Gmail not connected');
-            redirect(url('dashboard'));
+            redirect($this->back());
         }
 
         flash('success', 'Gmail ' . $email . ' is connected. Your inbox is loading.', 'Gmail connected');
-        redirect(url('dashboard'));
+        redirect($this->back());
     }
 
     public function inbox(): void
@@ -254,9 +256,10 @@ public function thread(): void
     {
         $user = require_login();
         (new GmailService())->disconnect((int) $user['id']);
+        $_SESSION['gmail_return'] = ($_POST['return'] ?? '') === 'staff' ? 'staff' : 'dashboard';
 
         flash('success', 'Gmail was disconnected. The dashboard shows demo emails again.', 'Gmail disconnected');
-        redirect(url('dashboard'));
+        redirect($this->back());
     }
 
 
@@ -406,4 +409,12 @@ public function thread(): void
     }
 
     
+
+    /** Where to go after connecting / disconnecting: the Dashboard, or Staff Assistant > Connections. */
+    private function back(): string
+    {
+        $staff = ($_SESSION['gmail_return'] ?? '') === 'staff';
+        unset($_SESSION['gmail_return']);
+        return $staff ? url('staff', ['action' => 'connections']) . '#gmail' : url('dashboard');
+    }
 }

@@ -128,6 +128,30 @@
 
     /* ---------------------------------------------------------- messages */
 
+    /** Staff-only card under a reply the AI could not give: why, and how to fix it. */
+    function problemCard(pr, side) {
+        var card = node('div', 'msgr-problem msgr-problem--' + side);
+        var head = node('div', 'msgr-problem__head');
+        head.appendChild(node('i', 'fa-solid fa-triangle-exclamation'));
+        head.appendChild(node('strong', null, pr.title || 'The AI could not answer'));
+        head.appendChild(node('span', 'msgr-problem__tag', 'Only staff see this'));
+        card.appendChild(head);
+        if (pr.why) { card.appendChild(node('p', null, pr.why)); }
+        if (pr.fix) {
+            var fix = node('p', 'msgr-problem__fix');
+            fix.appendChild(node('b', null, 'How to fix: '));
+            fix.appendChild(document.createTextNode(pr.fix));
+            card.appendChild(fix);
+        }
+        if (pr.detail) {
+            var det = node('details');
+            det.appendChild(node('summary', null, 'Technical detail'));
+            det.appendChild(node('code', null, pr.detail));
+            card.appendChild(det);
+        }
+        return card;
+    }
+
     function appendMessages(messages) {
         var stick = nearBottom() || state.lastId === 0;
         messages.forEach(function (m) {
@@ -162,6 +186,7 @@
             bubble.appendChild(meta);
             wrap.appendChild(bubble);
             el.body.appendChild(wrap);
+            if (m.problem) { el.body.appendChild(problemCard(m.problem, 'right')); }
         });
         if (messages.length) {
             if (stick) { toBottom(); } else { el.jump.hidden = false; }

@@ -28,7 +28,7 @@ final class FlowLog
 {
     private const MAX_STRING = 12000; // room for the whole system message
     private const SECRET_KEYS = ['token', 'bot_token', 'api_key', 'apikey', 'provider_api_key', 'tool_token',
-                                 'authorization', 'secret', 'webhook_secret', 'password', 'key'];
+                                 'authorization', 'secret', 'webhook_secret', 'password', 'key', 'openaiapikey', 'anthropicapikey'];
 
     private static ?string $requestId = null;
 

@@ -1199,6 +1199,198 @@ public function thread(int $userId, string $threadId): array
     }
 
     /**
+     * Staff assistant (tools/check_email): messages with these Gmail labels
+     * and/or matching a Gmail search ("from:ali invoice", "after:2026/10/01").
+     * Metadata and snippet only, newest first.
+     *
+     * @param list<string> $labels INBOX, IMPORTANT, UNREAD, STARRED, SENT, SPAM, TRASH, CATEGORY_*
+     * @return array{ok: bool, emails?: list<array>, estimate?: int, error?: string, reconnect?: bool}
+     */
+    public function search(int $userId, array $labels, string $query = '', int $max = 10): array
+    {
+        $token = $this->accessToken($userId);
+        if ($token === null) {
+            return ['ok' => false, 'reconnect' => true,
+                    'error' => 'Gmail is not connected, or the connection expired. Connect Gmail on the Dashboard first.'];
+        }
+
+        $url = self::API_URL . '/messages?maxResults=' . max(1, min(50, $max));
+        foreach ($labels as $label) {
+            if (preg_match('/^[A-Z_]+$/', $label)) {
+                $url .= '&labelIds=' . rawurlencode($label);
+            }
+        }
+        $query = trim(str_replace(["\r", "\n"], ' ', $query));
+        if ($query !== '') {
+            $url .= '&q=' . rawurlencode(mb_substr($query, 0, 300));
+        }
+        if (array_intersect($labels, ['SPAM', 'TRASH']) !== []) {
+            $url .= '&includeSpamTrash=true';
+        }
+
+        $list = HttpClient::get($url, $this->auth($token));
+        if ($list['status'] === 401) {
+            return ['ok' => false, 'reconnect' => true, 'error' => 'Gmail access expired. Please connect Gmail again on the Dashboard.'];
+        }
+        if ($list['status'] !== 200 || !is_array($list['body'])) {
+            error_log('[gmail] search failed: HTTP ' . $list['status']);
+            return ['ok' => false, 'error' => 'Could not load Gmail right now (HTTP ' . $list['status'] . ').'];
+        }
+
+        $urls = [];
+        foreach ($list['body']['messages'] ?? [] as $message) {
+            $id = (string) ($message['id'] ?? '');
+            if (preg_match('/^[A-Za-z0-9]+$/', $id)) {
+                $urls[$id] = self::API_URL . '/messages/' . $id . '?format=metadata'
+                    . '&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date';
+            }
+        }
+
+        $emails = [];
+        foreach (HttpClient::getMany($urls, $this->auth($token)) as $id => $detail) {
+            if ($detail['status'] !== 200 || !is_array($detail['body'])) {
+                continue;
+            }
+            $email = $this->toEmail((string) $id, $detail['body']);
+            $email['to'] = '';
+            foreach ($detail['body']['payload']['headers'] ?? [] as $header) {
+                if (strtolower((string) ($header['name'] ?? '')) === 'to') {
+                    $email['to'] = (string) ($header['value'] ?? '');
+                }
+            }
+            $emails[] = $email;
+        }
+        usort($emails, static fn ($a, $b) => ($b['timestamp'] ?? 0) <=> ($a['timestamp'] ?? 0));
+
+        return ['ok' => true, 'emails' => $emails, 'estimate' => (int) ($list['body']['resultSizeEstimate'] ?? count($emails))];
+    }
+
+    /**
+     * Staff assistant (tools/send_email): a new email (not a reply) from the
+     * connected Gmail. $to / $cc: addresses separated by commas ("Ali <a@b.my>"
+     * is fine). Plain text.
+     *
+     * @return array{ok: bool, id?: ?string, to?: list<string>, error?: string, reconnect?: bool}
+     */
+    public function sendNew(int $userId, string $to, string $subject, string $body, string $cc = ''): array
+    {
+        $parse = static function (string $list): ?array {
+            $out = [];
+            foreach (preg_split('/[,;]+/', $list) ?: [] as $part) {
+                $part = trim($part);
+                if ($part === '') {
+                    continue;
+                }
+                $email = preg_match('/<([^<>]+)>/', $part, $m) ? trim($m[1]) : $part;
+                if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    return null;
+                }
+                $out[strtolower($email)] = $email;
+            }
+            return array_values($out);
+        };
+        $toList = $parse($to);
+        $ccList = $parse($cc);
+        if ($toList === null || $toList === [] || $ccList === null) {
+            return ['ok' => false, 'error' => 'Invalid email address. Use addresses like name@example.com.'];
+        }
+        if (count($toList) + count($ccList) > 10) {
+            return ['ok' => false, 'error' => 'Too many recipients (10 at most).'];
+        }
+        $subject = trim(str_replace(["\r", "\n"], ' ', $subject));
+        if ($subject === '' || trim($body) === '') {
+            return ['ok' => false, 'error' => 'The email needs a subject and a message.'];
+        }
+
+        $token = $this->accessToken($userId);
+        if ($token === null) {
+            return ['ok' => false, 'reconnect' => true,
+                    'error' => 'Gmail is not connected, or the connection expired. Connect Gmail on the Dashboard first.'];
+        }
+        $from = (string) ((new GmailConnection())->find($userId)['google_email'] ?? '');
+        if (!filter_var($from, FILTER_VALIDATE_EMAIL)) {
+            return ['ok' => false, 'error' => 'Invalid connected Gmail address.'];
+        }
+
+        $mime = [
+            'From: ' . $from,
+            'To: ' . implode(', ', $toList),
+        ];
+        if ($ccList !== []) {
+            $mime[] = 'Cc: ' . implode(', ', $ccList);
+        }
+        $mime = array_merge($mime, [
+            'Subject: =?UTF-8?B?' . base64_encode($subject) . '?=',
+            'MIME-Version: 1.0',
+            'Content-Type: text/plain; charset=UTF-8',
+            'Content-Transfer-Encoding: base64',
+            '',
+            chunk_split(base64_encode(str_replace("\r\n", "\n", $body))),
+        ]);
+
+        $response = HttpClient::postJson(
+            self::API_URL . '/messages/send',
+            ['raw' => rtrim(strtr(base64_encode(implode("\r\n", $mime)), '+/', '-_'), '=')],
+            $this->auth($token)
+        );
+        if ($response['status'] === 401) {
+            return ['ok' => false, 'reconnect' => true, 'error' => 'Gmail access expired. Please connect Gmail again on the Dashboard.'];
+        }
+        if ($response['status'] !== 200) {
+            $err = $response['body']['error'] ?? [];
+            $msg = is_array($err) ? (string) ($err['message'] ?? 'Unknown Gmail API error') : (string) $err;
+            error_log('[gmail] send new failed HTTP ' . $response['status'] . ': ' . $msg);
+            return ['ok' => false, 'error' => 'Gmail API Error (' . $response['status'] . '): ' . $msg];
+        }
+
+        return ['ok' => true, 'id' => $response['body']['id'] ?? null, 'to' => $toList, 'cc' => $ccList];
+    }
+
+    /**
+     * Staff assistant (tools/read_email): one message with its headers and
+     * plain-text body. Read only; nothing is changed in Gmail.
+     */
+    public function read(int $userId, string $messageId): array
+    {
+        if (!preg_match('/^[A-Za-z0-9]{6,64}$/', $messageId)) {
+            return ['ok' => false, 'error' => 'Invalid Gmail message id.'];
+        }
+        $token = $this->accessToken($userId);
+        if ($token === null) {
+            return ['ok' => false, 'reconnect' => true,
+                    'error' => 'Gmail is not connected, or the connection expired. Connect Gmail on the Dashboard first.'];
+        }
+
+        $response = HttpClient::get(self::API_URL . '/messages/' . $messageId . '?format=full', $this->auth($token));
+        if ($response['status'] === 401) {
+            return ['ok' => false, 'reconnect' => true, 'error' => 'Gmail access expired. Please connect Gmail again on the Dashboard.'];
+        }
+        if ($response['status'] === 404) {
+            return ['ok' => false, 'error' => 'No email with that id in this mailbox.'];
+        }
+        if ($response['status'] !== 200 || !is_array($response['body'])) {
+            return ['ok' => false, 'error' => 'Unable to load the email (HTTP ' . $response['status'] . ').'];
+        }
+
+        $message = $response['body'];
+        $headers = [];
+        foreach ($message['payload']['headers'] ?? [] as $header) {
+            $headers[strtolower((string) ($header['name'] ?? ''))] = (string) ($header['value'] ?? '');
+        }
+        $body = is_array($message['payload'] ?? null) ? $this->extractBody($message['payload']) : '';
+        if (trim($body) === '') {
+            $body = html_entity_decode((string) ($message['snippet'] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        return ['ok' => true, 'email' => $this->toEmail($messageId, $message) + [
+            'to'       => $headers['to'] ?? '',
+            'cc'       => $headers['cc'] ?? '',
+            'reply_to' => $headers['reply-to'] ?? '',
+            'body'     => $body,
+        ]];
+    }
+
+    /**
      * Convert Gmail metadata into dashboard email format.
      */
     private function toEmail(

@@ -2,8 +2,8 @@
 /**
  * ChatbotController.php - AI Chatbot for two audiences.
  *
- *   Customer: Setting & Integration, Product & Service (ProductController), Chat Interface
- *   Staff:    Setting & Integration, Chat Interface
+ *   Customer: Setup, Product & Service (ProductController), Chat Interface
+ *   Staff:    Setup, Chat Interface
  *
  * Customer settings use the AI Settings & Integration page (ai_settings/*).
  * Staff settings and both chat screens share chatbot/settings.php and
@@ -14,14 +14,20 @@ declare(strict_types=1);
 namespace Src\Controllers;
 
 use Src\Models\ChatMessage;
+use Src\Models\GmailConnection;
+use Src\Models\TelegramIntegration;
 use Src\Models\Order;
 use Src\Models\Product;
 use Src\Services\AssistantConfigService;
 use Src\Services\AssistantReplyService;
 use Src\Services\BrevoMailer;
 use Src\Services\FlowiseService;
+use Src\Services\GmailService;
+use Src\Services\SetupStatus;
+use Src\Services\OrderService;
 use Src\Services\SystemMessageBuilder;
 use Src\Services\StaffAssistantService;
+use Src\Support\AssistantErrorAdvice;
 use Throwable;
 
 final class ChatbotController
@@ -57,13 +63,87 @@ final class ChatbotController
         $user = require_login();
 
         view('ai_settings/index', [
+            'user'           => $user,
+            'userId'         => (int) $user['id'],
+            'endpoints'      => self::aiSettingsEndpoints(),
+            'aiModels'       => AiSettingsController::AI_MODELS,
+            'chatUrl'        => url('customer', ['action' => 'chat']),
+            'steps'          => SetupStatus::customer((int) $user['id']),
+            'companyUrl'     => url('company'),
+            'connectionsUrl' => url('customer', ['action' => 'connections']),
+        ]);
+    }
+
+    /** GET /?page=customer&action=connections - Telegram bot and Google Calendar. */
+    public function customerConnections(): void
+    {
+        $user = require_login();
+
+        view('ai_settings/connections', [
+            'user'                => $user,
+            'userId'              => (int) $user['id'],
+            'endpoints'           => self::aiSettingsEndpoints(),
+            'timezones'           => \DateTimeZone::listIdentifiers(),
+            'setupUrl'            => url('customer', ['action' => 'settings']),
+            'staffConnectionsUrl' => url('staff', ['action' => 'connections']),
+        ]);
+    }
+
+    /** GET /?page=company - Settings > Company Profile (used by both assistants). */
+    public function companyProfile(): void
+    {
+        $user = require_login();
+
+        view('ai_settings/company', [
             'user'               => $user,
             'userId'             => (int) $user['id'],
             'endpoints'          => self::aiSettingsEndpoints(),
             'businessCategories' => self::BUSINESS_CATEGORIES,
-            'timezones'          => \DateTimeZone::listIdentifiers(),
-            'aiModels'           => AiSettingsController::AI_MODELS,
-            'chatUrl'            => url('customer', ['action' => 'chat']),
+            'customerSetupUrl'   => url('customer', ['action' => 'settings']),
+            'staffSetupUrl'      => url('staff', ['action' => 'settings']),
+        ]);
+    }
+
+    /** GET /?page=staff&action=connections - Gmail (Check email) and your Telegram for staff alerts. */
+    public function staffConnections(): void
+    {
+        $user   = require_login();
+        $userId = (int) $user['id'];
+        $gmail  = new GmailService();
+
+        try {
+            $mail = (new GmailConnection())->find($userId);
+        } catch (Throwable $e) {
+            $mail = null;
+        }
+        try {
+            $tg = (new TelegramIntegration())->find($userId) ?? [];
+        } catch (Throwable $e) {
+            $tg = [];
+        }
+        $functions = (new AssistantConfigService())->forStaff($userId)['functions'];
+
+        view('chatbot/staff_connections', [
+            'user'     => $user,
+            'gmail'    => [
+                'configured'   => $gmail->isConfigured(),
+                'email'        => $mail !== null ? (string) $mail['google_email'] : null,
+                'connected_at' => $mail !== null && !empty($mail['created_at']) ? date('j M Y', strtotime((string) $mail['created_at'])) : null,
+                'needed'       => in_array('check_email', $functions, true),
+            ],
+            'telegram' => [
+                'bot_connected' => ($tg['connection_status'] ?? '') === 'connected' && !empty($tg['bot_username']),
+                'bot_username'  => (string) ($tg['bot_username'] ?? ''),
+                'staff_linked'  => !empty($tg['staff_telegram_chat_id']),
+                'staff_name'    => (string) ($tg['staff_linked_name'] ?? ''),
+            ],
+            'connectUrl'             => url('gmail', ['action' => 'connect', 'return' => 'staff']),
+            'disconnectUrl'          => url('gmail', ['action' => 'disconnect']),
+            'linkUrl'                => url('ai_settings', ['action' => 'telegram_staff_link']),
+            'unlinkUrl'              => url('ai_settings', ['action' => 'telegram_staff_unlink']),
+            'customerConnectionsUrl' => url('customer', ['action' => 'connections']),
+            'setupUrl'               => url('staff', ['action' => 'settings']),
+            'dashboardUrl'           => url('dashboard'),
         ]);
     }
 
@@ -190,6 +270,9 @@ final class ChatbotController
                     'status'  => $m['status'],
                     'at'      => date(DATE_ATOM, strtotime((string) $m['created_at'])),
                     'event'   => preg_match('/^(📎|🖼|🧾|✅|⚠️|📦|📅)/u', (string) $m['content']) === 1,
+                    // Why the AI did not answer, and how to fix it (staff only).
+                    'problem' => $m['role'] === 'assistant' && $m['status'] !== 'ok'
+                        ? AssistantErrorAdvice::explain((string) ($m['error_reason'] ?? ''), (string) $m['status']) : null,
                 ];
             }
 
@@ -314,9 +397,11 @@ final class ChatbotController
 
         view('chatbot/settings', [
             'user'         => $user,
-            'title'        => 'Staff Setting & Integration',
+            'title'        => 'Staff Assistant Setup',
             'audience'     => 'Staff',
-            'sub'          => 'Set up how the staff assistant helps your team.',
+            'sub'          => 'Get the assistant your team chats with ready: model, personality and what it may look up.',
+            'steps'          => SetupStatus::staff((int) $user['id']),
+            'connectionsUrl' => url('staff', ['action' => 'connections']),
             'assistant'    => ['name' => APP_NAME . ' Staff Assistant', 'greeting' => 'Hi! What do you need to look up?'],
             'productCount' => null,
             'integrations' => [
@@ -336,7 +421,11 @@ final class ChatbotController
         ]);
     }
 
-    /** GET /?page=staff&action=chat - the staff assistant (Flowise, staff tools). */
+    /**
+     * GET /?page=staff&action=chat[&session=<key>|new] - the staff assistant.
+     * Each "New chat" is its own session (own history and Flowise memory);
+     * old sessions stay in the list on the left and can be reopened.
+     */
     public function staffChat(): void
     {
         $user   = require_login();
@@ -345,26 +434,65 @@ final class ChatbotController
         $fns    = $config['functions'];
 
         $suggestions = array_values(array_filter([
+            in_array('check_email', $fns, true) ? 'Show my important emails' : null,
+            in_array('check_email', $fns, true) ? 'Any unread emails today that need a reply?' : null,
+            in_array('check_orders', $fns, true) ? 'Check the receipts waiting for review' : null,
             in_array('check_orders', $fns, true) ? 'How many orders today and the total?' : null,
             in_array('check_invoice', $fns, true) ? 'Which invoices are overdue?' : null,
             in_array('check_claims', $fns, true) ? 'Show claims waiting for approval' : null,
-            in_array('check_orders', $fns, true) ? 'Orders this week by day' : null,
+            in_array('check_email', $fns, true) ? 'Show emails I sent this week' : null,
         ]));
 
         $functions = [];
         foreach (AiSettingsController::STAFF_FUNCTIONS as $key => [$label, $icon]) {
-            $on = in_array($key, $fns, true);
-            $functions[] = [
-                'label' => $label,
-                'icon'  => $icon,
-                'state' => $key === 'check_email' ? 'soon' : ($on ? 'on' : 'off'),
-            ];
+            $functions[] = ['label' => $label, 'icon' => $icon, 'state' => in_array($key, $fns, true) ? 'on' : 'off'];
         }
 
+        $messages = new ChatMessage();
         try {
-            $history = (new ChatMessage())->recent($userId, StaffAssistantService::CHANNEL, StaffAssistantService::chatId($userId), 60);
+            $sessions = $messages->staffSessions($userId);
         } catch (Throwable $e) {
-            $history = [];
+            $sessions = [];
+        }
+
+        // Which session: ?session=<key>, "new", or the latest one.
+        $asked   = (string) ($_GET['session'] ?? '');
+        $session = null;
+        if ($asked !== '' && $asked !== 'new') {
+            $session = preg_match('/^(?:main|[a-z0-9]{4,20})$/', $asked) ? ($asked === 'main' ? '' : $asked) : null;
+        } elseif ($asked === '' && $sessions !== []) {
+            $session = StaffAssistantService::sessionOf($userId, $sessions[0]['chat_id']);
+        }
+        $isNew = $session === null;
+        if ($isNew) {
+            $session = StaffAssistantService::newSession();
+        }
+
+        $history = [];
+        if (!$isNew) {
+            try {
+                $history = $messages->recent($userId, StaffAssistantService::CHANNEL, StaffAssistantService::chatId($userId, $session), 200);
+            } catch (Throwable $e) {
+                $history = [];
+            }
+        }
+
+        $chatUrl = static fn (string $key): string => url('staff', ['action' => 'chat', 'session' => $key === '' ? 'main' : $key]);
+        $list = [];
+        foreach ($sessions as $row) {
+            $key = StaffAssistantService::sessionOf($userId, $row['chat_id']);
+            if ($key === null) {
+                continue;
+            }
+            $title  = trim((string) preg_replace('/\s+/u', ' ', $row['title']));
+            $list[] = [
+                'key'     => $key,
+                'title'   => $title !== '' ? mb_strimwidth($title, 0, 60, '…') : 'Chat',
+                'at'      => date(DATE_ATOM, strtotime($row['last_at'])),
+                'count'   => $row['messages'],
+                'url'     => $chatUrl($key),
+                'current' => !$isNew && $key === $session,
+            ];
         }
 
         view('chatbot/staff_chat', [
@@ -376,24 +504,88 @@ final class ChatbotController
             'problems'    => $config['problems'],
             'functions'   => $functions,
             'suggestions' => $suggestions,
-            'history'     => array_map(static fn (array $m): array => [
+            'sessions'    => $list,
+            'session'     => $session,
+            'isNew'       => $isNew,
+            'history'     => array_map(fn (array $m): array => [
                 'role'    => $m['role'] === 'customer' ? 'me' : 'ai',
-                'content' => (string) $m['content'],
+                'content' => StaffAssistantService::splitCards((string) $m['content'])[0],
+                'cards'   => $m['role'] === 'customer' ? [] : $this->freshCards($userId, StaffAssistantService::splitCards((string) $m['content'])[1]),
                 'status'  => (string) $m['status'],
                 'at'      => date(DATE_ATOM, strtotime((string) $m['created_at'])),
+                'problem' => $m['role'] !== 'customer' && $m['status'] !== 'ok'
+                    ? AssistantErrorAdvice::explain((string) ($m['error_reason'] ?? ''), (string) $m['status']) : null,
             ], $history),
             'sendUrl'     => url('staff', ['action' => 'chat_send']),
-            'previewUrl'  => url('staff', ['action' => 'system_message']),
+            'decideUrl'   => url('staff', ['action' => 'order_decide']),
+            'newUrl'      => url('staff', ['action' => 'chat', 'session' => 'new']),
+            'sessionUrl'  => $chatUrl($session),
             'settingsUrl' => url('staff', ['action' => 'settings']),
-            'chatflowSet' => StaffAssistantService::chatflowId() !== '',
+            'chatflowSet' => StaffAssistantService::chatflowId($config['provider']) !== '',
         ]);
     }
 
-    /** POST /?page=staff&action=chat_send (JSON) - one staff message through Flowise. */
+    /** Receipt cards show the order's current status (it may have been decided since). */
+    private function freshCards(int $userId, array $cards): array
+    {
+        foreach ($cards as &$card) {
+            if (($card['type'] ?? '') === 'receipt' && !empty($card['order_id'])) {
+                $order = (new Order())->find($userId, (int) $card['order_id']);
+                if ($order !== null) {
+                    $card['status']       = (string) $order['status'];
+                    $card['status_label'] = Order::STATUSES[$order['status']] ?? $order['status'];
+                }
+            }
+        }
+        unset($card);
+        return $cards;
+    }
+
+    /**
+     * POST /?page=staff&action=order_decide (JSON) - the Approve / Reject
+     * buttons on a receipt card in the staff chat. The staff member decides
+     * (same as the Orders page); the customer is told on Telegram.
+     */
+    public function staffOrderDecide(): void
+    {
+        $user     = require_login();
+        $userId   = (int) $user['id'];
+        $decision = (string) ($_POST['decision'] ?? '');
+        $reason   = mb_substr(trim((string) ($_POST['reason'] ?? '')), 0, 300);
+        $order    = (new Order())->find($userId, (int) ($_POST['id'] ?? 0));
+
+        if ($order === null) {
+            json_response(false, [], 'That order was not found.', 404);
+        }
+        if (!in_array($decision, ['approve', 'reject'], true)) {
+            json_response(false, [], 'Choose approve or reject.', 422);
+        }
+
+        try {
+            $result = $decision === 'approve'
+                ? (new OrderService())->approve($userId, $order)
+                : (new OrderService())->reject($userId, $order, $reason);
+        } catch (\RuntimeException $e) {
+            json_response(false, ['status' => $order['status'], 'status_label' => Order::STATUSES[$order['status']] ?? $order['status']],
+                $e->getMessage(), 409);
+        }
+
+        $status = (string) $result['order']['status'];
+        json_response(true, [
+            'status'       => $status,
+            'status_label' => Order::STATUSES[$status] ?? $status,
+            'notified'     => $result['notified'],
+        ], $decision === 'approve'
+            ? ($result['notified'] ? 'Approved. The customer was told on Telegram.' : 'Approved. The customer could not be messaged on Telegram.')
+            : ($result['notified'] ? 'Rejected. The customer was asked for a new receipt.' : 'Rejected. The customer could not be messaged on Telegram.'));
+    }
+
+    /** POST /?page=staff&action=chat_send (JSON) - one staff message through Flowise, in one chat session. */
     public function staffChatSend(): void
     {
         $user    = require_login();
         $message = trim((string) ($_POST['message'] ?? ''));
+        $session = (string) ($_POST['session'] ?? '');
 
         if ($message === '') {
             json_response(false, ['errors' => ['message' => 'Type a message first.']], 'Type a message first.', 422);
@@ -401,45 +593,12 @@ final class ChatbotController
         if (mb_strlen($message) > 4000) {
             json_response(false, ['errors' => ['message' => 'Keep the message under 4,000 characters.']], 'Message is too long.', 422);
         }
+        if ($session !== '' && $session !== 'main' && !preg_match('/^[a-z0-9]{4,20}$/', $session)) {
+            json_response(false, [], 'Unknown chat session. Reload the page.', 422);
+        }
 
-        $result = (new StaffAssistantService())->reply((int) $user['id'], (string) $user['name'], $message);
+        $result = (new StaffAssistantService())->reply((int) $user['id'], (string) $user['name'], $message,
+            $session === 'main' ? '' : $session);
         json_response(true, $result);
-    }
-
-    /** GET /?page=staff&action=system_message (JSON) - what the staff chatflow receives (secrets masked). */
-    public function staffSystemMessage(): void
-    {
-        $user    = require_login();
-        $userId  = (int) $user['id'];
-        $config  = (new AssistantConfigService())->forStaff($userId);
-        $staff   = new StaffAssistantService();
-        $system  = $staff->systemMessage($config);
-        $flowise = new FlowiseService();
-        $payload = $flowise->payload($config, $system, '<staff message>',
-            StaffAssistantService::CHANNEL . ':' . $userId . ':' . StaffAssistantService::chatId($userId), [
-                'channel' => StaffAssistantService::CHANNEL, 'customer_chat_id' => StaffAssistantService::chatId($userId),
-                'audience' => 'staff', 'staff_name' => (string) $user['name'], 'functions' => implode(',', $config['functions']),
-            ]);
-
-        if (isset($payload['overrideConfig']['vars']['provider_api_key'])) {
-            $key = (string) $payload['overrideConfig']['vars']['provider_api_key'];
-            $payload['overrideConfig']['vars']['provider_api_key'] = substr($key, 0, 7) . '…' . substr($key, -4);
-        }
-        if (!empty($payload['overrideConfig']['vars']['tool_token'])) {
-            $payload['overrideConfig']['vars']['tool_token'] = '(signed staff token, valid 30 minutes)';
-        }
-        $payload['overrideConfig']['systemMessage'] = '(the system message above)';
-        $chatflow = StaffAssistantService::chatflowId() ?: '(FLOWISE_STAFF_CHATFLOW_ID not set: the customer chatflow is used)';
-
-        json_response(true, [
-            'system_message'     => $system,
-            'payload'            => ['chatflow' => $chatflow] + $payload,
-            'enabled'            => $config['enabled'],
-            'problems'           => $config['problems'],
-            'flowise_configured' => FLOWISE_API_URL !== '',
-            'model'              => $config['ai_model'],
-            'provider'           => $config['provider'],
-            'temperature'        => $config['temperature'],
-        ]);
     }
 }

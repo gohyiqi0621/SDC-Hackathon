@@ -3047,3 +3047,37 @@ a.badge:hover {
         flex-direction: column-reverse;
     }
 }
+
+/* Sidebar: receipts-to-review badge and unfinished-setup dot */
+.nav-badge {
+    margin-left: auto;
+    min-width: 20px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: #ff5a7a;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 18px;
+    text-align: center;
+}
+.nav-dot {
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    margin-left: auto;
+    border-radius: 50%;
+    background: #f5a524;
+    box-shadow: 0 0 0 3px #fff3dc;
+}
+.nav-dot + .nav-caret { margin-left: 8px; }
+.sidebar-collapsed .nav-link { position: relative; }
+.sidebar-collapsed .nav-badge,
+.sidebar-collapsed .nav-dot {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    min-width: 0;
+    margin: 0;
+}
+.sidebar-collapsed .nav-badge { padding: 0 5px; font-size: 10px; line-height: 16px; }
