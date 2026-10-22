@@ -1008,3 +1008,468 @@
 .dashboard-draggable-card > :not(.dashboard-drag-header) {
     display: revert !important;
 }
+
+
+/* Gmail-style reply editor */
+
+.gmail-reply-editor {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-top: 14px;
+}
+
+.gmail-reply-to {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 13px 16px;
+    border-bottom: 1px solid #edf0f5;
+    font-size: 13px;
+    color: #737b90;
+}
+
+.gmail-reply-to strong {
+    color: #30364a;
+    overflow-wrap: anywhere;
+}
+
+.gmail-reply-editor #replyDraft {
+    display: block;
+    width: 100%;
+    min-height: 190px;
+    border: none;
+    border-radius: 0;
+    outline: none;
+    resize: vertical;
+    padding: 18px;
+    font-size: 14px;
+    line-height: 1.7;
+    box-sizing: border-box;
+    background: #fff;
+}
+
+.gmail-reply-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 11px 14px;
+    border-top: 1px solid #edf0f5;
+}
+
+.gmail-reply-toolbar button {
+    border: none;
+    background: transparent;
+    color: #626b80;
+    padding: 8px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.gmail-reply-toolbar button:hover {
+    background: #f0edff;
+    color: #6654dc;
+}
+
+.gmail-reply-toolbar button i {
+    margin-right: 5px;
+}
+
+#replyDraftStatus {
+    margin-left: auto;
+    font-size: 11px;
+    color: #9097a8;
+}
+
+.reply-attachment-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0 14px 10px;
+}
+
+.reply-attachment-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f3f2ff;
+    border: 1px solid #e5e1ff;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #5147a5;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+.reply-attachment-item button {
+    border: none;
+    background: transparent;
+    color: #7b70b3;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+/* ==========================================
+   SEND REPLY CONFIRMATION MODAL
+========================================== */
+
+.send-modal-backdrop[hidden] {
+    display: none !important;
+}
+
+.send-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+
+    background: rgba(20, 22, 45, 0.55);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+}
+
+.send-modal {
+    background: #ffffff;
+    width: min(420px, 100%);
+    padding: 32px;
+
+    border-radius: 18px;
+    text-align: center;
+
+    box-shadow: 0 20px 60px rgba(20, 22, 45, 0.2);
+}
+
+.send-modal-icon {
+    width: 62px;
+    height: 62px;
+
+    margin: 0 auto 18px;
+    border-radius: 50%;
+
+    background: #eeeaff;
+    color: #6d59ef;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 25px;
+}
+
+.send-modal h3 {
+    margin: 0 0 12px;
+    font-size: 20px;
+    font-weight: 700;
+    color: #25264c;
+}
+
+.send-modal p {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #8589a0;
+
+    margin: 0 0 25px;
+}
+
+.send-modal-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+.send-modal-actions button {
+    min-width: 115px;
+    padding: 11px 18px;
+    border-radius: 9px;
+    cursor: pointer;
+}
+
+@media (max-width: 480px) {
+    .send-modal {
+        padding: 24px 18px;
+    }
+}
+
+/* ==========================================
+   SENT EMAIL CONVERSATION THREAD
+========================================== */
+
+.conversation-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.conversation-message {
+    padding: 18px 0;
+}
+
+.conversation-message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.conversation-message-header strong {
+    font-size: 15px;
+    color: #25264c;
+}
+
+.conversation-message-header span {
+    font-size: 12px;
+    color: #8589a0;
+}
+
+.conversation-message-body {
+    font-size: 14px;
+    line-height: 1.8;
+    color: #414366;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.conversation-divider {
+    height: 1px;
+    background: #e9e8f3;
+}
+
+.conversation-sent-status {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 18px;
+    color: #2d9b72;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Gmail Conversation History */
+
+#emailBody .conversation-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    width: 100%;
+}
+
+#emailBody .conversation-message {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px 0;
+    margin: 0;
+    min-height: 0;
+    height: auto;
+}
+
+#emailBody .conversation-message-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 0;
+}
+
+#emailBody .conversation-message-body {
+    margin: 0;
+    padding: 8px 0 0;
+    min-height: 0;
+    height: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.6;
+}
+
+#emailBody .conversation-divider {
+    height: 1px;
+    background: #e5e7eb;
+    margin: 12px 0;
+}
+
+#emailBody .conversation-sent-status {
+    margin-top: 8px;
+    font-size: 12px;
+}
+
+
+/* Inbox Search */
+.inbox-search-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 18px;
+    padding: 12px 14px;
+    border: 1px solid #e6e7f0;
+    border-radius: 10px;
+    background: #f8f9fc;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.inbox-search-wrapper:focus-within {
+    border-color: #7865e9;
+    box-shadow: 0 0 0 3px rgba(120, 101, 233, 0.1);
+}
+
+.inbox-search-wrapper i {
+    color: #999db1;
+    font-size: 14px;
+}
+
+.inbox-search-wrapper input {
+    width: 100%;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    font: inherit;
+    font-size: 13px;
+    color: #292a48;
+}
+
+.inbox-search-wrapper input::placeholder {
+    color: #9a9db0;
+}
+
+/* Collapsible Email Details */
+#emailBody.email-body-collapsed {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+    line-clamp: 5;
+    overflow: hidden;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.email-view-more-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    padding: 12px;
+    margin: 4px 0 16px;
+    border: none;
+    border-top: 1px solid #eeedf5;
+    background: transparent;
+    color: #6d59ef;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.email-view-more-btn:hover {
+    color: #503acb;
+}
+
+.email-view-more-btn[hidden] {
+    display: none !important;
+}
+
+
+/* ========================================
+   GMAIL MORE ACTIONS DROPDOWN
+======================================== */
+
+#emailMoreMenu[hidden] {
+    display: none !important;
+}
+
+#emailMoreMenu {
+    position: absolute;
+    z-index: 99999;
+    box-sizing: border-box;
+    width: 240px;
+    max-width: calc(100vw - 24px);
+    padding: 8px;
+    pointer-events: auto;
+
+    background: #ffffff;
+    border: 1px solid #e6e6f2;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(8, 8, 11, 0.15);
+}
+
+#emailMoreMenu button {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 10px 12px;
+    margin: 0;
+
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+
+    color: #545b82;
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+#emailMoreMenu button:hover {
+    background: #f1efff;
+    color: #6558e8;
+}
+
+/* Gmail More Menu — final positioning fix */
+
+#emailMoreMenu[hidden] {
+    display: none !important;
+}
+
+#emailMoreMenu:not([hidden]) {
+    display: block !important;
+    position: fixed !important;
+    z-index: 999999 !important;
+
+    width: 220px !important;
+    max-width: calc(100vw - 16px) !important;
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+
+    background: #ffffff;
+    border: 1px solid #e6e6f2;
+    border-radius: 12px;
+    padding: 8px;
+    box-shadow: 0 12px 30px rgba(30, 30, 70, 0.15);
+
+    pointer-events: auto !important;
+}
+
+#emailMoreMenu button {
+    display: block;
+    width: 100%;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+
+    color: #545b82;
+    font-size: 13px;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+#emailMoreMenu button:hover {
+    background: #f1efff;
+    color: #6558e8;
+}
+
+
+/* Gmail Connected - Green Check Icon */
+.badge--success .fa-circle-check {
+    color: #16A34A !important;
+}

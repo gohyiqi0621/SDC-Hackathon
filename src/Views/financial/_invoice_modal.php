@@ -21,6 +21,7 @@ $err        = static fn (string $key): string => isset($errors[$key]) ? ' class=
 $maxMb      = (int) (InvoiceService::FILE_MAX_BYTES / 1024 / 1024);
 $currency   = $v('currency', 'MYR') ?: 'MYR';
 $status     = $v('status', 'unpaid') ?: 'unpaid';
+$type       = isset(Invoice::TYPES[$v('type')]) ? $v('type') : 'purchase';
 $hasFile    = $editing && !empty($invoice['file_path']);
 $fileUrl    = $hasFile ? url('financial', ['action' => 'file', 'id' => $invoice['id']]) : '';
 $isPdf      = $hasFile && $invoice['file_mime'] === 'application/pdf';
@@ -99,6 +100,20 @@ $isPdf      = $hasFile && $invoice['file_mime'] === 'application/pdf';
 
             <!-- ---------------------------------------- the details --- -->
             <section class="modal-pane modal-pane--fields">
+                <fieldset class="field">
+                    <legend>Invoice type *</legend>
+                    <div class="segmented" data-invoice-type>
+                        <?php foreach (Invoice::TYPES as $key => [$label, $party, $icon]): ?>
+                            <label>
+                                <input type="radio" name="type" value="<?= e($key) ?>" data-party="<?= e($party) ?>"<?= $type === $key ? ' checked' : '' ?>>
+                                <span><i class="<?= e($icon) ?>"></i> <?= e($label) ?>
+                                    <small><?= $key === 'purchase' ? '(a supplier billed us)' : '(we billed a customer)' ?></small></span>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                    <p class="field-error" data-error-for="type"><?= e($errors['type'] ?? '') ?></p>
+                </fieldset>
+
                 <div class="form-row">
                     <div class="field">
                         <label for="invoice_number">Invoice number *</label>
@@ -108,10 +123,33 @@ $isPdf      = $hasFile && $invoice['file_mime'] === 'application/pdf';
                     </div>
 
                     <div class="field">
-                        <label for="party_name">Customer / supplier *</label>
+                        <label for="party_name"><span data-party-label><?= e(Invoice::TYPES[$type][1]) ?></span> *</label>
                         <input id="party_name" name="party_name" type="text" maxlength="200" required
-                               placeholder="e.g. ABC Supplier Sdn Bhd" value="<?= e($v('party_name')) ?>"<?= $err('party_name') ?>>
+                               placeholder="e.g. ABC Sdn Bhd" value="<?= e($v('party_name')) ?>"<?= $err('party_name') ?>>
                         <p class="field-error" data-error-for="party_name"><?= e($errors['party_name'] ?? '') ?></p>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="party_address">Address</label>
+                    <textarea id="party_address" name="party_address" rows="2" maxlength="1000"
+                              placeholder="Street, city, postcode, country"<?= $err('party_address') ?>><?= e($v('party_address')) ?></textarea>
+                    <p class="field-error" data-error-for="party_address"><?= e($errors['party_address'] ?? '') ?></p>
+                </div>
+
+                <div class="form-row">
+                    <div class="field">
+                        <label for="party_phone">Phone</label>
+                        <input id="party_phone" name="party_phone" type="text" maxlength="50"
+                               placeholder="e.g. 03-1234 5678" value="<?= e($v('party_phone')) ?>"<?= $err('party_phone') ?>>
+                        <p class="field-error" data-error-for="party_phone"><?= e($errors['party_phone'] ?? '') ?></p>
+                    </div>
+
+                    <div class="field">
+                        <label for="payment_terms">Payment terms</label>
+                        <input id="payment_terms" name="payment_terms" type="text" maxlength="100"
+                               placeholder="e.g. Net 30 days" value="<?= e($v('payment_terms')) ?>"<?= $err('payment_terms') ?>>
+                        <p class="field-error" data-error-for="payment_terms"><?= e($errors['payment_terms'] ?? '') ?></p>
                     </div>
                 </div>
 
@@ -133,10 +171,10 @@ $isPdf      = $hasFile && $invoice['file_mime'] === 'application/pdf';
 
                 <div class="form-row">
                     <div class="field">
-                        <label for="amount">Amount *</label>
-                        <input id="amount" name="amount" type="text" inputmode="decimal" required data-money
-                               autocomplete="off" placeholder="0.00" value="<?= e($v('amount')) ?>"<?= $err('amount') ?>>
-                        <p class="field-error" data-error-for="amount"><?= e($errors['amount'] ?? '') ?></p>
+                        <label for="reference_no">Reference no.</label>
+                        <input id="reference_no" name="reference_no" type="text" maxlength="100"
+                               placeholder="e.g. PO or GRN number" value="<?= e($v('reference_no')) ?>"<?= $err('reference_no') ?>>
+                        <p class="field-error" data-error-for="reference_no"><?= e($errors['reference_no'] ?? '') ?></p>
                     </div>
 
                     <div class="field">
@@ -149,6 +187,9 @@ $isPdf      = $hasFile && $invoice['file_mime'] === 'application/pdf';
                         <p class="field-error" data-error-for="currency"><?= e($errors['currency'] ?? '') ?></p>
                     </div>
                 </div>
+
+                <!-- ------------------------------------- line items --- -->
+                <?php require __DIR__ . '/_invoice_items.php'; ?>
 
                 <?php if ($supervisor): ?>
                     <div class="field">

@@ -19,13 +19,14 @@ final class GmailService
     private const TOKEN_URL  = 'https://oauth2.googleapis.com/token';
     private const REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
     private const API_URL    = 'https://gmail.googleapis.com/gmail/v1/users/me';
-    private const SCOPE      = 'https://www.googleapis.com/auth/gmail.readonly';
+    private const SCOPE =
+    'https://www.googleapis.com/auth/gmail.modify ' .
+    'https://www.googleapis.com/auth/gmail.send';
 
     public function isConfigured(): bool
     {
         return GMAIL_CLIENT_ID !== '' && GMAIL_CLIENT_SECRET !== '';
     }
-
     /**
      * Generate Google OAuth authorization URL.
      */
@@ -129,14 +130,16 @@ final class GmailService
             ];
         }
 
+                
         $list = HttpClient::get(
             self::API_URL . '/messages?' . http_build_query([
-                'maxResults'       => $max,
-                'includeSpamTrash' => 'true',
-                'q'                => 'in:inbox OR in:spam',
+                'maxResults' => $max,
+                'labelIds' => 'INBOX',
+                'includeSpamTrash' => 'false',
             ]),
             $this->auth($token)
         );
+
 
         if ($list['status'] === 401) {
             return [
@@ -290,6 +293,422 @@ final class GmailService
         ];
     }
 
+
+    /**
+     * Send a Gmail reply in the original conversation.
+     *
+     * @param array|null $attachments Files from $_FILES['attachments']
+     */
+    public function sendReply(
+        int $userId,
+        string $messageId,
+        string $body,
+        ?array $attachments = null
+    ): array {
+        if (!preg_match('/^[A-Za-z0-9]+$/', $messageId)) {
+            return ['ok' => false, 'error' => 'Invalid message ID.'];
+        }
+
+        $token = $this->accessToken($userId);
+
+        if ($token === null) {
+            return [
+                'ok' => false,
+                'reconnect' => true,
+                'error' => 'Please reconnect Gmail.'
+            ];
+        }
+
+        // Fetch the original message to verify the recipient and thread.
+        $original = HttpClient::get(
+            self::API_URL . '/messages/' . $messageId . '?format=metadata',
+            $this->auth($token)
+        );
+
+        if ($original['status'] !== 200 || !is_array($original['body'])) {
+            return [
+                'ok' => false,
+                'error' => 'Could not load the original email.'
+            ];
+        }
+
+        $message = $original['body'];
+        $headers = [];
+
+        foreach ($message['payload']['headers'] ?? [] as $header) {
+            $headers[strtolower((string) ($header['name'] ?? ''))] =
+                (string) ($header['value'] ?? '');
+        }
+
+        $connection = (new GmailConnection())->find($userId);
+        $from = (string) ($connection['google_email'] ?? '');
+
+        if (!filter_var($from, FILTER_VALIDATE_EMAIL)) {
+            return ['ok' => false, 'error' => 'Invalid connected Gmail address.'];
+        }
+
+        // Prefer Reply-To when present.
+        $recipientHeader = $headers['reply-to'] ?? $headers['from'] ?? '';
+        $addresses = [];
+
+        if (preg_match_all(
+            '/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i',
+            $recipientHeader,
+            $matches
+        )) {
+            $addresses = $matches[0];
+        }
+
+        $to = $addresses[0] ?? '';
+
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return ['ok' => false, 'error' => 'Invalid recipient address.'];
+        }
+
+        $subject = trim((string) ($headers['subject'] ?? ''));
+        if (!preg_match('/^Re:/i', $subject)) {
+            $subject = 'Re: ' . $subject;
+        }
+
+        $threadId = (string) ($message['threadId'] ?? '');
+        $originalMessageId = trim((string) ($headers['message-id'] ?? ''));
+
+        if ($threadId === '' || $originalMessageId === '') {
+            return [
+                'ok' => false,
+                'error' => 'Original email thread information is missing.'
+            ];
+        }
+
+        // Prevent header injection.
+        $originalMessageId = str_replace(["\r", "\n"], '', $originalMessageId);
+        $subject = str_replace(["\r", "\n"], ' ', $subject);
+
+        $boundary = 'smart_sme_' . bin2hex(random_bytes(16));
+
+        $mime = [
+            'From: ' . $from,
+            'To: ' . $to,
+            'Subject: ' . '=?UTF-8?B?' . base64_encode($subject) . '?=',
+            'MIME-Version: 1.0',
+            'In-Reply-To: ' . $originalMessageId,
+            'References: ' . trim(
+                ($headers['references'] ?? '') . ' ' . $originalMessageId
+            ),
+            'Content-Type: multipart/mixed; boundary="' . $boundary . '"',
+            '',
+            '--' . $boundary,
+            'Content-Type: text/plain; charset=UTF-8',
+            'Content-Transfer-Encoding: base64',
+            '',
+            chunk_split(base64_encode($body))
+        ];
+
+    if ($attachments !== null && isset($attachments['size'])) {
+        $totalSize = 0;
+
+        foreach ((array) $attachments['size'] as $size) {
+            $totalSize += (int) $size;
+        }
+
+        // Leave room for MIME/base64 encoding overhead.
+        if ($totalSize > 15 * 1024 * 1024) {
+            return [
+                'ok' => false,
+                'error' => 'Total attachments must be 15 MB or smaller.'
+            ];
+        }
+    }
+
+
+    if ($attachments !== null && isset($attachments['name'])) {
+        $names = (array) $attachments['name'];
+        $tmpNames = (array) $attachments['tmp_name'];
+        $errors = (array) $attachments['error'];
+        $sizes = (array) $attachments['size'];
+
+        foreach ($names as $index => $name) {
+            $error = (int) ($errors[$index] ?? UPLOAD_ERR_NO_FILE);
+
+            if ($error === UPLOAD_ERR_NO_FILE) {
+                continue;
+            }
+
+            if ($error !== UPLOAD_ERR_OK) {
+                return ['ok' => false, 'error' => 'Attachment upload failed.'];
+            }
+
+            $tmp = (string) ($tmpNames[$index] ?? '');
+            $size = (int) ($sizes[$index] ?? 0);
+
+            if ($size > 10 * 1024 * 1024) {
+                return [
+                    'ok' => false,
+                    'error' => 'Each attachment must be 10 MB or smaller.'
+                ];
+            }
+
+            if (!is_uploaded_file($tmp)) {
+                return ['ok' => false, 'error' => 'Invalid attachment.'];
+            }
+
+            $content = file_get_contents($tmp);
+
+            if ($content === false) {
+                return ['ok' => false, 'error' => 'Unable to read attachment.'];
+            }
+
+            $filename = basename(str_replace('\\', '/', (string) $name));
+            $mimeType = (new \finfo(FILEINFO_MIME_TYPE))->file($tmp)
+                ?: 'application/octet-stream';
+
+            $mime[] = '--' . $boundary;
+            $mime[] = 'Content-Type: ' . $mimeType;
+            $mime[] = 'Content-Disposition: attachment; filename*=UTF-8\'\'' .
+                rawurlencode($filename);
+            $mime[] = 'Content-Transfer-Encoding: base64';
+            $mime[] = '';
+            $mime[] = chunk_split(base64_encode($content));
+        }
+    }
+
+    $mime[] = '--' . $boundary . '--';
+    $mime[] = '';
+
+    $raw = implode("\r\n", $mime);
+
+    $response = HttpClient::postJson(
+        self::API_URL . '/messages/send',
+        [
+            'raw' => rtrim(strtr(base64_encode($raw), '+/', '-_'), '='),
+            'threadId' => $threadId
+        ],
+        $this->auth($token)
+    );
+
+    
+if ($response['status'] !== 200) {
+    $googleError = $response['body']['error'] ?? [];
+    $googleMessage = is_array($googleError)
+        ? ($googleError['message'] ?? 'Unknown Gmail API error')
+        : (string) $googleError;
+
+    error_log(
+        '[gmail] Send failed HTTP ' .
+        $response['status'] . ': ' . $googleMessage
+    );
+
+    return [
+        'ok' => false,
+        'error' => 'Gmail API Error (' .
+            $response['status'] . '): ' . $googleMessage
+    ];
+}
+
+
+    return [
+        'ok' => true,
+        'id' => $response['body']['id'] ?? null
+    ];
+}
+
+    /**
+ * Get sent emails from Gmail.
+ */
+public function sent(int $userId): array
+{
+    $token = $this->accessToken($userId);
+
+    if ($token === null) {
+        return [
+            'ok' => false,
+            'reconnect' => true,
+            'error' => 'Please reconnect Gmail.'
+        ];
+    }
+
+    $response = HttpClient::get(
+        self::API_URL . '/messages?' . http_build_query([
+            'labelIds' => 'SENT',
+            'maxResults' => 50
+        ]),
+        $this->auth($token)
+    );
+
+    if ($response['status'] === 401) {
+        return [
+            'ok' => false,
+            'reconnect' => true,
+            'error' => 'Gmail connection expired.'
+        ];
+    }
+
+    if ($response['status'] !== 200) {
+        return [
+            'ok' => false,
+            'error' => 'Unable to load sent emails.'
+        ];
+    }
+
+    $urls = [];
+
+    foreach ($response['body']['messages'] ?? [] as $message) {
+        $id = (string) ($message['id'] ?? '');
+
+        if (preg_match('/^[A-Za-z0-9]+$/', $id)) {
+            $urls[$id] =
+                self::API_URL . '/messages/' . $id .
+                '?format=metadata' .
+                '&metadataHeaders=From' .
+                '&metadataHeaders=To' .
+                '&metadataHeaders=Subject' .
+                '&metadataHeaders=Date';
+        }
+    }
+
+    $emails = [];
+
+    foreach (
+        HttpClient::getMany($urls, $this->auth($token))
+        as $id => $detail
+    ) {
+        if (
+            $detail['status'] !== 200 ||
+            !is_array($detail['body'])
+        ) {
+            continue;
+        }
+
+        $email = $this->toEmail((string) $id, $detail['body']);
+
+        $headers = [];
+
+        foreach ($detail['body']['payload']['headers'] ?? [] as $header) {
+            $headers[strtolower((string) ($header['name'] ?? ''))] =
+                (string) ($header['value'] ?? '');
+        }
+
+        $email['sender'] = $headers['to'] ?? '';
+        $email['senderEmail'] = $headers['to'] ?? '';
+        $email['from'] = $headers['from'] ?? '';
+        $email['to'] = $headers['to'] ?? '';
+        $email['threadId'] =
+            (string) ($detail['body']['threadId'] ?? '');
+
+        $email['sent'] = true;
+        $email['unread'] = false;
+        $email['needsReply'] = false;
+
+        $emails[] = $email;
+    }
+
+    usort($emails, static function ($a, $b) {
+        return ($b['timestamp'] ?? 0) <=> ($a['timestamp'] ?? 0);
+    });
+
+    return [
+        'ok' => true,
+        'emails' => $emails
+    ];
+}
+
+    /**
+ * Get all messages in a Gmail conversation.
+ */
+public function thread(int $userId, string $threadId): array
+{
+    if (!preg_match('/^[A-Za-z0-9]+$/', $threadId)) {
+        return [
+            'ok' => false,
+            'error' => 'Invalid thread ID.'
+        ];
+    }
+
+    $token = $this->accessToken($userId);
+
+    if ($token === null) {
+        return [
+            'ok' => false,
+            'reconnect' => true,
+            'error' => 'Please reconnect Gmail.'
+        ];
+    }
+
+    $response = HttpClient::get(
+        self::API_URL . '/threads/' . $threadId . '?format=full',
+        $this->auth($token)
+    );
+
+    if ($response['status'] === 401) {
+        return [
+            'ok' => false,
+            'reconnect' => true,
+            'error' => 'Gmail connection expired.'
+        ];
+    }
+
+    if (
+        $response['status'] !== 200 ||
+        !is_array($response['body'])
+    ) {
+        return [
+            'ok' => false,
+            'error' => 'Unable to load conversation.'
+        ];
+    }
+
+    $messages = [];
+
+    foreach ($response['body']['messages'] ?? [] as $message) {
+        $headers = [];
+
+        foreach ($message['payload']['headers'] ?? [] as $header) {
+            $headers[strtolower((string) ($header['name'] ?? ''))] =
+                (string) ($header['value'] ?? '');
+        }
+
+        $payload = $message['payload'] ?? [];
+
+        $body = is_array($payload)
+            ? $this->extractBody($payload)
+            : '';
+
+        if ($body === '') {
+            $body = html_entity_decode(
+                (string) ($message['snippet'] ?? ''),
+                ENT_QUOTES | ENT_HTML5,
+                'UTF-8'
+            );
+        }
+
+        $messages[] = [
+            'id' => (string) ($message['id'] ?? ''),
+            'threadId' => $threadId,
+            'from' => $headers['from'] ?? '',
+            'to' => $headers['to'] ?? '',
+            'subject' => $headers['subject'] ?? '',
+            'body' => $body,
+            'timestamp' => isset($message['internalDate'])
+                ? intdiv((int) $message['internalDate'], 1000)
+                : null,
+            'sent' => in_array(
+                'SENT',
+                $message['labelIds'] ?? [],
+                true
+            )
+        ];
+    }
+
+    usort($messages, static function ($a, $b) {
+        return ($a['timestamp'] ?? 0) <=> ($b['timestamp'] ?? 0);
+    });
+
+    return [
+        'ok' => true,
+        'messages' => $messages
+    ];
+}
+
     /**
      * Disconnect Gmail and revoke the token.
      */
@@ -311,6 +730,257 @@ final class GmailService
             $model->delete($userId);
         }
     }
+
+
+    /**
+     * Get Gmail Spam messages.
+     */
+    public function spam(int $userId): array
+    {
+        return $this->folder($userId, 'SPAM');
+    }
+
+    /**
+     * Get Gmail Trash messages.
+     */
+    public function trash(int $userId): array
+    {
+        return $this->folder($userId, 'TRASH');
+    }
+
+    /**
+     * Load messages from a Gmail system folder.
+     */
+    private function folder(int $userId, string $label): array
+    {
+        if (!in_array($label, ['SPAM', 'TRASH'], true)) {
+            return [
+                'ok' => false,
+                'error' => 'Invalid Gmail folder.'
+            ];
+        }
+
+        $token = $this->accessToken($userId);
+
+        if ($token === null) {
+            return [
+                'ok' => false,
+                'reconnect' => true,
+                'error' => 'Please reconnect Gmail.'
+            ];
+        }
+
+        $response = HttpClient::get(
+            self::API_URL . '/messages?' . http_build_query([
+                'labelIds' => $label,
+                'maxResults' => 50,
+                'includeSpamTrash' => 'true'
+            ]),
+            $this->auth($token)
+        );
+
+        if ($response['status'] === 401) {
+            return [
+                'ok' => false,
+                'reconnect' => true,
+                'error' => 'Gmail authorization expired.'
+            ];
+        }
+
+        if ($response['status'] !== 200) {
+            return [
+                'ok' => false,
+                'error' => 'Unable to load Gmail folder.'
+            ];
+        }
+
+        $urls = [];
+
+        foreach ($response['body']['messages'] ?? [] as $message) {
+            $id = (string) ($message['id'] ?? '');
+
+            if (preg_match('/^[A-Za-z0-9]+$/', $id)) {
+                $urls[$id] =
+                    self::API_URL . '/messages/' . $id .
+                    '?format=metadata' .
+                    '&metadataHeaders=From' .
+                    '&metadataHeaders=Subject' .
+                    '&metadataHeaders=Date';
+            }
+        }
+
+        $emails = [];
+
+        foreach (
+            HttpClient::getMany($urls, $this->auth($token))
+            as $id => $detail
+        ) {
+            if (
+                $detail['status'] !== 200 ||
+                !is_array($detail['body'])
+            ) {
+                continue;
+            }
+
+            $email = $this->toEmail(
+                (string) $id,
+                $detail['body']
+            );
+
+            $email['folder'] = strtolower($label);
+
+            $emails[] = $email;
+        }
+
+        usort($emails, static function ($a, $b) {
+            return ($b['timestamp'] ?? 0)
+                <=> ($a['timestamp'] ?? 0);
+        });
+
+        return [
+            'ok' => true,
+            'emails' => $emails
+        ];
+    }
+
+
+    /**
+     * Perform Gmail actions on a message.
+     *
+     * Supported actions:
+     * star, unstar, archive, trash, restore,
+     * read, unread, spam, not_spam,
+     * important, not_important
+     */
+    public function action(
+        int $userId,
+        string $messageId,
+        string $action
+    ): array {
+        if (!preg_match('/^[A-Za-z0-9]+$/', $messageId)) {
+            return [
+                'ok' => false,
+                'error' => 'Invalid Gmail message ID.'
+            ];
+        }
+
+        $token = $this->accessToken($userId);
+
+        if ($token === null) {
+            return [
+                'ok' => false,
+                'reconnect' => true,
+                'error' => 'Please reconnect Gmail.'
+            ];
+        }
+
+        $add = [];
+        $remove = [];
+
+        switch ($action) {
+            case 'star':
+                $add = ['STARRED'];
+                break;
+
+            case 'unstar':
+                $remove = ['STARRED'];
+                break;
+
+            case 'archive':
+                $remove = ['INBOX'];
+                break;
+
+            case 'trash':
+                $add = ['TRASH'];
+                $remove = ['INBOX'];
+                break;
+
+            case 'restore':
+                $add = ['INBOX'];
+                $remove = ['TRASH'];
+                break;
+
+            case 'read':
+                $remove = ['UNREAD'];
+                break;
+
+            case 'unread':
+                $add = ['UNREAD'];
+                break;
+
+            case 'spam':
+                $add = ['SPAM'];
+                $remove = ['INBOX'];
+                break;
+
+            case 'not_spam':
+                $add = ['INBOX'];
+                $remove = ['SPAM'];
+                break;
+
+            case 'important':
+                $add = ['IMPORTANT'];
+                break;
+
+            case 'not_important':
+                $remove = ['IMPORTANT'];
+                break;
+
+            default:
+                return [
+                    'ok' => false,
+                    'error' => 'Unsupported Gmail action.'
+                ];
+        }
+
+        $response = HttpClient::postJson(
+            self::API_URL .
+                '/messages/' .
+                $messageId .
+                '/modify',
+            [
+                'addLabelIds' => $add,
+                'removeLabelIds' => $remove
+            ],
+            $this->auth($token)
+        );
+
+        if ($response['status'] === 401) {
+            return [
+                'ok' => false,
+                'reconnect' => true,
+                'error' => 'Gmail authorization expired. Please reconnect.'
+            ];
+        }
+
+        if ($response['status'] !== 200) {
+            $googleError = $response['body']['error'] ?? [];
+
+            $googleMessage = is_array($googleError)
+                ? (string) ($googleError['message'] ?? 'Gmail action failed.')
+                : (string) $googleError;
+
+            error_log(
+                '[gmail] Action failed HTTP ' .
+                $response['status'] .
+                ': ' .
+                $googleMessage
+            );
+
+            return [
+                'ok' => false,
+                'error' => $googleMessage
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'messageId' => $messageId,
+            'action' => $action
+        ];
+    }
+
+
 
     /* -------------------- PRIVATE METHODS -------------------- */
 
@@ -590,6 +1260,24 @@ final class GmailService
                 $labels,
                 true
             ),
+
+
+            'isTrash' => in_array(
+                'TRASH',
+                $labels,
+                true
+            ),
+
+            'isInbox' => in_array(
+                'INBOX',
+                $labels,
+                true
+            ),
+
+            'threadId' => (string) (
+                $message['threadId'] ?? ''
+            ),
+
         ];
     }
 }

@@ -1,7 +1,7 @@
 -- ============================================================================
 -- all_migrations.sql - the whole Smart SME schema in ONE block (PostgreSQL)
 --
--- Combines database/schema.sql + database/migrations/001 ... 015.
+-- Combines database/schema.sql + database/migrations/001 ... 016.
 --
 -- Safe to run on ANY database, new or old, as many times as you like:
 --   * a table that does not exist yet is created (already in its final shape)
@@ -253,6 +253,42 @@ CREATE TABLE IF NOT EXISTS invoices (
 CREATE UNIQUE INDEX IF NOT EXISTS invoices_user_number_uniq ON invoices (user_id, LOWER(invoice_number));
 CREATE INDEX        IF NOT EXISTS invoices_user_created_idx ON invoices (user_id, created_at DESC);
 
+-- 016: details the printable template needs; amount = subtotal - discount + SST.
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS type            VARCHAR(10)   NOT NULL DEFAULT 'purchase'
+    CONSTRAINT invoices_type_check CHECK (type IN ('purchase', 'sales'));
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS party_address   TEXT          NULL;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS party_phone     VARCHAR(50)   NULL;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_terms   VARCHAR(100)  NULL;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS reference_no    VARCHAR(100)  NULL;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS subtotal        NUMERIC(12,2) NULL
+    CONSTRAINT invoices_subtotal_check CHECK (subtotal IS NULL OR subtotal >= 0);
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2) NOT NULL DEFAULT 0
+    CONSTRAINT invoices_discount_check CHECK (discount_amount >= 0);
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS sst_rate        NUMERIC(5,2)  NOT NULL DEFAULT 0
+    CONSTRAINT invoices_sst_rate_check CHECK (sst_rate >= 0 AND sst_rate <= 100);
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS sst_amount      NUMERIC(12,2) NOT NULL DEFAULT 0
+    CONSTRAINT invoices_sst_amount_check CHECK (sst_amount >= 0);
+
+CREATE TABLE IF NOT EXISTS invoice_items (
+    id          BIGINT        GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    invoice_id  BIGINT        NOT NULL REFERENCES invoices (id) ON DELETE CASCADE,
+    position    SMALLINT      NOT NULL,
+    sku         VARCHAR(100)  NULL,
+    description VARCHAR(255)  NOT NULL,
+    uom         VARCHAR(20)   NULL,
+    quantity    NUMERIC(12,3) NOT NULL,
+    unit_price  NUMERIC(12,2) NOT NULL,
+    discount    NUMERIC(12,2) NOT NULL DEFAULT 0,
+    amount      NUMERIC(12,2) NOT NULL,
+
+    CONSTRAINT invoice_items_quantity_check   CHECK (quantity > 0),
+    CONSTRAINT invoice_items_unit_price_check CHECK (unit_price >= 0),
+    CONSTRAINT invoice_items_discount_check   CHECK (discount >= 0),
+    CONSTRAINT invoice_items_amount_check     CHECK (amount >= 0)
+);
+
+CREATE INDEX IF NOT EXISTS invoice_items_invoice_idx ON invoice_items (invoice_id, position);
+
 CREATE TABLE IF NOT EXISTS claims (
     id              BIGINT        GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id         BIGINT        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -476,8 +512,8 @@ COMMIT;
 --   SELECT table_name FROM information_schema.tables
 --    WHERE table_schema = 'public' ORDER BY table_name;
 --
--- Expected (17): ai_assistant_settings, bookings, chat_messages, claims,
--- company_profiles, gmail_connections, google_calendar_integrations, invoices,
--- order_items, orders, password_resets, product_categories, products,
+-- Expected (18): ai_assistant_settings, bookings, chat_messages, claims,
+-- company_profiles, gmail_connections, google_calendar_integrations, invoice_items,
+-- invoices, order_items, orders, password_resets, product_categories, products,
 -- staff_ai_assistant_settings, telegram_integrations, telegram_updates, users
 -- ----------------------------------------------------------------------------

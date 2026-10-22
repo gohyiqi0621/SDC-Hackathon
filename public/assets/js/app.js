@@ -17,6 +17,7 @@
   15. Popups            <dialog class="modal"> opened by [data-modal-open="#id"]
   16. File preview      [data-file-preview] shows the chosen PDF / image
   17. Submit confirm    <form data-submit-confirm="Message"> asks once before sending
+  18. Invoice items     [data-items] line-item rows with live totals
 ===================================== */
 
 (function () {
@@ -532,28 +533,37 @@
         return cents === null ? whole : whole + '.' + cents;
     }
 
+    function padMoney(value) {
+        var parts = formatMoney(value).split('.');
+        return (parts[0] || '0') + '.' + ((parts[1] || '') + '00').slice(0, 2);
+    }
+
     document.querySelectorAll('input[data-money]').forEach(function (input) {
-        if (input.value !== '') { input.value = formatMoney(input.value); }
+        if (input.value !== '') { input.value = padMoney(input.value); }
+    });
 
-        input.addEventListener('input', function () {
-            // Keep the caret after the same digit once commas move around.
-            var caret = input.selectionStart || 0;
-            var before = input.value.slice(0, caret).replace(/,/g, '').length;
-            var next = formatMoney(input.value);
-            input.value = next;
+    // Delegated, so rows added later (invoice items) are formatted too.
+    document.addEventListener('input', function (e) {
+        var input = e.target;
+        if (!(input instanceof HTMLInputElement) || !input.hasAttribute('data-money') || input.readOnly) { return; }
 
-            var pos = 0;
-            for (var seen = 0; pos < next.length && seen < before; pos++) {
-                if (next.charAt(pos) !== ',') { seen++; }
-            }
-            input.setSelectionRange(pos, pos);
-        });
+        // Keep the caret after the same digit once commas move around.
+        var caret = input.selectionStart || 0;
+        var before = input.value.slice(0, caret).replace(/,/g, '').length;
+        var next = formatMoney(input.value);
+        input.value = next;
 
-        input.addEventListener('blur', function () {
-            if (input.value === '') { return; }
-            var parts = formatMoney(input.value).split('.');
-            input.value = (parts[0] || '0') + '.' + ((parts[1] || '') + '00').slice(0, 2);
-        });
+        var pos = 0;
+        for (var seen = 0; pos < next.length && seen < before; pos++) {
+            if (next.charAt(pos) !== ',') { seen++; }
+        }
+        input.setSelectionRange(pos, pos);
+    });
+
+    document.addEventListener('focusout', function (e) {
+        var input = e.target;
+        if (!(input instanceof HTMLInputElement) || !input.hasAttribute('data-money') || input.value === '') { return; }
+        input.value = padMoney(input.value);
     });
 
     /* ---------- 14. AI preview ---------- */
@@ -729,4 +739,117 @@
             if (typeof form.requestSubmit === 'function') { form.requestSubmit(); } else { form.submit(); }
         });
     }, true);
+
+    /* ---------- 18. Invoice items ---------- */
+
+    // Add / remove item rows and show the sums live: line = qty x price - disc,
+    // total = subtotal - discount + SST. The server recalculates on save; this
+    // is only what the user sees while typing. window.App.setInvoiceItems(rows)
+    // lets other code (e.g. AI auto-fill) fill the table.
+    document.querySelectorAll('[data-items]').forEach(function (editor) {
+        var body = editor.querySelector('[data-items-body]');
+        var template = editor.querySelector('[data-item-template]');
+        var empty = editor.querySelector('[data-items-empty]');
+        var form = editor.closest('form');
+        var amount = form.querySelector('[data-total-amount]');
+        var next = body.querySelectorAll('[data-item-row]').length;
+
+        function toCents(value) {
+            var n = parseFloat(String(value || '').replace(/,/g, ''));
+            return isNaN(n) ? 0 : Math.round(n * 100);
+        }
+
+        function show(cents) {
+            return padMoney((cents / 100).toFixed(2));
+        }
+
+        function rowHasValue(row) {
+            return Array.prototype.some.call(row.querySelectorAll('input'), function (input) {
+                return input.value.trim() !== '';
+            });
+        }
+
+        function recalc() {
+            var rows = body.querySelectorAll('[data-item-row]');
+            var subtotal = 0;
+            var active = false;
+
+            rows.forEach(function (row, i) {
+                row.querySelector('[data-item-num]').textContent = String(i + 1);
+
+                var qty = parseFloat(String(row.querySelector('[data-item-qty]').value).replace(/,/g, '')) || 0;
+                var line = Math.max(0, Math.round(qty * toCents(row.querySelector('[data-item-price]').value))
+                    - toCents(row.querySelector('[data-item-disc]').value));
+                row.querySelector('[data-item-total]').textContent = show(line);
+
+                if (rowHasValue(row)) {
+                    active = true;
+                    subtotal += line;
+                }
+            });
+
+            if (empty) { empty.hidden = rows.length > 0; }
+
+            editor.querySelectorAll('[data-when-items]').forEach(function (el) { el.hidden = !active; });
+            amount.readOnly = active;
+            amount.classList.toggle('is-computed', active);
+            if (!active) { return; }
+
+            var discount = Math.min(toCents(form.querySelector('[name="discount_amount"]').value), subtotal);
+            var rate = parseFloat(String(form.querySelector('[name="sst_rate"]').value).replace(/[,%\s]/g, '')) || 0;
+            var sst = Math.round((subtotal - discount) * Math.min(Math.max(rate, 0), 100) / 100);
+
+            editor.querySelector('[data-total-subtotal]').textContent = show(subtotal);
+            editor.querySelector('[data-total-sst]').textContent = show(sst);
+            amount.value = show(subtotal - discount + sst);
+        }
+
+        function addRow(values) {
+            var holder = document.createElement('tbody');
+            holder.innerHTML = template.innerHTML.replace(/__i__/g, String(next++));
+            var row = holder.firstElementChild;
+
+            Object.keys(values || {}).forEach(function (key) {
+                var input = row.querySelector('[name$="[' + key + ']"]');
+                if (input && values[key] !== null && values[key] !== undefined) {
+                    input.value = input.hasAttribute('data-money') && values[key] !== '' ? padMoney(String(values[key])) : String(values[key]);
+                }
+            });
+
+            body.appendChild(row);
+            return row;
+        }
+
+        editor.querySelector('[data-item-add]').addEventListener('click', function () {
+            var row = addRow();
+            recalc();
+            row.querySelector('[name$="[description]"]').focus();
+        });
+
+        editor.addEventListener('click', function (e) {
+            var remove = e.target.closest('[data-item-remove]');
+            if (!remove) { return; }
+            remove.closest('[data-item-row]').remove();
+            recalc();
+        });
+
+        form.addEventListener('input', recalc);
+        form.addEventListener('focusout', function () { setTimeout(recalc, 0); });
+
+        // Purchase / Sales: the other party is a Supplier or a Customer.
+        form.querySelectorAll('[data-invoice-type] input[name="type"]').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                var label = form.querySelector('[data-party-label]');
+                if (label && radio.checked) { label.textContent = radio.getAttribute('data-party'); }
+            });
+        });
+
+        window.App.setInvoiceItems = function (rows) {
+            body.innerHTML = '';
+            (rows || []).forEach(function (r) { addRow(r); });
+            recalc();
+        };
+
+        recalc();
+    });
 })();

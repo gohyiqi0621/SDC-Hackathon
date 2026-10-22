@@ -16,6 +16,7 @@ GMAIL_CLIENT_ID = "838167772236-n24261gbvd3hc5kgbugeit8a547m5i72.apps.googleuser
 BREVO_SENDER_EMAIL = "gohyiqi1@gmail.com"
 BREVO_SENDER_NAME = "SMART SME"
 BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
+FLOWISE_API_URL = "https://flowise-production-d25d.up.railway.app"
 
 [workflows]
 runButton = "Project"

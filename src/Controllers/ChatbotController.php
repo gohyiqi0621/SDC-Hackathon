@@ -21,6 +21,7 @@ use Src\Services\AssistantReplyService;
 use Src\Services\BrevoMailer;
 use Src\Services\FlowiseService;
 use Src\Services\SystemMessageBuilder;
+use Src\Services\StaffAssistantService;
 use Throwable;
 
 final class ChatbotController
@@ -335,23 +336,110 @@ final class ChatbotController
         ]);
     }
 
-    /** GET /?page=staff&action=chat */
+    /** GET /?page=staff&action=chat - the staff assistant (Flowise, staff tools). */
     public function staffChat(): void
     {
-        view('chatbot/chat', [
-            'user'        => require_login(),
+        $user   = require_login();
+        $userId = (int) $user['id'];
+        $config = (new AssistantConfigService())->forStaff($userId);
+        $fns    = $config['functions'];
+
+        $suggestions = array_values(array_filter([
+            in_array('check_orders', $fns, true) ? 'How many orders today and the total?' : null,
+            in_array('check_invoice', $fns, true) ? 'Which invoices are overdue?' : null,
+            in_array('check_claims', $fns, true) ? 'Show claims waiting for approval' : null,
+            in_array('check_orders', $fns, true) ? 'Orders this week by day' : null,
+        ]));
+
+        $functions = [];
+        foreach (AiSettingsController::STAFF_FUNCTIONS as $key => [$label, $icon]) {
+            $on = in_array($key, $fns, true);
+            $functions[] = [
+                'label' => $label,
+                'icon'  => $icon,
+                'state' => $key === 'check_email' ? 'soon' : ($on ? 'on' : 'off'),
+            ];
+        }
+
+        try {
+            $history = (new ChatMessage())->recent($userId, StaffAssistantService::CHANNEL, StaffAssistantService::chatId($userId), 60);
+        } catch (Throwable $e) {
+            $history = [];
+        }
+
+        view('chatbot/staff_chat', [
+            'user'        => $user,
             'title'       => 'Staff Chat Interface',
-            'heading'     => 'Staff assistant',
-            'sub'         => 'Give your team a faster way to look things up.',
-            'icon'        => 'fa-solid fa-user-tie',
-            'intro'       => 'Hi! Ask me across invoices, claims, settlements and your product list.',
-            'suggestions' => ['Which invoices are overdue?', 'Show unmatched payments', 'Summarise this month\'s claims'],
-            'notes'       => [
-                ['fa-solid fa-chart-pie', 'Finance-wide view', 'Answers drawn from the workspace'],
-                ['fa-solid fa-eye', 'Read-only first', 'Look-ups before any write action'],
-                ['fa-solid fa-clipboard-check', 'Auditable', 'Every request stays in the app session'],
-            ],
+            'assistant'   => $config['assistant_name'] !== 'Assistant' ? $config['assistant_name'] : 'Staff assistant',
+            'model'       => AiSettingsController::AI_MODELS[$config['ai_model']][0] ?? $config['ai_model'],
+            'enabled'     => $config['enabled'],
+            'problems'    => $config['problems'],
+            'functions'   => $functions,
+            'suggestions' => $suggestions,
+            'history'     => array_map(static fn (array $m): array => [
+                'role'    => $m['role'] === 'customer' ? 'me' : 'ai',
+                'content' => (string) $m['content'],
+                'status'  => (string) $m['status'],
+                'at'      => date(DATE_ATOM, strtotime((string) $m['created_at'])),
+            ], $history),
+            'sendUrl'     => url('staff', ['action' => 'chat_send']),
+            'previewUrl'  => url('staff', ['action' => 'system_message']),
             'settingsUrl' => url('staff', ['action' => 'settings']),
+            'chatflowSet' => StaffAssistantService::chatflowId() !== '',
+        ]);
+    }
+
+    /** POST /?page=staff&action=chat_send (JSON) - one staff message through Flowise. */
+    public function staffChatSend(): void
+    {
+        $user    = require_login();
+        $message = trim((string) ($_POST['message'] ?? ''));
+
+        if ($message === '') {
+            json_response(false, ['errors' => ['message' => 'Type a message first.']], 'Type a message first.', 422);
+        }
+        if (mb_strlen($message) > 4000) {
+            json_response(false, ['errors' => ['message' => 'Keep the message under 4,000 characters.']], 'Message is too long.', 422);
+        }
+
+        $result = (new StaffAssistantService())->reply((int) $user['id'], (string) $user['name'], $message);
+        json_response(true, $result);
+    }
+
+    /** GET /?page=staff&action=system_message (JSON) - what the staff chatflow receives (secrets masked). */
+    public function staffSystemMessage(): void
+    {
+        $user    = require_login();
+        $userId  = (int) $user['id'];
+        $config  = (new AssistantConfigService())->forStaff($userId);
+        $staff   = new StaffAssistantService();
+        $system  = $staff->systemMessage($config);
+        $flowise = new FlowiseService();
+        $payload = $flowise->payload($config, $system, '<staff message>',
+            StaffAssistantService::CHANNEL . ':' . $userId . ':' . StaffAssistantService::chatId($userId), [
+                'channel' => StaffAssistantService::CHANNEL, 'customer_chat_id' => StaffAssistantService::chatId($userId),
+                'audience' => 'staff', 'staff_name' => (string) $user['name'], 'functions' => implode(',', $config['functions']),
+            ]);
+
+        if (isset($payload['overrideConfig']['vars']['provider_api_key'])) {
+            $key = (string) $payload['overrideConfig']['vars']['provider_api_key'];
+            $payload['overrideConfig']['vars']['provider_api_key'] = substr($key, 0, 7) . '…' . substr($key, -4);
+        }
+        if (!empty($payload['overrideConfig']['vars']['tool_token'])) {
+            $payload['overrideConfig']['vars']['tool_token'] = '(signed staff token, valid 30 minutes)';
+        }
+        $payload['overrideConfig']['systemMessage'] = '(the system message above)';
+        $chatflow = StaffAssistantService::chatflowId() ?: '(FLOWISE_STAFF_CHATFLOW_ID not set: the customer chatflow is used)';
+
+        json_response(true, [
+            'system_message'     => $system,
+            'payload'            => ['chatflow' => $chatflow] + $payload,
+            'enabled'            => $config['enabled'],
+            'problems'           => $config['problems'],
+            'flowise_configured' => FLOWISE_API_URL !== '',
+            'model'              => $config['ai_model'],
+            'provider'           => $config['provider'],
+            'temperature'        => $config['temperature'],
         ]);
     }
 }

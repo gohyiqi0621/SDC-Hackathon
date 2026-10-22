@@ -16,11 +16,12 @@ $supervisor = is_supervisor();
 $newUrl     = url('financial', ['action' => 'invoice', 'new' => 1]);
 $openNew    = $modal['invoice'] === null ? ' data-modal-open="#invoiceModal"' : '';
 
-$filtered  = $filters['q'] !== '' || $filters['status'] !== '';
+$filtered  = $filters['q'] !== '' || $filters['status'] !== '' || $filters['type'] !== '';
 $listQuery = array_filter([
     'action' => 'invoice',
     'q'      => $filters['q'],
     'status' => $filters['status'],
+    'type'   => $filters['type'],
     'sort'   => $filters['sort'] !== 'newest' ? $filters['sort'] : null,
 ], static fn ($v) => $v !== null && $v !== '');
 $listUrl   = url('financial', $listQuery + ($page > 1 ? ['p' => $page] : []));
@@ -90,6 +91,14 @@ $today     = date('Y-m-d');
                     <input id="q" name="q" type="search" placeholder="Search number, customer or file..." value="<?= e($filters['q']) ?>">
                 </div>
 
+                <label class="sr-only" for="type">Type</label>
+                <select id="type" name="type">
+                    <option value="">All types</option>
+                    <?php foreach (Invoice::TYPES as $key => [$label]): ?>
+                        <option value="<?= e($key) ?>"<?= $filters['type'] === $key ? ' selected' : '' ?>><?= e($label) ?></option>
+                    <?php endforeach; ?>
+                </select>
+
                 <label class="sr-only" for="status">Status</label>
                 <select id="status" name="status">
                     <option value="">All statuses</option>
@@ -136,14 +145,12 @@ $today     = date('Y-m-d');
                     <thead>
                         <tr>
                             <th>Invoice</th>
-                            <th>Customer / supplier</th>
+                            <th>Supplier / customer</th>
                             <th>Date</th>
                             <th>Due</th>
                             <th class="num">Amount</th>
                             <th>Status</th>
-                            <?php if ($supervisor): ?>
-                                <th class="actions"><span class="sr-only">Actions</span></th>
-                            <?php endif; ?>
+                            <th class="actions"><span class="sr-only">Actions</span></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -155,13 +162,14 @@ $today     = date('Y-m-d');
                             <tr>
                                 <td data-label="Invoice">
                                     <strong><?= e($row['invoice_number']) ?></strong>
+                                    <span class="badge badge--muted"><?= e(Invoice::TYPES[$row['type']][0] ?? ucfirst((string) $row['type'])) ?></span>
                                     <?php if (!empty($row['file_path'])): ?>
                                         <br><a class="file-link" href="<?= e(url('financial', ['action' => 'file', 'id' => $row['id']])) ?>" target="_blank" rel="noopener">
                                             <i class="<?= $row['file_mime'] === 'application/pdf' ? 'fa-regular fa-file-pdf' : 'fa-regular fa-file-image' ?>"></i> Open file
                                         </a>
                                     <?php endif; ?>
                                 </td>
-                                <td data-label="Customer / supplier"><?= e($row['party_name']) ?></td>
+                                <td data-label="<?= e(Invoice::TYPES[$row['type']][1] ?? 'Supplier / customer') ?>"><?= e($row['party_name']) ?></td>
                                 <td data-label="Date"><?= e(fmt_datetime($row['issue_date'], 'j M Y')) ?></td>
                                 <td data-label="Due">
                                     <?php if ($row['due_date'] === null): ?>
@@ -173,8 +181,20 @@ $today     = date('Y-m-d');
                                 </td>
                                 <td data-label="Amount" class="num"><?= e(format_money($row['amount'], $row['currency'])) ?></td>
                                 <td data-label="Status"><span class="badge <?= e($statusClass) ?>"><?= e($statusLabel) ?></span></td>
+                                <td class="actions">
+                                    <?php
+                                    /*
+                                     * PRINT BUTTON (template owner): add it here, for both User and
+                                     * Supervisor, before the Supervisor buttons. Suggested:
+                                     *   <a class="icon-btn" href="<?= e(url('financial', ['action' => 'print', 'id' => $row['id']])) ?>"
+                                     *      target="_blank" rel="noopener" title="Print" aria-label="Print ...">
+                                     *       <i class="fa-solid fa-print"></i></a>
+                                     * Data for the template: Invoice::find($userId, $id) (header, totals,
+                                     * party address / phone / terms / reference) + InvoiceItem::forInvoice($id)
+                                     * (sku, description, uom, quantity, unit_price, discount, amount).
+                                     */
+                                    ?>
                                 <?php if ($supervisor): ?>
-                                    <td class="actions">
                                         <?php if ($row['status'] !== 'paid'): ?>
                                             <form method="post" action="<?= e(url('financial', ['action' => 'mark_paid'])) ?>"
                                                   data-confirm="Mark invoice &quot;<?= e($row['invoice_number']) ?>&quot; as fully paid?"
@@ -200,8 +220,8 @@ $today     = date('Y-m-d');
                                                 <i class="fa-regular fa-trash-can"></i>
                                             </button>
                                         </form>
-                                    </td>
                                 <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

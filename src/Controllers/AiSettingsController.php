@@ -234,6 +234,14 @@ final class AiSettingsController
         $this->assistantSaveFor(new StaffAiAssistantSetting());
     }
 
+    /** Staff assistant functions (checkboxes on Staff Setting & Integration): key => [label, icon, hint]. */
+    public const STAFF_FUNCTIONS = [
+        'check_email'   => ['Check email',    'fa-regular fa-envelope',       'Read and summarise the connected Gmail inbox.'],
+        'check_invoice' => ['Check invoice',  'fa-solid fa-file-invoice',     'Look up invoices, amounts and payment status.'],
+        'check_claims'  => ['Check claims',   'fa-solid fa-receipt',          'Look up expense claims and their approval status.'],
+        'check_orders'  => ['Check orders',   'fa-solid fa-bag-shopping',     'Look up customer orders, receipts and shipping.'],
+    ];
+
     private function assistantSaveFor(UserSettingsRow $model): void
     {
         $this->run(function (int $userId) use ($model): void {
@@ -294,6 +302,25 @@ final class AiSettingsController
                 $errors['system_instructions'] = 'System instructions must be ' . number_format(self::MAX_INSTRUCTIONS) . ' characters or fewer.';
             }
 
+            // Staff assistant: functions instead of free-text instructions.
+            $isStaff   = $model instanceof StaffAiAssistantSetting;
+            $functions = [];
+            if ($isStaff) {
+                $raw = $_POST['functions'] ?? '';
+                $raw = is_array($raw) ? $raw : explode(',', (string) $raw);
+                foreach ($raw as $fn) {
+                    $fn = trim((string) $fn);
+                    if ($fn === '') {
+                        continue;
+                    }
+                    if (!isset(self::STAFF_FUNCTIONS[$fn])) {
+                        $errors['functions'] = 'Unknown function: ' . $fn . '.';
+                        break;
+                    }
+                    $functions[$fn] = true;
+                }
+            }
+
             if ($errors !== []) {
                 $this->invalid($errors);
             }
@@ -310,6 +337,12 @@ final class AiSettingsController
             ];
             if ($apiKey !== '') {
                 $values['api_key_encrypted'] = Crypto::encrypt($apiKey);   // otherwise the saved key is kept
+            }
+            if ($isStaff) {
+                // Keep the checkbox order; the free-text instructions are not used for staff.
+                $values['functions'] = implode(',', array_values(array_filter(array_keys(self::STAFF_FUNCTIONS),
+                    static fn (string $k): bool => isset($functions[$k]))));
+                unset($values['system_instructions']);
             }
 
             $row = $model->save($userId, $values);
@@ -868,6 +901,10 @@ final class AiSettingsController
             'temperature'         => isset($row['temperature']) ? (float) $row['temperature'] : self::DEFAULT_TEMPERATURE,
             'reply_language'      => (string) ($row['reply_language'] ?? 'auto'),
             'has_api_key'         => !empty($row['api_key_encrypted']),   // the key itself never leaves the server
+            // Staff assistant only (null for the customer assistant).
+            'functions'           => array_key_exists('functions', $row)
+                ? array_values(array_filter(explode(',', (string) $row['functions'])))
+                : null,
             'updated_at'          => $this->iso($row['updated_at'] ?? null),
         ];
     }

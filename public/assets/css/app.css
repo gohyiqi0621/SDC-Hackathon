@@ -1459,7 +1459,7 @@ code {
 /* ---------- Large popup (Upload invoice / New claim) ---------- */
 
 .modal {
-    width: min(1100px, calc(100vw - 32px));
+    width: min(1240px, calc(100vw - 32px));
     height: min(780px, calc(100vh - 48px));
     margin: auto;
     padding: 0;
@@ -1532,7 +1532,194 @@ code {
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+}
+
+/* ---------- Invoice line items (inside the popup) ---------- */
+
+.items-editor {
+    margin: 4px 0 18px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: #fcfcff;
+}
+
+.items-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.items-head h3 {
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.items-head .secondary-btn {
+    flex-shrink: 0;
+}
+
+.items-scroll {
+    overflow-x: auto;
+}
+
+.items-table {
+    width: 100%;
+    min-width: 640px;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.items-table th {
+    padding: 0 4px 6px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+}
+
+.items-table td {
+    padding: 3px 4px;
+    vertical-align: middle;
+}
+
+.items-table input {
+    width: 100%;
+    min-width: 56px;
+    height: 34px;
+    padding: 0 8px;
+    border: 1px solid #e3e4f7;
+    border-radius: 8px;
+    background: white;
+    font-size: 12px;
+    outline: none;
+}
+
+.items-table input:focus {
+    border-color: #9186ff;
+}
+
+.items-table .items-num {
+    width: 22px;
+    color: var(--muted);
+    text-align: center;
+}
+
+.items-table .items-desc {
+    width: 30%;
+}
+
+.items-table .items-total {
+    min-width: 80px;
+    font-weight: 700;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.items-table .icon-btn {
+    width: 30px;
+    height: 30px;
+}
+
+.items-empty {
+    padding: 14px;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+}
+
+.items-totals {
+    display: grid;
+    gap: 6px;
+    width: min(100%, 320px);
+    margin: 14px 0 0 auto;
+}
+
+.items-totals > div {
+    display: grid;
+    grid-template-columns: 1fr 150px;
+    align-items: center;
+    gap: 10px;
+}
+
+.items-totals > div[hidden] {
+    display: none;
+}
+
+.items-totals dt {
+    color: var(--muted);
+    font-size: 12px;
+    text-align: right;
+}
+
+.items-totals dd {
+    margin: 0;
+    font-weight: 700;
+    text-align: right;
+}
+
+.items-totals input {
+    width: 100%;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid #e3e4f7;
+    border-radius: 8px;
+    text-align: right;
+    outline: none;
+}
+
+.items-totals .field-error:empty {
+    display: none;
+}
+
+.items-sst {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.items-rate {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--muted);
+    font-weight: 500;
+}
+
+.items-rate input {
+    width: 56px;
+}
+
+.items-grand {
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
+.items-grand dt {
+    color: var(--text);
+    font-weight: 800;
+}
+
+.items-grand input {
+    font-size: 14px;
+    font-weight: 800;
+}
+
+/* With items, the total is worked out, not typed. */
+.items-totals input.is-computed {
+    border-color: transparent;
+    background: var(--primary-light);
+    color: #4c43b8;
 }
 
 .modal-pane {
@@ -2013,6 +2200,12 @@ fieldset.field legend {
 
 .segmented label {
     position: relative;
+}
+
+.segmented span small {
+    font-size: 10px;
+    font-weight: 500;
+    opacity: 0.75;
 }
 
 /* Four or more choices: as many columns as fit, two on a phone. */

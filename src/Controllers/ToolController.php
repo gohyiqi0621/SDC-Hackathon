@@ -41,6 +41,7 @@ namespace Src\Controllers;
 
 use Src\Models\CompanyProfile;
 use Src\Models\Order;
+use Src\Models\StaffAiAssistantSetting;
 use Src\Services\BookingService;
 use Src\Services\OrderService;
 use Src\Support\Database;
@@ -385,7 +386,296 @@ final class ToolController
         $this->json(200, $out);
     }
 
+    /* ================================================ staff assistant ==== */
+    // Called by the STAFF chatflow only: the token must be a staff token
+    // ("staff:staff-<id>", issued by StaffAssistantService), and the function
+    // must be ticked in Staff > Setting & Integration. Read-only.
+
+    /**
+     * POST /tools/check_invoice
+     * { "status": "unpaid|partial|paid|overdue|all", "period": "today|this_month|...",
+     *   "date_from": "YYYY-MM-DD", "date_to": "YYYY-MM-DD", "query": "INV-001 or party", "limit": 20 }
+     */
+    public function checkInvoice(): void
+    {
+        $userId = $this->staffAuth('check_invoice');
+        $input  = $this->input();
+        $status = strtolower(trim((string) ($input['status'] ?? 'all')));
+        [$from, $to, $label] = $this->period($input);
+        $query  = mb_substr(trim((string) ($input['query'] ?? $input['q'] ?? '')), 0, 100);
+        $limit  = max(1, min(50, (int) ($input['limit'] ?? 20)));
+        $today  = date('Y-m-d');
+
+        $where  = 'user_id = ?';
+        $params = [$userId];
+        if (in_array($status, ['unpaid', 'partial', 'paid'], true)) {
+            $where .= ' AND status = ?';
+            $params[] = $status;
+        } elseif ($status === 'overdue') {
+            $where .= " AND status <> 'paid' AND due_date IS NOT NULL AND due_date < ?";
+            $params[] = $today;
+        } elseif ($status === 'outstanding') {
+            $where .= " AND status <> 'paid'";
+        }
+        if ($from !== null) { $where .= ' AND issue_date >= ?'; $params[] = $from; }
+        if ($to !== null)   { $where .= ' AND issue_date <= ?'; $params[] = $to; }
+        if ($query !== '') {
+            $like = '%' . addcslashes(mb_strtolower($query), '%_\\') . '%';
+            $where .= ' AND (LOWER(invoice_number) LIKE ? OR LOWER(party_name) LIKE ?)';
+            array_push($params, $like, $like);
+        }
+
+        $db   = Database::connection();
+        $stmt = $db->prepare("SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total,
+                                     COALESCE(SUM(amount) FILTER (WHERE status <> 'paid'), 0) AS outstanding,
+                                     COUNT(*) FILTER (WHERE status <> 'paid' AND due_date IS NOT NULL AND due_date < ?) AS overdue,
+                                     COALESCE(MAX(currency), 'MYR') AS currency
+                                FROM invoices WHERE $where");
+        $stmt->execute(array_merge([$today], $params));
+        $sum = $stmt->fetch() ?: [];
+
+        $stmt = $db->prepare("SELECT invoice_number, party_name, issue_date, due_date, amount, currency, status, notes
+                                FROM invoices WHERE $where ORDER BY issue_date DESC, id DESC LIMIT $limit");
+        $stmt->execute($params);
+        $rows = array_map(static function (array $r) use ($today): array {
+            $overdue = $r['status'] !== 'paid' && $r['due_date'] !== null && $r['due_date'] < $today;
+            return [
+                'invoice_number' => $r['invoice_number'],
+                'party'          => $r['party_name'],
+                'issue_date'     => $r['issue_date'],
+                'due_date'       => $r['due_date'],
+                'amount'         => format_money($r['amount'], $r['currency']),
+                'status'         => $overdue ? $r['status'] . ' (overdue)' : $r['status'],
+                'notes'          => $r['notes'] !== null ? mb_strimwidth((string) $r['notes'], 0, 120, '…') : null,
+            ];
+        }, $stmt->fetchAll());
+
+        $currency = (string) ($sum['currency'] ?? 'MYR');
+        $this->staffResult('check_invoice', [
+            'filter'          => array_filter(['status' => $status, 'period' => $label, 'query' => $query]),
+            'count'           => (int) ($sum['n'] ?? 0),
+            'total_amount'    => format_money($sum['total'] ?? 0, $currency),
+            'outstanding'     => format_money($sum['outstanding'] ?? 0, $currency),
+            'overdue_count'   => (int) ($sum['overdue'] ?? 0),
+            'shown'           => count($rows),
+            'invoices'        => $rows,
+        ]);
+    }
+
+    /**
+     * POST /tools/check_claims
+     * { "status": "submitted|approved|rejected|reimbursed|pending|all", "category": "travel|meals|office|other",
+     *   "claimant": "name", "period": "...", "date_from", "date_to", "limit": 20 }
+     */
+    public function checkClaims(): void
+    {
+        $userId   = $this->staffAuth('check_claims');
+        $input    = $this->input();
+        $status   = strtolower(trim((string) ($input['status'] ?? 'all')));
+        $category = strtolower(trim((string) ($input['category'] ?? '')));
+        $claimant = mb_substr(trim((string) ($input['claimant'] ?? $input['query'] ?? '')), 0, 100);
+        [$from, $to, $label] = $this->period($input);
+        $limit    = max(1, min(50, (int) ($input['limit'] ?? 20)));
+
+        $where  = 'user_id = ?';
+        $params = [$userId];
+        if (in_array($status, ['submitted', 'approved', 'rejected', 'reimbursed'], true)) {
+            $where .= ' AND status = ?';
+            $params[] = $status;
+        } elseif ($status === 'pending') {
+            $where .= " AND status = 'submitted'";
+        }
+        if (in_array($category, ['travel', 'meals', 'office', 'other'], true)) {
+            $where .= ' AND category = ?';
+            $params[] = $category;
+        }
+        if ($claimant !== '') {
+            $like = '%' . addcslashes(mb_strtolower($claimant), '%_\\') . '%';
+            $where .= ' AND (LOWER(claimant_name) LIKE ? OR LOWER(title) LIKE ?)';
+            array_push($params, $like, $like);
+        }
+        if ($from !== null) { $where .= ' AND expense_date >= ?'; $params[] = $from; }
+        if ($to !== null)   { $where .= ' AND expense_date <= ?'; $params[] = $to; }
+
+        $db   = Database::connection();
+        $stmt = $db->prepare("SELECT status, COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total, COALESCE(MAX(currency), 'MYR') AS currency
+                                FROM claims WHERE $where GROUP BY status");
+        $stmt->execute($params);
+        $byStatus = [];
+        $count = 0;
+        $total = 0.0;
+        $currency = 'MYR';
+        foreach ($stmt->fetchAll() as $r) {
+            $byStatus[$r['status']] = ['count' => (int) $r['n'], 'amount' => format_money($r['total'], $r['currency'])];
+            $count += (int) $r['n'];
+            $total += (float) $r['total'];
+            $currency = (string) $r['currency'];
+        }
+
+        $stmt = $db->prepare("SELECT claimant_name, title, category, expense_date, amount, currency, status, notes
+                                FROM claims WHERE $where ORDER BY expense_date DESC, id DESC LIMIT $limit");
+        $stmt->execute($params);
+        $rows = array_map(static fn (array $r): array => [
+            'claimant'     => $r['claimant_name'],
+            'title'        => $r['title'],
+            'category'     => $r['category'],
+            'expense_date' => $r['expense_date'],
+            'amount'       => format_money($r['amount'], $r['currency']),
+            'status'       => $r['status'],
+        ], $stmt->fetchAll());
+
+        $this->staffResult('check_claims', [
+            'filter'       => array_filter(['status' => $status, 'category' => $category, 'claimant' => $claimant, 'period' => $label]),
+            'count'        => $count,
+            'total_amount' => format_money($total, $currency),
+            'by_status'    => $byStatus,
+            'shown'        => count($rows),
+            'claims'       => $rows,
+        ]);
+    }
+
+    /**
+     * POST /tools/check_orders
+     * { "status": "pending_payment|payment_submitted|paid|shipped|payment_rejected|cancelled|to_review|to_ship|all",
+     *   "period": "today|yesterday|this_week|last_7_days|this_month|last_month", "date": "YYYY-MM-DD",
+     *   "date_from", "date_to", "query": "order no. / customer", "product": "name", "limit": 20 }
+     * Returns the orders plus totals per day and per status for the same filter.
+     */
+    public function checkOrders(): void
+    {
+        $userId = $this->staffAuth('check_orders');
+        $input  = $this->input();
+        $status = strtolower(trim((string) ($input['status'] ?? 'all')));
+        $status = ['to_review' => 'payment_submitted', 'to_ship' => 'paid', 'unpaid' => 'pending_payment'][$status] ?? $status;
+        [$from, $to, $label] = $this->period($input);
+        $limit  = max(1, min(50, (int) ($input['limit'] ?? 20)));
+
+        $f = [
+            'status'  => isset(Order::STATUSES[$status]) ? $status : '',
+            'q'       => mb_substr(trim((string) ($input['query'] ?? $input['q'] ?? '')), 0, 100),
+            'from'    => $from,
+            'to'      => $to,
+            'product' => mb_substr(trim((string) ($input['product'] ?? '')), 0, 200),
+            'sort'    => 'newest',
+        ];
+        $model   = new Order();
+        $summary = $model->summary($userId, $f);
+        $orders  = $model->search($userId, $f, $limit, 0);
+        $items   = $model->itemsFor(array_map(static fn (array $o): int => (int) $o['id'], $orders));
+        $counts  = array_filter($model->countsByStatus($userId, $f));
+
+        // Totals per day for the same filter (newest first, up to 31 days).
+        $db = Database::connection();
+        $tz = date('P');
+        $where  = "user_id = ? AND status <> 'cancelled'";
+        $params = [$userId];
+        if ($f['status'] !== '') { $where .= ' AND status = ?'; $params[] = $f['status']; }
+        if ($from !== null) { $where .= ' AND created_at >= ?::timestamptz'; $params[] = $from . ' 00:00:00' . $tz; }
+        if ($to !== null)   { $where .= " AND created_at < (?::timestamptz + INTERVAL '1 day')"; $params[] = $to . ' 00:00:00' . $tz; }
+        $stmt = $db->prepare("SELECT to_char(created_at AT TIME ZONE ?, 'YYYY-MM-DD') AS day, COUNT(*) AS n, SUM(total) AS total,
+                                     COALESCE(MAX(currency), 'MYR') AS currency
+                                FROM orders WHERE $where GROUP BY 1 ORDER BY 1 DESC LIMIT 31");
+        $stmt->execute(array_merge([date_default_timezone_get()], $params));
+        $byDay = array_map(static fn (array $r): array => [
+            'date' => $r['day'], 'orders' => (int) $r['n'], 'total' => format_money($r['total'], $r['currency']),
+        ], $stmt->fetchAll());
+
+        $rows = array_map(static fn (array $o): array => [
+            'order_no' => $o['order_no'],
+            'date'     => date('Y-m-d H:i', strtotime((string) $o['created_at'])),
+            'customer' => trim((string) ($o['customer_name'] ?? '')) ?: 'Telegram ' . $o['customer_chat_id'],
+            'items'    => implode(', ', array_map(static fn (array $i): string => $i['quantity'] . ' × ' . $i['product_name'], $items[(int) $o['id']] ?? [])),
+            'total'    => format_money($o['total'], $o['currency']),
+            'status'   => Order::STATUSES[$o['status']] ?? $o['status'],
+            'receipt'  => !empty($o['receipt_path']) ? 'sent' : 'not sent',
+        ], $orders);
+
+        $this->staffResult('check_orders', [
+            'filter'          => array_filter(['status' => $f['status'], 'period' => $label, 'query' => $f['q'], 'product' => $f['product']]),
+            'count'           => $summary['count'],
+            'total_amount'    => format_money($summary['sum'], $summary['currency']) . ' (excluding cancelled)',
+            'by_status'       => array_combine(array_map(static fn (string $k): string => Order::STATUSES[$k] ?? $k, array_keys($counts)), array_values($counts)),
+            'by_day'          => $byDay,
+            'shown'           => count($rows),
+            'orders'          => $rows,
+        ]);
+    }
+
     /* ---------------------------------------------------------- private ---- */
+
+    /**
+     * A staff tool: the token must be a staff token and the function must be
+     * ticked in Staff > Setting & Integration. Returns the business (user) id.
+     */
+    private function staffAuth(string $function): int
+    {
+        $auth = $this->token();
+        FlowLog::write('tool.' . $function, ['user_id' => $auth['user_id'], 'input' => $this->input()]);
+
+        if ($auth['channel'] !== 'staff') {
+            FlowLog::write('tool.refused', ['tool' => $function, 'reason' => 'not a staff token']);
+            $this->json(403, ['success' => false, 'error' => 'This tool is only for the staff assistant.']);
+        }
+
+        try {
+            $row = (new StaffAiAssistantSetting())->find($auth['user_id']) ?? [];
+        } catch (Throwable $e) {
+            $row = [];
+        }
+        $enabled = array_key_exists('functions', $row) ? explode(',', (string) $row['functions']) : [$function];
+        if (!in_array($function, $enabled, true)) {
+            $this->json(200, ['success' => false, 'message' => 'This function is switched off in Staff > Setting & Integration. '
+                . 'Tell the staff member it is not enabled.']);
+        }
+
+        return $auth['user_id'];
+    }
+
+    /**
+     * A period from the tool input: "period" (today, yesterday, this_week, last_week,
+     * last_7_days, last_30_days, this_month, last_month, this_year), "date"
+     * (one day) or "date_from"/"date_to" (YYYY-MM-DD).
+     *
+     * @return array{0: ?string, 1: ?string, 2: string} [from, to, label]
+     */
+    private function period(array $input): array
+    {
+        $ymd   = static fn ($v): ?string => is_string($v) && preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($v)) ? trim($v) : null;
+        $today = new \DateTimeImmutable('today');
+
+        if (($day = $ymd($input['date'] ?? null)) !== null) {
+            return [$day, $day, $day];
+        }
+        $from = $ymd($input['date_from'] ?? null);
+        $to   = $ymd($input['date_to'] ?? null);
+        if ($from !== null || $to !== null) {
+            return [$from, $to, trim(($from ?? '…') . ' to ' . ($to ?? '…'))];
+        }
+
+        $period = strtolower(str_replace([' ', '-'], '_', trim((string) ($input['period'] ?? ''))));
+        $f = static fn (\DateTimeImmutable $d): string => $d->format('Y-m-d');
+        return match ($period) {
+            'today'        => [$f($today), $f($today), 'today'],
+            'yesterday'    => [$f($today->modify('-1 day')), $f($today->modify('-1 day')), 'yesterday'],
+            'this_week'    => [$f($today->modify('monday this week')), $f($today), 'this week'],
+            'last_week'    => [$f($today->modify('monday last week')), $f($today->modify('sunday last week')), 'last week'],
+            'last_7_days'  => [$f($today->modify('-6 days')), $f($today), 'last 7 days'],
+            'last_30_days' => [$f($today->modify('-29 days')), $f($today), 'last 30 days'],
+            'this_month'   => [$today->format('Y-m-01'), $f($today), 'this month'],
+            'last_month'   => [$f($today->modify('first day of last month')), $f($today->modify('last day of last month')), 'last month'],
+            'this_year'    => [$today->format('Y-01-01'), $f($today), 'this year'],
+            default        => [null, null, 'any date'],
+        };
+    }
+
+    private function staffResult(string $tool, array $data): never
+    {
+        FlowLog::write('tool.' . $tool . '_ok', ['count' => $data['count'] ?? null, 'filter' => $data['filter'] ?? null]);
+        $data['note'] = ($data['shown'] ?? 0) < ($data['count'] ?? 0)
+            ? 'Only the newest ' . $data['shown'] . ' of ' . $data['count'] . ' are listed. Give the totals and offer to narrow down.'
+            : null;
+        $this->json(200, ['success' => true, 'today' => date('Y-m-d (l)')] + $data);
+    }
 
     /** check_availability without a time: the next free start times from that date (or tomorrow). */
     private function freeTimesAnswer(int $userId, array $input): never

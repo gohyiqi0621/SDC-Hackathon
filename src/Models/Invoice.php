@@ -16,6 +16,16 @@ final class Invoice
 {
     public const STATUSES   = ['unpaid', 'partial', 'paid'];
 
+    /**
+     * purchase = a supplier billed us (we owe them);
+     * sales    = we billed a customer (they owe us).
+     * [label, who the other party is, icon]
+     */
+    public const TYPES = [
+        'purchase' => ['Purchase', 'Supplier', 'fa-solid fa-cart-arrow-down'],
+        'sales'    => ['Sales',    'Customer', 'fa-solid fa-hand-holding-dollar'],
+    ];
+
     /** Label and badge modifier for each status, shared by the views. */
     public const STATUS_LABELS = [
         'unpaid'  => ['Unpaid',         'badge--warn'],
@@ -33,9 +43,15 @@ final class Invoice
         'amount_asc'  => ['Amount (low-high)',   'amount ASC, id ASC'],
     ];
 
-    private const COLUMNS = 'id, invoice_number, party_name, issue_date, due_date, amount, currency,
-                             status, notes, file_path, file_name, file_mime, file_size,
-                             created_at, updated_at';
+    private const COLUMNS = 'id, type, invoice_number, party_name, party_address, party_phone, payment_terms,
+                             reference_no, issue_date, due_date, subtotal, discount_amount, sst_rate,
+                             sst_amount, amount, currency, status, notes, file_path, file_name,
+                             file_mime, file_size, created_at, updated_at';
+
+    /** The header columns InvoiceService validates (everything but status and the file). */
+    private const DETAIL_COLUMNS = ['type', 'invoice_number', 'party_name', 'party_address', 'party_phone',
+                                    'payment_terms', 'reference_no', 'issue_date', 'due_date', 'subtotal',
+                                    'discount_amount', 'sst_rate', 'sst_amount', 'amount', 'currency', 'notes'];
 
     /**
      * One page of a user's invoices.
@@ -127,63 +143,70 @@ final class Invoice
         return (bool) $stmt->fetchColumn();
     }
 
-    /** @param array<string, mixed> $data validated by InvoiceService */
+    /**
+     * Insert an invoice and its line items in one transaction.
+     *
+     * @param array<string, mixed> $data validated by InvoiceService (incl. 'items'), plus the file columns
+     */
     public function create(int $userId, array $data): int
     {
-        $stmt = Database::connection()->prepare(
-            'INSERT INTO invoices
-                (user_id, invoice_number, party_name, issue_date, due_date, amount, currency,
-                 status, notes, file_path, file_name, file_mime, file_size)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-             RETURNING id'
-        );
-        $stmt->execute([
-            $userId,
-            $data['invoice_number'],
-            $data['party_name'],
-            $data['issue_date'],
-            $data['due_date'],
-            $data['amount'],
-            $data['currency'],
-            $data['status'],
-            $data['notes'],
-            $data['file_path'] ?? null,
-            $data['file_name'] ?? null,
-            $data['file_mime'] ?? null,
-            $data['file_size'] ?? null,
-        ]);
+        $columns = array_merge(self::DETAIL_COLUMNS, ['status', 'file_path', 'file_name', 'file_mime', 'file_size']);
+        $values  = array_map(static fn (string $c) => $data[$c] ?? null, $columns);
 
-        return (int) $stmt->fetchColumn();
+        $pdo = Database::connection();
+        $pdo->beginTransaction();
+
+        try {
+            $stmt = $pdo->prepare(
+                'INSERT INTO invoices (user_id, ' . implode(', ', $columns) . ')
+                 VALUES (?' . str_repeat(', ?', count($columns)) . ')
+                 RETURNING id'
+            );
+            $stmt->execute(array_merge([$userId], $values));
+            $id = (int) $stmt->fetchColumn();
+
+            (new InvoiceItem())->replace($id, $data['items'] ?? []);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        return $id;
     }
 
-    /** @param array<string, mixed> $data validated by InvoiceService, plus the file columns */
+    /**
+     * Update an invoice and replace its line items in one transaction.
+     *
+     * @param array<string, mixed> $data validated by InvoiceService (incl. 'items'), plus the file columns
+     */
     public function update(int $userId, int $id, array $data): bool
     {
-        $stmt = Database::connection()->prepare(
-            'UPDATE invoices
-                SET invoice_number = ?, party_name = ?, issue_date = ?, due_date = ?, amount = ?,
-                    currency = ?, status = ?, notes = ?, file_path = ?, file_name = ?,
-                    file_mime = ?, file_size = ?, updated_at = CURRENT_TIMESTAMP
-              WHERE user_id = ? AND id = ?'
-        );
-        $stmt->execute([
-            $data['invoice_number'],
-            $data['party_name'],
-            $data['issue_date'],
-            $data['due_date'],
-            $data['amount'],
-            $data['currency'],
-            $data['status'],
-            $data['notes'],
-            $data['file_path'],
-            $data['file_name'],
-            $data['file_mime'],
-            $data['file_size'],
-            $userId,
-            $id,
-        ]);
+        $columns = array_merge(self::DETAIL_COLUMNS, ['status', 'file_path', 'file_name', 'file_mime', 'file_size']);
+        $set     = implode(', ', array_map(static fn (string $c) => $c . ' = ?', $columns));
+        $values  = array_map(static fn (string $c) => $data[$c] ?? null, $columns);
 
-        return $stmt->rowCount() > 0;
+        $pdo = Database::connection();
+        $pdo->beginTransaction();
+
+        try {
+            $stmt = $pdo->prepare(
+                'UPDATE invoices SET ' . $set . ', updated_at = CURRENT_TIMESTAMP
+                  WHERE user_id = ? AND id = ?'
+            );
+            $stmt->execute(array_merge($values, [$userId, $id]));
+            $updated = $stmt->rowCount() > 0;
+
+            if ($updated) {
+                (new InvoiceItem())->replace($id, $data['items'] ?? []);
+            }
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        return $updated;
     }
 
     /** Mark an unpaid or partly paid invoice as fully paid. */
@@ -227,6 +250,12 @@ final class Invoice
         if (in_array($status, self::STATUSES, true)) {
             $where[]  = 'status = ?';
             $params[] = $status;
+        }
+
+        $type = (string) ($filters['type'] ?? '');
+        if (isset(self::TYPES[$type])) {
+            $where[]  = 'type = ?';
+            $params[] = $type;
         }
 
         return [implode(' AND ', $where), $params];

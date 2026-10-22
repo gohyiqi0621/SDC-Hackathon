@@ -110,6 +110,145 @@ public function message(): void
     );
 }
 
+    /**
+     * Send a reply using the connected Gmail account.
+     */
+
+public function send(): void
+{
+    $user = require_login();
+
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        json_response(false, null, 'Method not allowed.', 405);
+        return;
+    }
+
+    if (!csrf_valid()) {
+        json_response(false, null, 'Invalid CSRF token.', 403);
+        return;
+    }
+
+    $messageId = (string) ($_POST['messageId'] ?? '');
+    $body = trim((string) ($_POST['body'] ?? ''));
+
+
+        if (!preg_match('/^[A-Za-z0-9]+$/', $messageId)) {
+            json_response(false, null, 'Invalid message ID.', 400);
+            return;
+        }
+
+        if ($body === '') {
+            json_response(false, null, 'Reply cannot be empty.', 422);
+            return;
+        }
+
+        if (strlen($body) > 1000000) {
+            json_response(false, null, 'Reply is too large.', 413);
+            return;
+        }
+
+        $attachments = $_FILES['attachments'] ?? null;
+
+        $result = (new GmailService())->sendReply(
+            (int) $user['id'],
+            $messageId,
+            $body,
+            $attachments
+        );
+
+        if (!$result['ok']) {
+            json_response(
+                false,
+                null,
+                $result['error'] ?? 'Unable to send reply.',
+                502
+            );
+            return;
+        }
+
+        json_response(
+            true,
+            ['id' => $result['id'] ?? null],
+            'Reply sent successfully.'
+        );
+    }
+
+    /**
+ * Get Gmail sent messages.
+ * GET /gmail/sent
+ */
+public function sent(): void
+{
+    $user = require_login();
+
+    $result = (new GmailService())->sent(
+        (int) $user['id']
+    );
+
+    if (!$result['ok']) {
+        json_response(
+            false,
+            ['reconnect' => $result['reconnect'] ?? false],
+            $result['error'] ?? 'Unable to load sent emails.',
+            502
+        );
+        return;
+    }
+
+    json_response(
+        true,
+        ['emails' => $result['emails']],
+        'Sent emails loaded.'
+    );
+}
+
+/**
+ * Get the full Gmail conversation thread.
+ * GET /gmail/thread?id=THREAD_ID
+ */
+public function thread(): void
+{
+    $user = require_login();
+
+    $threadId = $_GET['id'] ?? '';
+
+    if (
+        !is_string($threadId) ||
+        !preg_match('/^[A-Za-z0-9]+$/', $threadId)
+    ) {
+        json_response(
+            false,
+            null,
+            'Invalid Gmail thread ID.',
+            400
+        );
+        return;
+    }
+
+    $result = (new GmailService())->thread(
+        (int) $user['id'],
+        $threadId
+    );
+
+    if (!$result['ok']) {
+        json_response(
+            false,
+            ['reconnect' => $result['reconnect'] ?? false],
+            $result['error'] ?? 'Unable to load conversation.',
+            502
+        );
+        return;
+    }
+
+    json_response(
+        true,
+        ['messages' => $result['messages']],
+        'Conversation loaded.'
+    );
+}
+
+
+
 
     public function disconnect(): void
     {
@@ -119,4 +258,152 @@ public function message(): void
         flash('success', 'Gmail was disconnected. The dashboard shows demo emails again.', 'Gmail disconnected');
         redirect(url('dashboard'));
     }
+
+
+    /**
+     * Get Gmail Spam messages.
+     * GET /gmail/spam
+     */
+    public function spam(): void
+    {
+        $user = require_login();
+
+        $result = (new GmailService())->spam(
+            (int) $user['id']
+        );
+
+        if (!$result['ok']) {
+            json_response(
+                false,
+                [
+                    'reconnect' => $result['reconnect'] ?? false
+                ],
+                $result['error'] ?? 'Unable to load Spam.',
+                502
+            );
+            return;
+        }
+
+        json_response(
+            true,
+            ['emails' => $result['emails'] ?? []],
+            'Spam emails loaded.'
+        );
+    }
+
+    /**
+     * Get Gmail Trash messages.
+     * GET /gmail/trash
+     */
+    public function trash(): void
+    {
+        $user = require_login();
+
+        $result = (new GmailService())->trash(
+            (int) $user['id']
+        );
+
+        if (!$result['ok']) {
+            json_response(
+                false,
+                [
+                    'reconnect' => $result['reconnect'] ?? false
+                ],
+                $result['error'] ?? 'Unable to load Trash.',
+                502
+            );
+            return;
+        }
+
+        json_response(
+            true,
+            ['emails' => $result['emails'] ?? []],
+            'Trash emails loaded.'
+        );
+    }
+
+    /**
+     * Perform Gmail message actions.
+     * POST /gmail/action
+     */
+    public function action(): void
+    {
+        $user = require_login();
+
+        if (!csrf_valid()) {
+            json_response(
+                false,
+                null,
+                'Invalid CSRF token.',
+                403
+            );
+            return;
+        }
+
+        $messageId = (string) ($_POST['messageId'] ?? '');
+        $action = (string) ($_POST['action'] ?? '');
+
+        if (!preg_match('/^[A-Za-z0-9]+$/', $messageId)) {
+            json_response(
+                false,
+                null,
+                'Invalid Gmail message ID.',
+                400
+            );
+            return;
+        }
+
+        $allowedActions = [
+            'star',
+            'unstar',
+            'archive',
+            'trash',
+            'restore',
+            'read',
+            'unread',
+            'spam',
+            'not_spam',
+            'important',
+            'not_important'
+        ];
+
+        if (!in_array($action, $allowedActions, true)) {
+            json_response(
+                false,
+                null,
+                'Unsupported Gmail action.',
+                422
+            );
+            return;
+        }
+
+        $result = (new GmailService())->action(
+            (int) $user['id'],
+            $messageId,
+            $action
+        );
+
+        if (!$result['ok']) {
+            json_response(
+                false,
+                [
+                    'reconnect' => $result['reconnect'] ?? false
+                ],
+                $result['error'] ?? 'Gmail action failed.',
+                502
+            );
+            return;
+        }
+
+        json_response(
+            true,
+            [
+                'messageId' => $messageId,
+                'action' => $action
+            ],
+            'Gmail action completed.'
+        );
+    }
+
+    
 }

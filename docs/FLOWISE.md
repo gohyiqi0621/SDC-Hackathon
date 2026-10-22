@@ -323,6 +323,83 @@ for the last place at the same moment cannot both get it. Bookings are listed
 under **AI Chatbot → Customer → Bookings**; cancelling one there deletes the
 Google event and tells the customer on Telegram.
 
+## Staff assistant (Staff > Chat Interface)
+
+Staff chat with their own assistant about the business's records. Flow:
+`Staff > Chat Interface -> POST staff/chat_send -> StaffAssistantService -> Flowise (staff chatflow) -> reply`.
+
+- **Settings:** Staff > Setting & Integration (`staff_ai_assistant_settings`): name, personality, tone, AI model,
+  temperature, key, and the **Functions** ticked (`check_email`, `check_invoice`, `check_claims`, `check_orders`).
+- **Chatflow:** `FLOWISE_STAFF_CHATFLOW_ID` (Secret / .env). Not set: `FLOWISE_CHATFLOW_ID` is used.
+- **overrideConfig** sent: `sessionId` (`staff:<user>:staff-<user>`), `systemMessage` (src/Prompts/staff_system_message.md,
+  lists only the ticked tools), `modelName`, `temperature`, and `vars`: `tool_base_url`, `tool_token` (a **staff** token),
+  `channel` = `staff`, `staff_name`, `functions`, `company_name`, `assistant_name`, `provider`, `model`, `provider_api_key`.
+- **Tools** (read-only): they refuse customer tokens (403) and functions that are not ticked (success=false).
+- **History:** `chat_messages` with channel `staff` (migration 017); never shown in Customer > Chat Interface.
+- Check the exact request on the Staff Chat Interface: **View system message**.
+
+### Staff tool: `check_invoice`
+Description: *Look up the business's invoices. Use for any question about invoices, amounts owed, unpaid, partially paid,
+paid or overdue invoices. Returns totals (count, total amount, outstanding, overdue count) and the newest matching invoices.*
+
+| Property | Type | Description | Required |
+|---|---|---|---|
+| `status` | string | unpaid, partial, paid, overdue, outstanding (not paid) or all | no |
+| `period` | string | today, yesterday, this_week, last_week, last_7_days, last_30_days, this_month, last_month, this_year (by issue date) | no |
+| `date_from` | string | YYYY-MM-DD (issue date from) | no |
+| `date_to` | string | YYYY-MM-DD (issue date to) | no |
+| `query` | string | Invoice number or party name | no |
+
+### Staff tool: `check_claims`
+Description: *Look up staff expense claims. Use for questions about claims, who claimed what, pending approval, approved,
+rejected or reimbursed claims. Returns totals by status and the newest matching claims.*
+
+| Property | Type | Description | Required |
+|---|---|---|---|
+| `status` | string | submitted, pending (= submitted), approved, rejected, reimbursed or all | no |
+| `category` | string | travel, meals, office or other | no |
+| `claimant` | string | Name of the person, or words in the claim title | no |
+| `period` | string | Same values as check_invoice (by expense date) | no |
+| `date_from` / `date_to` | string | YYYY-MM-DD | no |
+
+### Staff tool: `check_orders`
+Description: *Look up customer orders placed through the AI chatbot. Use for questions about orders, sales, receipts to
+review, orders to ship, or orders on a date or in a period. Returns the count, total, counts per status, totals per day
+and the newest matching orders.*
+
+| Property | Type | Description | Required |
+|---|---|---|---|
+| `status` | string | pending_payment, payment_submitted (to_review), paid (to_ship), shipped, payment_rejected, cancelled or all | no |
+| `period` | string | today, yesterday, this_week, last_week, last_7_days, last_30_days, this_month, last_month, this_year | no |
+| `date` | string | One day, YYYY-MM-DD | no |
+| `date_from` / `date_to` | string | YYYY-MM-DD | no |
+| `query` | string | Order number, customer name or phone | no |
+| `product` | string | Product name | no |
+
+**JavaScript Function** (same for all three; change the path at the end of the URL):
+```javascript
+const httpFetch = typeof globalThis.fetch === 'function' ? globalThis.fetch : require('node-fetch');
+const body = {};
+for (const [k, v] of Object.entries({
+  status: typeof $status !== 'undefined' ? $status : '',
+  period: typeof $period !== 'undefined' ? $period : '',
+  date: typeof $date !== 'undefined' ? $date : '',
+  date_from: typeof $date_from !== 'undefined' ? $date_from : '',
+  date_to: typeof $date_to !== 'undefined' ? $date_to : '',
+  query: typeof $query !== 'undefined' ? $query : '',
+  category: typeof $category !== 'undefined' ? $category : '',
+  claimant: typeof $claimant !== 'undefined' ? $claimant : '',
+  product: typeof $product !== 'undefined' ? $product : ''
+})) { if (v !== null && v !== undefined && String(v) !== '') body[k] = String(v); }
+
+const res = await httpFetch($vars.tool_base_url + '/check_orders', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + $vars.tool_token, 'ngrok-skip-browser-warning': 'true' },
+  body: JSON.stringify(body)
+});
+return await res.text();
+```
+
 ## Telegram needs a public https address
 
 Telegram can't call `http://localhost`. For XAMPP:

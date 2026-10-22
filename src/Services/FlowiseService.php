@@ -50,12 +50,14 @@ final class FlowiseService
      */
     public function ask(array $config, string $systemMessage, string $question, string $sessionId, array $context = []): array
     {
-        if (!$this->isConfigured($config['provider'])) {
-            FlowLog::write('flowise.not_configured', ['flowise_api_url' => FLOWISE_API_URL, 'chatflow_id' => $this->chatflowId($config['provider'])]);
+        // A caller may pick its own chatflow (the staff assistant: FLOWISE_STAFF_CHATFLOW_ID).
+        $chatflow = trim((string) ($context['_chatflow'] ?? '')) ?: $this->chatflowId($config['provider']);
+        if (FLOWISE_API_URL === '' || $chatflow === '') {
+            FlowLog::write('flowise.not_configured', ['flowise_api_url' => FLOWISE_API_URL, 'chatflow_id' => $chatflow]);
             return ['ok' => false, 'reply' => '', 'error' => 'Flowise is not configured (set FLOWISE_API_URL and FLOWISE_CHATFLOW_ID in .env).'];
         }
 
-        $url     = FLOWISE_API_URL . '/api/v1/prediction/' . rawurlencode($this->chatflowId($config['provider']));
+        $url     = FLOWISE_API_URL . '/api/v1/prediction/' . rawurlencode($chatflow);
         $headers = ['Content-Type' => 'application/json'];
         if (FLOWISE_API_KEY !== '') {
             $headers['Authorization'] = 'Bearer ' . FLOWISE_API_KEY;

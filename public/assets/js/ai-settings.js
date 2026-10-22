@@ -721,6 +721,16 @@
             { key: 'sales',   label: 'Salesman SOP' }
         ];
 
+        // Staff page: "Functions" checkboxes instead of the SOP editor.
+        var hasSop = !!output;
+        var functionBoxes = $all('[data-function]', form);
+        if (!hasSop) { SOP = []; }
+
+        function selectedFunctions(values) {
+            return functionBoxes.filter(function (box) { return !!values[box.name]; })
+                .map(function (box) { return box.getAttribute('data-function'); });
+        }
+
         var editors = {};
         SOP.forEach(function (s) { editors[s.key] = $('[data-sop="' + s.key + '"]', form); });
 
@@ -754,6 +764,7 @@
         }
 
         function syncInstructions() {
+            if (!hasSop) { return; }
             var text = compose();
             output.value = text;
             combined.textContent = text || '(nothing yet)';
@@ -766,6 +777,7 @@
         }
 
         function fillEditors(text) {
+            if (!hasSop) { return; }
             var parts = parse(text);
             SOP.forEach(function (s) { editors[s.key].value = parts[s.key]; });
             syncInstructions();
@@ -842,7 +854,7 @@
             });
         }
 
-        makeTabs($all('[data-sop-tab]', form), function (tab) {
+        if (hasSop) makeTabs($all('[data-sop-tab]', form), function (tab) {
             return document.getElementById(tab.getAttribute('aria-controls'));
         });
 
@@ -919,7 +931,7 @@
                     },
                     Rules.maxLength(500, 'Tone description')
                 ],
-                system_instructions: [Rules.maxLength(MAX_INSTRUCTIONS, 'System instructions')],
+                system_instructions: hasSop ? [Rules.maxLength(MAX_INSTRUCTIONS, 'System instructions')] : [],
                 ai_model: [Rules.required('AI model'), Rules.oneOf(selectOptions(modelSelect), 'Choose an AI model from the list.')],
                 temperature: [function (value) {
                     var n = Number(value);
@@ -948,17 +960,22 @@
             keyState = { saved: !!s.has_api_key, provider: s.has_api_key ? providerOf(model) : null };
             clearKey();
             fillEditors(s.system_instructions || '');
-            ctrl.load({
+            var fnValues = {};
+            var enabledFns = Array.isArray(s.functions) ? s.functions : null;   // null: never saved -> all on
+            functionBoxes.forEach(function (box) {
+                fnValues[box.name] = enabledFns === null || enabledFns.indexOf(box.getAttribute('data-function')) !== -1;
+            });
+            ctrl.load(Object.assign(fnValues, {
                 assistant_name: s.assistant_name || '',
                 personality: PERSONALITIES.indexOf(s.personality) === -1 ? 'friendly' : s.personality,
                 tone_description: s.tone_description || '',
                 is_enabled: s.is_enabled === undefined || s.is_enabled === null ? true : s.is_enabled,
-                system_instructions: output.value,
+                system_instructions: hasSop ? output.value : '',
                 ai_model: model,
                 temperature: String(Math.round(temp * 10) / 10),
                 reply_language: ['auto', 'en', 'ms', 'zh', 'ta'].indexOf(s.reply_language) === -1 ? 'auto' : s.reply_language,
                 api_key: ''
-            });
+            }));
             ctrl.setSavedMeta(savedMetaText(s.updated_at, demo));
             updateToneRequirement();
             updateSwitchLabel();
@@ -997,6 +1014,10 @@
                 temperature: values.temperature,
                 reply_language: values.reply_language || 'auto'
             };
+            if (!hasSop) {
+                delete payload.system_instructions;
+                payload.functions = selectedFunctions(values).join(',');
+            }
             // Only sent when typed; otherwise the server keeps the saved key.
             if (trimmed(values.api_key) !== '') { payload.api_key = trimmed(values.api_key); }
 
@@ -1489,10 +1510,22 @@
         }
 
         function fill(g) {
+            var v = values(g || {});
             render(g);
+            // Show the saved booking rules straight away; the calendar list
+            // (a call to Google) fills in afterwards.
+            ctrl.load(v);
+            ctrl.setSavedMeta(savedMetaText((g || {}).updated_at));
+            updateRules();
+            var before = JSON.stringify(Object.assign({}, ctrl.values(), { calendar_id: null }));
             return loadCalendars().then(function () {
-                ctrl.load(values(g || {}));
-                ctrl.setSavedMeta(savedMetaText((g || {}).updated_at));
+                var now = JSON.stringify(Object.assign({}, ctrl.values(), { calendar_id: null }));
+                if (now === before) {
+                    ctrl.load(v);              // nothing edited while loading: saved state incl. calendar
+                } else {
+                    calendarSelect.value = v.calendar_id;   // keep the user's edits, just pick the calendar
+                    ctrl.refresh();
+                }
                 updateRules();
             });
         }

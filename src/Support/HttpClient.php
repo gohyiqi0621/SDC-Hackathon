@@ -153,4 +153,23 @@ final class HttpClient
 
         return ['status' => $status, 'body' => is_array($decoded) ? $decoded : null];
     }
+
+
+    /**
+     * POST JSON data to an external API.
+     *
+     * @return array{status:int, body:?array<string,mixed>}
+     */
+    public static function postJson(
+        string $url,
+        array $data,
+        array $headers = []
+    ): array {
+        $json = json_encode($data, JSON_THROW_ON_ERROR);
+
+        $headers[] = 'Content-Type: application/json; charset=UTF-8';
+
+        return self::send('POST', $url, $headers, $json);
+    }
+
 }
