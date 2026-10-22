@@ -128,11 +128,11 @@ unset($__appUrl, $__scheme, $__host, $__script, $__base, $__public, $__publicHos
 /* ------------------------------------------------------------- database --- */
 // PostgreSQL only. These are the same DB_* names the rest of the project uses;
 // the DSN itself is built in Src\Support\Database.
-define('DB_HOST', (string) env('DB_HOST', '127.0.0.1'));
-define('DB_PORT', (string) env('DB_PORT', '5432'));
-define('DB_NAME', (string) env('DB_NAME', 'sme_assistant'));
-define('DB_USER', (string) env('DB_USER', 'postgres'));
-define('DB_PASS', (string) env('DB_PASS', ''));
+define('DB_HOST', (string) env('DB_HOST', env('PGHOST', '127.0.0.1')));
+define('DB_PORT', (string) env('DB_PORT', env('PGPORT', '5432')));
+define('DB_NAME', (string) env('DB_NAME', env('PGDATABASE', 'sme_assistant')));
+define('DB_USER', (string) env('DB_USER', env('PGUSER', 'postgres')));
+define('DB_PASS', (string) env('DB_PASS', env('PGPASSWORD', '')));
 define('DB_SSLMODE', (string) env('DB_SSLMODE', 'prefer'));
 
 /* ----------------------------------------------------------------- mail --- */
@@ -200,7 +200,12 @@ if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_NONE) {
 /* ------------------------------------------------------- security heads --- */
 if (PHP_SAPI !== 'cli' && !headers_sent()) {
     header('X-Content-Type-Options: nosniff');
-    header('X-Frame-Options: DENY');
+    if (APP_ENV === 'development') {
+        // Permit the Replit preview while keeping unrelated sites from framing it.
+        header("Content-Security-Policy: frame-ancestors 'self' https://replit.com https://*.replit.com https://*.replit.dev");
+    } else {
+        header('X-Frame-Options: DENY');
+    }
     header('Referrer-Policy: strict-origin-when-cross-origin');
     header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
     header('Cache-Control: no-store, private');

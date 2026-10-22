@@ -1,6 +1,39 @@
-run = "python src/main.py"
-entrypoint = "src/main.py"
-modules = ["php-8.2", "web", "nodejs-20"]
+run = "php -S 0.0.0.0:5000 -t public bin/serve.php"
+entrypoint = "public/index.php"
+modules = ["php-8.2", "web", "nodejs-20", "postgresql-16", "python-base-3.13"]
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.development]
+APP_ENV = "development"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php -S 0.0.0.0:5000 -t public bin/serve.php"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
