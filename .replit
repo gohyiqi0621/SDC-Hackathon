@@ -1,6 +1,6 @@
 run = "php -S 0.0.0.0:5000 -t public bin/serve.php"
 entrypoint = "public/index.php"
-modules = ["php-8.2", "web", "nodejs-20", "postgresql-16", "python-base-3.13"]
+modules = ["php-8.2", "web", "nodejs-20", "python-base-3.13", "postgresql-16"]
 
 [nix]
 channel = "stable-25_05"
