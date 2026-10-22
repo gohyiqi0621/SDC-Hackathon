@@ -1,6 +1,6 @@
 <?php
 /**
- * email/index.php - the Smart SME AI email dashboard (moved from the old
+ * email/index.php - the SME Smart AI email dashboard (moved from the old
  * top-level email/ folder). Rendered by EmailController behind AuthMiddleware.
  *
  * Expects: $workerName, $workerRole, $brevoReady
@@ -13,7 +13,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Smart SME | AI Email Dashboard</title>
+    <title>SME Smart | AI Email Dashboard</title>
 
     <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
 

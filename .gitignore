@@ -4,8 +4,9 @@ __pycache__/
 venv/
 .venv/
 
-# Environment
+# Environment (real keys: never commit; "env" is a stray copy without the dot)
 .env
+env
 
 # Runtime storage
 storage/logs/*.log
@@ -23,3 +24,5 @@ composer.lock
 
 # User-uploaded product images
 public/uploads/products/
+
+.workbuddy-ai/

@@ -18,8 +18,12 @@ use Src\Controllers\ClaimController;
 use Src\Controllers\DashboardController;
 use Src\Controllers\FinancialController;
 use Src\Controllers\GmailController;
+use Src\Controllers\OrderController;
 use Src\Controllers\ProductController;
 use Src\Controllers\ProfileController;
+use Src\Controllers\SystemController;
+use Src\Controllers\TelegramWebhookController;
+use Src\Controllers\ToolController;
 use Src\Middleware\AuthMiddleware;
 use Src\Middleware\GuestMiddleware;
 use Src\Support\Router;
@@ -146,26 +150,34 @@ $router->post(
 
 
     /* ------------------------------------------------------- financial --- */
+    // Invoice: list + upload popup (?new=1, ?edit=N). Edit / mark paid / delete are Supervisor only.
     $router->get('financial/invoice', [FinancialController::class, 'invoice'], $auth);
-    $router->get('financial/upload', [FinancialController::class, 'upload'], $auth);
+    $router->post('financial/role', [FinancialController::class, 'role'], $auth);
     $router->post('financial/store', [FinancialController::class, 'store'], $auth);
-    $router->get('financial/edit', [FinancialController::class, 'edit'], $auth);
     $router->post('financial/update', [FinancialController::class, 'update'], $auth);
+    $router->post('financial/mark_paid', [FinancialController::class, 'markPaid'], $auth);
     $router->post('financial/delete', [FinancialController::class, 'delete'], $auth);
     $router->get('financial/file', [FinancialController::class, 'file'], $auth);
+
+    // Claims: list + new-claim popup (?new=1, ?edit=N). Review / edit / delete are Supervisor only.
     $router->get('financial/claims', [ClaimController::class, 'index'], $auth);
-    $router->get('financial/claim_new', [ClaimController::class, 'create'], $auth);
     $router->post('financial/claim_store', [ClaimController::class, 'store'], $auth);
-    $router->get('financial/claim_edit', [ClaimController::class, 'edit'], $auth);
     $router->post('financial/claim_update', [ClaimController::class, 'update'], $auth);
     $router->post('financial/claim_status', [ClaimController::class, 'status'], $auth);
     $router->post('financial/claim_delete', [ClaimController::class, 'delete'], $auth);
     $router->get('financial/claim_file', [ClaimController::class, 'file'], $auth);
-    $router->get('financial/settlement', [FinancialController::class, 'settlement'], $auth);
+
+    // Old addresses: the Upload Invoice and claim-form pages became popups; Settlement was removed.
+    $router->get('financial/upload', [FinancialController::class, 'upload'], $auth);
+    $router->get('financial/edit', [FinancialController::class, 'edit'], $auth);
+    $router->get('financial/claim_new', [ClaimController::class, 'create'], $auth);
+    $router->get('financial/claim_edit', [ClaimController::class, 'edit'], $auth);
+    $router->get('financial/settlement', static fn () => redirect(url('financial', ['action' => 'invoice'])), $auth);
 
     /* -------------------------------------------- AI chatbot: customer --- */
     $router->get('customer/settings', [ChatbotController::class, 'customerSettings'], $auth);
     $router->get('customer/chat', [ChatbotController::class, 'customerChat'], $auth);
+    $router->get('customer/chat_feed', [ChatbotController::class, 'customerChatFeed'], $auth);
 
     // Product & Service (Customer)
     $router->get('products', [ProductController::class, 'index'], $auth);
@@ -174,6 +186,18 @@ $router->post(
     $router->get('products/edit', [ProductController::class, 'edit'], $auth);
     $router->post('products/update', [ProductController::class, 'update'], $auth);
     $router->post('products/delete', [ProductController::class, 'delete'], $auth);
+    $router->post('products/import_preview', [ProductController::class, 'importPreview'], $auth);
+    $router->post('products/import_commit', [ProductController::class, 'importCommit'], $auth);
+    $router->post('products/import_cancel', [ProductController::class, 'importCancel'], $auth);
+    $router->get('products/import_template', [ProductController::class, 'importTemplate'], $auth);
+
+    // Orders from the AI chatbot (buy_product): review payment receipts
+    $router->get('orders', [OrderController::class, 'index'], $auth);
+    $router->get('orders/receipt', [OrderController::class, 'receipt'], $auth);
+    $router->post('orders/approve', [OrderController::class, 'approve'], $auth);
+    $router->post('orders/reject', [OrderController::class, 'reject'], $auth);
+    $router->post('orders/ship', [OrderController::class, 'ship'], $auth);
+    $router->post('orders/cancel', [OrderController::class, 'cancel'], $auth);
 
     $router->get('categories', [CategoryController::class, 'index'], $auth);
     $router->post('categories/store', [CategoryController::class, 'store'], $auth);
@@ -187,17 +211,35 @@ $router->post(
     $router->post('ai_settings/company_profile_save', [AiSettingsController::class, 'companyProfileSave'], $auth);
     $router->get('ai_settings/assistant', [AiSettingsController::class, 'assistant'], $auth);
     $router->post('ai_settings/assistant_save', [AiSettingsController::class, 'assistantSave'], $auth);
+    $router->post('ai_settings/generate_sops', [AiSettingsController::class, 'generateSops'], $auth);
+    $router->get('ai_settings/staff_assistant', [AiSettingsController::class, 'staffAssistant'], $auth);
+    $router->post('ai_settings/staff_assistant_save', [AiSettingsController::class, 'staffAssistantSave'], $auth);
+    $router->post('ai_settings/staff_generate_sops', [AiSettingsController::class, 'staffGenerateSops'], $auth);
     $router->get('ai_settings/telegram', [AiSettingsController::class, 'telegram'], $auth);
-    $router->post('ai_settings/telegram_test', [AiSettingsController::class, 'telegramTest'], $auth);
     $router->post('ai_settings/telegram_connect', [AiSettingsController::class, 'telegramConnect'], $auth);
     $router->post('ai_settings/telegram_disconnect', [AiSettingsController::class, 'telegramDisconnect'], $auth);
+    $router->post('ai_settings/telegram_forget', [AiSettingsController::class, 'telegramForget'], $auth);
+    $router->post('ai_settings/telegram_staff_link', [AiSettingsController::class, 'telegramStaffLink'], $auth);
+    $router->post('ai_settings/telegram_staff_unlink', [AiSettingsController::class, 'telegramStaffUnlink'], $auth);
     $router->get('ai_settings/google_calendar', [AiSettingsController::class, 'googleCalendar'], $auth);
     $router->get('ai_settings/google_calendar_oauth_start', [AiSettingsController::class, 'googleCalendarOauthStart'], $auth);
     $router->get('ai_settings/google_calendar_oauth_callback', [AiSettingsController::class, 'googleCalendarOauthCallback'], $auth);
     $router->get('ai_settings/google_calendar_calendars', [AiSettingsController::class, 'googleCalendarCalendars'], $auth);
     $router->post('ai_settings/google_calendar_save', [AiSettingsController::class, 'googleCalendarSave'], $auth);
-    $router->post('ai_settings/google_calendar_test', [AiSettingsController::class, 'googleCalendarTest'], $auth);
     $router->post('ai_settings/google_calendar_disconnect', [AiSettingsController::class, 'googleCalendarDisconnect'], $auth);
+
+    /* ------------------------------ Telegram -> website -> Flowise ------- */
+    // Called by Telegram and by Flowise, not by a browser: no login and no
+    // CSRF token (csrf: false). Each checks its own secret instead - the
+    // webhook secret header / the signed tool token.
+    $router->post('telegram/webhook', [TelegramWebhookController::class, 'handle'], [], false);
+    $router->post('tools/check_product', [ToolController::class, 'checkProduct'], [], false);
+    $router->post('tools/buy_product', [ToolController::class, 'buyProduct'], [], false);
+    $router->post('tools/check_availability', [ToolController::class, 'checkAvailability'], [], false);
+    $router->post('tools/make_booking', [ToolController::class, 'makeBooking'], [], false);
+
+    // Preview of the system message built from AI Settings.
+    $router->get('customer/system_message', [ChatbotController::class, 'customerSystemMessage'], $auth);
 
     /* ----------------------------------------------- AI chatbot: staff --- */
     $router->get('staff/settings', [ChatbotController::class, 'staffSettings'], $auth);
@@ -205,6 +247,7 @@ $router->post(
 
     /* -------------------------------------------------------- profile --- */
     $router->get('profile', [ProfileController::class, 'index'], $auth);
+    $router->get('system/settings', [SystemController::class, 'settings'], $auth);
     $router->post('profile/update', [ProfileController::class, 'update'], $auth);
     $router->post('profile/password', [ProfileController::class, 'password'], $auth);
 

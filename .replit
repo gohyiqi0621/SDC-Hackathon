@@ -1,5 +1,13 @@
-run = "python src/main.py"
-entrypoint = "src/main.py"
+# Replit: run the PHP app (public/ is the web root). Settings come from
+# Replit Secrets; do not upload a .env file.
+run = "php -S 0.0.0.0:8080 -t public public/router.php"
+entrypoint = "public/index.php"
+modules = ["php-8.2", "postgresql-16"]
 
-[nix]
-channel = "stable-24_05"
+[[ports]]
+localPort = 8080
+externalPort = 80
+
+[deployment]
+deploymentTarget = "vm"
+run = ["sh", "-c", "php -S 0.0.0.0:8080 -t public public/router.php"]

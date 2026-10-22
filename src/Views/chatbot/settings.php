@@ -5,10 +5,18 @@
  * Expects (from ChatbotController): $title, $audience, $sub, $assistant,
  * $integrations [[icon, name, text, state]] (state: true = connected, 'setup' = available
  * but not configured, false = coming soon), $chatUrl, $productCount (Customer only).
+ * Optional: $aiModels + $aiEndpoints - adds the full AI Assistant Settings form
+ * (ai_settings/_ai_assistant_settings_form.php) below Assistant and Integrations,
+ * loaded and saved by assets/js/ai-settings.js through those endpoints.
  * Saving assistant settings and connecting channels is the next integration
  * step, so the controls are shown but not yet editable.
  */
-view('layouts/header', ['title' => $title]);
+$aiEndpoints = $aiEndpoints ?? null;
+
+view('layouts/header', [
+    'title'  => $title,
+    'styles' => $aiEndpoints !== null ? ['assets/css/ai-settings.css'] : [],
+]);
 ?>
 <section class="welcome-banner welcome-banner--compact">
     <div class="welcome-text">
@@ -28,7 +36,7 @@ view('layouts/header', ['title' => $title]);
         <i class="fa-solid fa-circle-info"></i>
         <div>
             <strong>Preview</strong>
-            <span>These settings show what will be configurable. Saving them and connecting channels is the next integration step.</span>
+            <span><?= $aiEndpoints !== null ? 'The Assistant and Integrations cards are a preview. The AI Assistant Settings below are live and can be saved.' : 'These settings show what will be configurable. Saving them and connecting channels is the next integration step.' ?></span>
         </div>
     </div>
 
@@ -43,25 +51,25 @@ view('layouts/header', ['title' => $title]);
             </div>
             <div class="panel-body">
                 <div class="field">
-                    <label for="assistant_name">Assistant name</label>
-                    <input id="assistant_name" type="text" value="<?= e($assistant['name']) ?>" disabled>
+                    <label for="preview_assistant_name">Assistant name</label>
+                    <input id="preview_assistant_name" type="text" value="<?= e($assistant['name']) ?>" disabled>
                 </div>
                 <div class="field">
-                    <label for="assistant_greeting">Greeting message</label>
-                    <textarea id="assistant_greeting" rows="3" disabled><?= e($assistant['greeting']) ?></textarea>
+                    <label for="preview_assistant_greeting">Greeting message</label>
+                    <textarea id="preview_assistant_greeting" rows="3" disabled><?= e($assistant['greeting']) ?></textarea>
                 </div>
                 <div class="form-row">
                     <div class="field">
-                        <label for="assistant_tone">Tone</label>
-                        <select id="assistant_tone" disabled>
+                        <label for="preview_assistant_tone">Tone</label>
+                        <select id="preview_assistant_tone" disabled>
                             <option>Friendly</option>
                             <option>Formal</option>
                             <option>Concise</option>
                         </select>
                     </div>
                     <div class="field">
-                        <label for="assistant_language">Language</label>
-                        <select id="assistant_language" disabled>
+                        <label for="preview_assistant_language">Language</label>
+                        <select id="preview_assistant_language" disabled>
                             <option>English</option>
                             <option>Bahasa Melayu</option>
                             <option>中文</option>
@@ -109,5 +117,19 @@ view('layouts/header', ['title' => $title]);
         </section>
 
     </div>
+
+    <?php if ($aiEndpoints !== null): ?>
+        <div class="ai-settings staff-ai-settings"
+             data-ai-settings
+             data-endpoints="<?= e(json_encode($aiEndpoints, JSON_UNESCAPED_SLASHES)) ?>">
+            <div class="staff-ai-heading">
+                <h2><i class="fa-solid fa-robot" aria-hidden="true"></i> AI Assistant Settings</h2>
+                <p>How the <?= e(strtolower($audience)) ?> assistant thinks and replies. Saved separately from the customer assistant.</p>
+            </div>
+            <section class="ai-panel" data-panel="assistant">
+                <?php view('ai_settings/_ai_assistant_settings_form', ['aiModels' => $aiModels, 'audience' => strtolower($audience)]); ?>
+            </section>
+        </div>
+    <?php endif; ?>
 </div>
-<?php view('layouts/footer'); ?>
+<?php view('layouts/footer', ['scripts' => $aiEndpoints !== null ? ['assets/js/ai-settings-api.js', 'assets/js/ai-settings.js'] : []]); ?>

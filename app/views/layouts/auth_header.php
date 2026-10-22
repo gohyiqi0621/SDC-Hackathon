@@ -17,7 +17,7 @@ require __DIR__ . '/head.php';
 </div>
 <main class="screen--auth">
   <a class="brand" href="<?= e(url('home')) ?>" aria-label="<?= e(APP_NAME) ?> home">
-    <span class="brand__mark" aria-hidden="true"><img src="<?= e(asset('assets/logo.webp')) ?>" alt="" width="52" height="52"></span>
-    <span class="brand__name">SDC <em>App</em></span>
+    <span class="brand__mark" aria-hidden="true"><img src="<?= e(asset('assets/gemini_logo.png')) ?>" alt="" width="52" height="52"></span>
+    <span class="brand__name">SME Smart</span>
   </a>
   <?php view('layouts/flashes', ['flashes' => flashes()]); ?>

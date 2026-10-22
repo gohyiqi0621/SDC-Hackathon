@@ -2,12 +2,20 @@
 /**
  * financial/claims.php - staff expense claims and their review status.
  *
+ * Anyone can view and submit; a Supervisor also sees the review, edit and
+ * delete buttons.
+ *
  * Expects: $claims, $total (matching filters), $allCount, $stats,
- * $filters [q, status, category, sort], $page, $pages, $perPage.
+ * $filters [q, status, category, sort], $page, $pages, $perPage, $modal, $modalOpen.
  */
 use Src\Models\Claim;
 
 view('layouts/header', ['title' => 'Claims']);
+
+$supervisor = is_supervisor();
+// While the popup is editing a claim, "New claim" reloads into a blank one.
+$newUrl     = url('financial', ['action' => 'claims', 'new' => 1]);
+$openNew    = $modal['claim'] === null ? ' data-modal-open="#claimModal"' : '';
 
 $filtered  = $filters['q'] !== '' || $filters['status'] !== '' || $filters['category'] !== '';
 $listQuery = array_filter([
@@ -43,7 +51,7 @@ $reviewActions = [
         <p>Staff expense claims with their receipts: submit, approve, then reimburse.</p>
     </div>
     <div class="welcome-actions">
-        <a class="primary-btn" href="<?= e(url('financial', ['action' => 'claim_new'])) ?>">
+        <a class="primary-btn" href="<?= e($newUrl) ?>"<?= $openNew ?>>
             <i class="fa-solid fa-plus"></i> New claim
         </a>
     </div>
@@ -137,7 +145,7 @@ $reviewActions = [
                 <div class="empty-icon"><i class="fa-solid fa-receipt"></i></div>
                 <h3>No claims yet</h3>
                 <p>When staff spend their own money for the business, submit a claim with the receipt here.</p>
-                <a class="primary-btn" href="<?= e(url('financial', ['action' => 'claim_new'])) ?>">
+                <a class="primary-btn" href="<?= e($newUrl) ?>"<?= $openNew ?>>
                     <i class="fa-solid fa-plus"></i> New claim
                 </a>
             </div>
@@ -161,7 +169,9 @@ $reviewActions = [
                             <th>Spent on</th>
                             <th class="num">Amount</th>
                             <th>Status</th>
-                            <th class="actions"><span class="sr-only">Actions</span></th>
+                            <?php if ($supervisor): ?>
+                                <th class="actions"><span class="sr-only">Actions</span></th>
+                            <?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
@@ -191,10 +201,11 @@ $reviewActions = [
                                         <br><small class="muted"><?= e(fmt_datetime($row['reimbursed_at'], 'j M Y')) ?></small>
                                     <?php endif; ?>
                                 </td>
+                                <?php if ($supervisor): ?>
                                 <td class="actions">
                                     <?php foreach ($reviewActions[$row['status']] ?? [] as [$do, $label, $icon, $btnClass, $confirm]): ?>
                                         <form method="post" action="<?= e(url('financial', ['action' => 'claim_status'])) ?>"
-                                              <?= $confirm !== null ? 'data-confirm="' . e($confirm) . '" data-confirm-title="' . e($label) . '?" data-confirm-ok="' . e($label) . '"' : '' ?>>
+                                              <?= $confirm !== null ? 'data-confirm="' . e($confirm) . '" data-confirm-title="' . e($label) . '?" data-confirm-ok="' . e($label) . '"' . ($do === 'reject' ? '' : ' data-confirm-tone="primary"') : '' ?>>
                                             <?= csrf_field() ?>
                                             <input type="hidden" name="id" value="<?= (int) $row['id'] ?>">
                                             <input type="hidden" name="do" value="<?= e($do) ?>">
@@ -206,7 +217,7 @@ $reviewActions = [
                                     <?php endforeach; ?>
 
                                     <?php if ($row['status'] !== 'reimbursed'): ?>
-                                        <a class="icon-btn" href="<?= e(url('financial', ['action' => 'claim_edit', 'id' => $row['id']])) ?>" title="Edit" aria-label="Edit <?= e($row['title']) ?>">
+                                        <a class="icon-btn" href="<?= e(url('financial', ['action' => 'claims', 'edit' => $row['id']])) ?>" title="Edit" aria-label="Edit <?= e($row['title']) ?>">
                                             <i class="fa-regular fa-pen-to-square"></i>
                                         </a>
                                     <?php endif; ?>
@@ -222,6 +233,7 @@ $reviewActions = [
                                         </button>
                                     </form>
                                 </td>
+                                <?php endif; ?>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -249,4 +261,6 @@ $reviewActions = [
     </section>
 
 </div>
+
+<?php require __DIR__ . '/_claim_modal.php'; ?>
 <?php view('layouts/footer'); ?>

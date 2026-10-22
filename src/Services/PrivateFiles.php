@@ -1,6 +1,6 @@
 <?php
 /**
- * PrivateFiles.php - private uploads (invoice files, claim receipts).
+ * PrivateFiles.php - private uploads (invoice files, claim receipts, order payment receipts).
  *
  * Files are stored OUTSIDE public/, under storage/uploads/<folder>/<user id>/
  * with a random name, so a URL can never reach them directly. The app sends
@@ -92,6 +92,45 @@ final class PrivateFiles
             'file_name' => $this->cleanName((string) ($file['name'] ?? ''), self::TYPES[$mime]),
             'file_mime' => $mime,
             'file_size' => (int) ($file['size'] ?? 0),
+        ];
+    }
+
+    /**
+     * Save file bytes that did not come from a browser upload (e.g. a payment
+     * receipt downloaded from Telegram). Same type checks as store().
+     *
+     * @return array{file_path: string, file_name: string, file_mime: string, file_size: int}|null
+     *         null when the bytes are not an allowed PDF/JPG/PNG/WebP or too large
+     */
+    public function storeBytes(int $userId, string $bytes, string $name): ?array
+    {
+        if ($bytes === '' || strlen($bytes) > self::MAX_BYTES) {
+            return null;
+        }
+
+        $mime = (string) (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+        if (!isset(self::TYPES[$mime]) || ($mime !== 'application/pdf' && @getimagesizefromstring($bytes) === false)) {
+            return null;
+        }
+
+        $relativeDir = $this->folder . '/' . $userId;
+        $absoluteDir = $this->root() . '/' . $relativeDir;
+        if (!is_dir($absoluteDir) && !mkdir($absoluteDir, 0755, true) && !is_dir($absoluteDir)) {
+            error_log('[' . $this->folder . '] cannot create ' . $absoluteDir);
+            return null;
+        }
+
+        $relative = $relativeDir . '/' . bin2hex(random_bytes(16)) . '.' . self::TYPES[$mime];
+        if (file_put_contents($this->root() . '/' . $relative, $bytes) === false) {
+            error_log('[' . $this->folder . '] could not write ' . $relative);
+            return null;
+        }
+
+        return [
+            'file_path' => $relative,
+            'file_name' => $this->cleanName($name, self::TYPES[$mime]),
+            'file_mime' => $mime,
+            'file_size' => strlen($bytes),
         ];
     }
 

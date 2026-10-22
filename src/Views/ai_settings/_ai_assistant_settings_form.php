@@ -9,11 +9,17 @@
  * single `system_instructions` field, each under a "### <Section>" heading.
  * ai-settings.js splits the stored text back into the boxes when it loads.
  *
+ * "Generate instruction with AI" asks Agnes AI (POST ai_settings/generate_sops) for
+ * three SOPs written from the saved company information, five steps each,
+ * and fills the three boxes. Nothing is saved until the owner clicks Save.
+ *
  * The secret key is sent once and stored encrypted; the page is only told
  * whether one is saved (has_api_key), never the key itself.
  *
  * Expects: $aiModels (AiSettingsController::AI_MODELS: id => [label, provider]).
+ * Optional: $audience ('customer' default, or 'staff' on Staff Setting & Integration).
  */
+$audience = ($audience ?? 'customer') === 'staff' ? 'staff' : 'customer';
 $byProvider = [];
 foreach ($aiModels as $id => [$label, $provider]) {
     $byProvider[$provider][$id] = $label;
@@ -41,8 +47,8 @@ $sections = [
                 <section class="panel">
                     <div class="panel-header">
                         <div>
-                            <h2>Assistant <span class="demo-chip" data-demo-chip hidden>Demo</span></h2>
-                            <p>Its name and personality, as customers will experience it.</p>
+                            <h2>Assistant</h2>
+                            <p>Its name and personality, as <?= $audience === 'staff' ? 'your team' : 'customers' ?> will experience it.</p>
                         </div>
                         <label class="switch">
                             <input type="checkbox" role="switch" id="is_enabled" name="is_enabled" value="1">
@@ -117,6 +123,17 @@ $sections = [
                         </div>
 
                         <div class="field">
+                            <label for="reply_language">Reply language</label>
+                            <select id="reply_language" name="reply_language" aria-describedby="hint-reply_language err-reply_language">
+                                <?php foreach (\Src\Controllers\AiSettingsController::REPLY_LANGUAGES as $code => $label): ?>
+                                    <option value="<?= e($code) ?>"><?= e($label) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <p class="field-hint" id="hint-reply_language">"Same language as the customer" answers Malay with Malay, English with English, Chinese with Chinese. Choose a fixed language to always reply in it.</p>
+                            <p class="field-error" id="err-reply_language" data-error-for="reply_language"></p>
+                        </div>
+
+                        <div class="field">
                             <label for="api_key">Secret key <span data-api-key-provider>(Anthropic)</span></label>
                             <div class="input-wrap">
                                 <input id="api_key" name="api_key" type="password" autocomplete="new-password"
@@ -139,8 +156,17 @@ $sections = [
                             <h2>System instructions</h2>
                             <p>Rules the assistant follows. All sections are saved together as one set of instructions.</p>
                         </div>
+                        <button class="primary-btn sop-generate-btn" type="button" data-sop-generate>
+                            <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Generate instruction with AI
+                        </button>
                     </div>
                     <div class="panel-body">
+                        <div class="sop-ai-note" data-sop-ai-note>
+                            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                            <p>Agnes AI reads your saved <strong>Company Information</strong> and products, picks the three SOPs your
+                                business needs most and writes 5 simple steps for each. Review and edit them, then click Save.</p>
+                        </div>
+                        <div class="sop-ai-result" data-sop-ai-result hidden aria-live="polite"></div>
                         <div class="sop-editor" data-sop-editor>
                             <div class="sop-tabs" role="tablist" aria-label="Instruction sections">
                                 <?php $first = true; foreach ($sections as $key => [$label, $icon]): ?>
@@ -163,9 +189,6 @@ $sections = [
                                     <div class="field">
                                         <div class="field-label-row">
                                             <label for="sop-<?= e($key) ?>"><?= e($label) ?></label>
-                                            <button class="link-btn" type="button" data-sop-template="<?= e($key) ?>">
-                                                <i class="fa-solid fa-file-lines" aria-hidden="true"></i> Insert starter template
-                                            </button>
                                         </div>
                                         <textarea id="sop-<?= e($key) ?>" rows="10" class="sop-textarea" data-sop="<?= e($key) ?>"
                                                   data-sop-label="<?= e($label) ?>" spellcheck="true"

@@ -209,10 +209,48 @@ function require_login(): array
     return \Src\Services\AuthService::requireUser();
 }
 
+/* -------------------------------------------------------- finance role ---- */
+
+/**
+ * The role used on the Financial pages: "user" (view and submit) or
+ * "supervisor" (also edit, approve, reject, mark paid and delete).
+ *
+ * This is a demo switch kept in the session - anyone signed in can flip it
+ * from the Financial pages - so the hackathon demo can show both views.
+ */
+function finance_role(): string
+{
+    return ($_SESSION['finance_role'] ?? 'user') === 'supervisor' ? 'supervisor' : 'user';
+}
+
+function is_supervisor(): bool
+{
+    return finance_role() === 'supervisor';
+}
+
+/** Stop the request unless the Financial role is Supervisor. */
+function require_supervisor(string $doing = 'do that'): void
+{
+    if (is_supervisor()) {
+        return;
+    }
+
+    $message = 'Only a supervisor can ' . $doing . '. Switch to Supervisor to continue.';
+
+    if (wants_json()) {
+        json_response(false, ['errors' => ['form' => $message]], $message, 403);
+    }
+
+    flash('error', $message, 'Supervisor only');
+
+    $back = (string) ($_POST['return'] ?? $_SERVER['HTTP_REFERER'] ?? '');
+    redirect(str_starts_with($back, APP_URL . '/') ? $back : url('financial', ['action' => 'invoice']));
+}
+
 /** Up to two initials for the avatar circle: "Goh Yi Qi" -> "GY". */
 function initials_of(?array $user): string
 {
-    $words = preg_split('/\s+/', trim((string) ($user['name'] ?? ''))) ?: [];
+    $words = preg_split('/\s+/u', trim((string) ($user['name'] ?? ''))) ?: [];
     $words = array_values(array_filter($words, static fn (string $w): bool => $w !== ''));
 
     if ($words === []) {
@@ -223,6 +261,76 @@ function initials_of(?array $user): string
 
     return mb_strtoupper($letters);
 }
+
+/* --------------------------------------------------------------- brand ---- */
+
+/**
+ * The two halves of the brand name: "SME Smart" -> ['SME', 'Smart'].
+ *
+ * The first word is always drawn in the dark blue and the rest in the mid
+ * blue, so renaming the app in .env re-colours the wordmark automatically
+ * instead of leaving hard-coded text in a view.
+ *
+ * @return array{0: string, 1: string}
+ */
+function brand_words(): array
+{
+    $parts = preg_split('/\s+/', trim(APP_NAME)) ?: [];
+    $parts = array_values(array_filter($parts, static fn (string $w): bool => $w !== ''));
+
+    if ($parts === []) {
+        return ['', ''];
+    }
+    if (count($parts) === 1) {
+        return [$parts[0], ''];
+    }
+
+    return [$parts[0], implode(' ', array_slice($parts, 1))];
+}
+
+/**
+ * The brand name as two-tone HTML: "SME" dark blue, "Smart" mid blue.
+ *
+ * Every value is escaped here, so a view echoes the result directly.
+ */
+function brand_wordmark(string $class = 'brand-name'): string
+{
+    [$lead, $tail] = brand_words();
+
+    $html = '<span class="' . e($class) . '">'
+          . '<span class="' . e($class) . '__lead">' . e($lead) . '</span>';
+
+    if ($tail !== '') {
+        $html .= ' <span class="' . e($class) . '__tail">' . e($tail) . '</span>';
+    }
+
+    return $html . '</span>';
+}
+
+/** The one logo file used by the sidebar, the auth screens and every icon. */
+function brand_logo(): string
+{
+    return 'assets/gemini_logo.png';
+}
+
+/**
+ * The company that issues our invoices (src/company.php).
+ *
+ * @return array<string, string>
+ */
+function company(): array
+{
+    static $company = null;
+
+    if ($company === null) {
+        $file    = SRC_ROOT . '/company.php';
+        $company = is_file($file) ? (array) require $file : [];
+    }
+
+    return $company;
+}
+
+/* --------------------------------------------------------------- money ---- */
 
 /** "MYR 1,234.50" from a NUMERIC string. Empty for null. */
 function format_money(mixed $amount, string $currency = 'MYR'): string
@@ -275,9 +383,7 @@ function nav_items(): array
             'group'    => 'Workspace',
             'children' => [
                 ['key' => 'financial/invoice',    'label' => 'Invoice',        'icon' => 'fa-solid fa-file-invoice',        'url' => url('financial', ['action' => 'invoice'])],
-                ['key' => 'financial/upload',     'label' => 'Upload Invoice', 'icon' => 'fa-solid fa-cloud-arrow-up',      'url' => url('financial', ['action' => 'upload']), 'match' => ['financial/upload', 'financial/edit']],
-                ['key' => 'financial/claims',     'label' => 'Claims',         'icon' => 'fa-solid fa-receipt',             'url' => url('financial', ['action' => 'claims']), 'match' => ['financial/claims', 'financial/claim_new', 'financial/claim_edit']],
-                ['key' => 'financial/settlement', 'label' => 'Settlement',     'icon' => 'fa-solid fa-scale-balanced',      'url' => url('financial', ['action' => 'settlement'])],
+                ['key' => 'financial/claims',     'label' => 'Claims',         'icon' => 'fa-solid fa-receipt',             'url' => url('financial', ['action' => 'claims'])],
             ],
         ],
         [
@@ -287,11 +393,12 @@ function nav_items(): array
             'icon'     => 'fa-solid fa-robot',
             'group'    => 'Workspace',
             // Pages that keep this group open and highlighted.
-            'match'    => ['customer', 'staff', 'products', 'categories'],
+            'match'    => ['customer', 'staff', 'products', 'categories', 'orders'],
             'children' => [
                 ['heading' => 'Customer'],
                 ['key' => 'customer/settings', 'label' => 'Setting & Integration', 'icon' => 'fa-solid fa-sliders',       'url' => url('customer', ['action' => 'settings'])],
                 ['key' => 'products',          'label' => 'Product & Service',     'icon' => 'fa-solid fa-box-open',      'url' => url('products'), 'match' => ['products', 'categories']],
+                ['key' => 'orders',            'label' => 'Orders',                'icon' => 'fa-solid fa-bag-shopping',  'url' => url('orders'), 'match' => ['orders', 'orders/receipt']],
                 ['key' => 'customer/chat',     'label' => 'Chat Interface',        'icon' => 'fa-regular fa-comments',    'url' => url('customer', ['action' => 'chat'])],
                 ['heading' => 'Staff'],
                 ['key' => 'staff/settings',    'label' => 'Setting & Integration', 'icon' => 'fa-solid fa-sliders',       'url' => url('staff', ['action' => 'settings'])],
@@ -355,11 +462,6 @@ function page_title_for(string $key): string
         'profile'             => 'Profile',
         'financial/invoice'   => 'Invoice',
         'financial/claims'    => 'Claims',
-        'financial/settlement'=> 'Settlement',
-        'financial/upload'    => 'Upload Invoice',
-        'financial/edit'      => 'Edit Invoice',
-        'financial/claim_new' => 'New Claim',
-        'financial/claim_edit'=> 'Edit Claim',
         'customer/settings'   => 'AI Settings & Integration',
         'customer/chat'       => 'Customer Chat Interface',
         'staff/settings'      => 'Staff Setting & Integration',

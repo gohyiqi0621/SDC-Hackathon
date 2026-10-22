@@ -71,20 +71,29 @@ if (is_file($__envPath)) {
     }
 }
 
-// Real environment variables (Docker, Railway, CI) come first; a local .env
-// overrides them, which is what makes XAMPP development work unchanged.
-foreach ((getenv() ?: []) as $__key => $__value) {
-    if (is_string($__value) && preg_match('/^[A-Z][A-Z0-9_]*$/', (string) $__key)) {
-        $_ENV[$__key] = $__value;
+// Real environment variables (Replit Secrets, Docker, Railway) win. A .env
+// file only fills in what the environment does not set, so XAMPP works with
+// .env alone and a stray .env on a server can never blank out a Secret.
+// $_SERVER is read too: some PHP setups (php-fpm, Apache) only put the
+// environment there, and getenv() alone then returns nothing.
+foreach ([(getenv() ?: []), $_SERVER] as $__source) {
+    foreach ($__source as $__key => $__value) {
+        if (is_string($__value) && $__value !== '' && preg_match('/^[A-Z][A-Z0-9_]*$/', (string) $__key)
+            && !str_starts_with((string) $__key, 'HTTP_') && !isset($_ENV[$__key])) {
+            $_ENV[$__key] = $__value;
+        }
     }
 }
 foreach ($__envFile as $__key => $__value) {
-    $_ENV[(string) $__key] = $__value;
+    if (!isset($_ENV[$__key]) || $_ENV[$__key] === '') {
+        $_ENV[(string) $__key] = $__value;
+    }
 }
+unset($__source);
 unset($__envPath, $__envFile, $__key, $__value, $__line);
 
 /* --------------------------------------------------------------- config --- */
-define('APP_NAME', (string) env('APP_NAME', 'Smart SME'));
+define('APP_NAME', (string) env('APP_NAME', 'SME Smart'));
 define('APP_ENV', (string) env('APP_ENV', 'production'));
 define('APP_DEBUG', filter_var(env('APP_DEBUG', 'false'), FILTER_VALIDATE_BOOL));
 define('APP_TIMEZONE', (string) env('APP_TIMEZONE', 'Asia/Kuala_Lumpur'));
@@ -110,8 +119,19 @@ if ($__appUrl === '') {
 
     $__appUrl = $__scheme . '://' . $__host . $__base;
 }
+
+// Opened through the public tunnel (e.g. ngrok)? Then build links and
+// redirects on that address, so the browser is not sent back to localhost.
+$__public = rtrim((string) env('PUBLIC_APP_URL', ''), '/');
+if ($__public !== '' && PHP_SAPI !== 'cli') {
+    $__publicHost = strtolower((string) parse_url($__public, PHP_URL_HOST));
+    $__reqHost    = strtolower(preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')));
+    if ($__publicHost !== '' && $__publicHost === $__reqHost) {
+        $__appUrl = $__public;
+    }
+}
 define('APP_URL', rtrim($__appUrl, '/'));
-unset($__appUrl, $__scheme, $__host, $__script, $__base);
+unset($__appUrl, $__scheme, $__host, $__script, $__base, $__public, $__publicHost, $__reqHost);
 
 
 /* ------------------------------------------------------------- database --- */
@@ -138,6 +158,18 @@ define('GMAIL_CLIENT_ID', (string) env('GMAIL_CLIENT_ID', ''));
 define('GMAIL_CLIENT_SECRET', (string) env('GMAIL_CLIENT_SECRET', ''));
 define('GMAIL_REDIRECT_URI', (string) (env('GMAIL_REDIRECT_URI', '') ?: APP_URL . '/gmail/callback'));
 define('GMAIL_MAX_RESULTS', max(1, min(50, (int) env('GMAIL_MAX_RESULTS', '20'))));
+
+/* -------------------------------------------- telegram + flowise (AI) --- */
+// Public HTTPS address of this app (the same place APP_URL points to), used
+// for the Telegram webhook and for Flowise tools calling back into the app.
+// On XAMPP use a tunnel, e.g. https://abc123.ngrok-free.app/SDC-Hackathon/public
+define('PUBLIC_APP_URL', rtrim((string) (env('PUBLIC_APP_URL', '') ?: APP_URL), '/'));
+
+// Flowise prediction API: POST {FLOWISE_API_URL}/api/v1/prediction/{chatflow id}
+define('FLOWISE_API_URL', rtrim((string) env('FLOWISE_API_URL', ''), '/'));
+define('FLOWISE_CHATFLOW_ID', (string) env('FLOWISE_CHATFLOW_ID', ''));
+define('FLOWISE_API_KEY', (string) env('FLOWISE_API_KEY', ''));
+define('FLOWISE_TIMEOUT', max(5, min(300, (int) env('FLOWISE_TIMEOUT', '90'))));
 
 /* -------------------------------------------------------------- session --- */
 define('SESSION_NAME', (string) env('SESSION_NAME', 'sme_session'));

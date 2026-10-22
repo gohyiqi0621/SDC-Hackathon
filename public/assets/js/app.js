@@ -8,13 +8,16 @@
    4. Password reveal   <button data-toggle-password="inputId">
    5. AJAX forms        <form data-ajax> (falls back to a normal post)
    6. Upload picker     [data-file-input] + [data-file-label]
-   7. Chat demo         [data-chat] composer (no backend yet)
+   7. Chat              [data-chat] composer; real AI when data-chat-endpoint is set, demo otherwise
    8. Confirm dialog    <form data-confirm="Message" data-confirm-title data-confirm-ok>
    9. Filter forms      <form data-auto-submit> submits when a select changes
   10. Image picker      [data-image-picker] preview before upload
-  11. Live list filter  <input data-filter-list="#list"> hides [data-filter-item] rows
   12. Field errors      a field's error clears as soon as it is edited
   13. Money inputs      <input data-money> shows 10,000.00 while typing
+  15. Popups            <dialog class="modal"> opened by [data-modal-open="#id"]
+  16. File preview      [data-file-preview] shows the chosen PDF / image
+  17. Submit confirm    <form data-submit-confirm="Message"> asks once before sending
+  18. Invoice items     [data-items] line-item rows with live totals
 ===================================== */
 
 (function () {
@@ -71,6 +74,11 @@
             btn.setAttribute('title', label);
         }
 
+        var brand = document.querySelector('[data-sidebar-brand]');
+        if (brand) {
+            brand.setAttribute('title', collapsed ? 'Open sidebar' : brand.dataset.brandTitle || 'Home');
+        }
+
         // With the labels hidden, a hover tooltip names each icon.
         document.querySelectorAll('.sidebar .nav-link').forEach(function (link) {
             var text = link.querySelector('span');
@@ -85,6 +93,13 @@
     if (root.classList.contains('sidebar-collapsed')) { setCollapsed(true); }
 
     document.addEventListener('click', function (e) {
+        var brand = e.target.closest('[data-sidebar-brand]');
+        if (brand && root.classList.contains('sidebar-collapsed') && window.matchMedia('(min-width: 901px)').matches) {
+            e.preventDefault();
+            setCollapsed(false);
+            return;
+        }
+
         if (e.target.closest('[data-sidebar-collapse]')) {
             setCollapsed(!root.classList.contains('sidebar-collapsed'));
             return;
@@ -242,12 +257,13 @@
     /* ---------- 6. Upload picker ---------- */
 
     document.querySelectorAll('[data-file-input]').forEach(function (input) {
-        var label = document.querySelector('[data-file-label]');
         var drop = input.closest('[data-upload-drop]');
+        var label = (drop || document).querySelector('[data-file-label]');
+        var original = label ? label.textContent : '';
 
         input.addEventListener('change', function () {
             var file = input.files && input.files[0];
-            if (label) { label.textContent = file ? file.name : 'Choose a PDF, PNG or JPG'; }
+            if (label) { label.textContent = file ? file.name : original; }
         });
 
         if (drop) {
@@ -272,7 +288,7 @@
         }
     });
 
-    /* ---------- 7. Chat demo ---------- */
+    /* ---------- 7. Chat ---------- */
 
     document.querySelectorAll('[data-chat]').forEach(function (chat) {
         var body = chat.querySelector('.chat-body');
@@ -287,11 +303,85 @@
             body.scrollTop = body.scrollHeight;
         }
 
+        var endpoint = chat.getAttribute('data-chat-endpoint');
+        var button = form.querySelector('button[type="submit"]');
+        var busy = false;
+
+        body.scrollTop = body.scrollHeight;
+
+        function note(text) {
+            var el = document.createElement('div');
+            el.className = 'chat-note';
+            el.textContent = text;
+            body.appendChild(el);
+            body.scrollTop = body.scrollHeight;
+        }
+
+        function typing(on) {
+            var el = body.querySelector('.chat-typing');
+            if (on && !el) {
+                el = document.createElement('div');
+                el.className = 'chat-bubble chat-bubble--bot chat-typing';
+                el.innerHTML = '<span></span><span></span><span></span>';
+                body.appendChild(el);
+                body.scrollTop = body.scrollHeight;
+            } else if (!on && el) {
+                el.remove();
+            }
+        }
+
+        // Real AI: same pipeline as Telegram (AI Settings -> Flowise).
+        function ask(text) {
+            busy = true;
+            setLoading(button, true);
+            typing(true);
+
+            var data = new FormData();
+            data.append('message', text);
+
+            fetch(endpoint, {
+                method: 'POST',
+                body: data,
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': csrfToken() }
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (result) {
+                    typing(false);
+                    if (!result.success) {
+                        note(result.message || 'The message could not be sent.');
+                        return;
+                    }
+                    var d = result.data || {};
+                    if (d.reply) { bubble(d.reply, 'bot'); }
+                    if (d.status === 'skipped') {
+                        note('No reply: the AI assistant is switched off in AI Settings.');
+                    } else if (d.status === 'error') {
+                        note('Customers would get the reply above. Reason: ' + (d.error || 'unknown error'));
+                    }
+                })
+                .catch(function () {
+                    typing(false);
+                    note('Network error. Please try again.');
+                })
+                .then(function () {
+                    busy = false;
+                    setLoading(button, false);
+                    input.focus();
+                });
+        }
+
         function send(text) {
             text = text.trim();
-            if (!text) { return; }
+            if (!text || busy) { return; }
             bubble(text, 'me');
             input.value = '';
+
+            if (endpoint) {
+                ask(text);
+                return;
+            }
+
             setTimeout(function () {
                 bubble('Thanks! The AI assistant is not connected yet, so this is a demo reply. '
                     + 'Once it is connected, it will answer from your records.', 'bot');
@@ -319,30 +409,47 @@
 
     var dialog = document.getElementById('confirmDialog');
 
-    document.addEventListener('submit', function (e) {
-        var form = e.target;
-        if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-confirm')) { return; }
-        if (form.dataset.confirmed === '1') { return; }
-
-        var message = form.getAttribute('data-confirm');
-
-        // No <dialog> support: fall back to the browser's own prompt.
+    /**
+     * Ask in the shared confirm dialog; onYes runs only on "confirm".
+     * tone "danger" (default, red) is for destructive actions; anything
+     * else ("primary") shows a calm, non-red dialog.
+     */
+    function askConfirm(opts, onYes) {
         if (!dialog || typeof dialog.showModal !== 'function') {
-            if (!window.confirm(message)) { e.preventDefault(); }
+            if (window.confirm(opts.message)) { onYes(); }
             return;
         }
 
-        e.preventDefault();
-        dialog.querySelector('[data-confirm-title]').textContent = form.getAttribute('data-confirm-title') || 'Are you sure?';
-        dialog.querySelector('[data-confirm-message]').textContent = message;
-        dialog.querySelector('[data-confirm-button]').textContent = form.getAttribute('data-confirm-ok') || 'Confirm';
+        var danger = (opts.tone || 'danger') === 'danger';
+        var button = dialog.querySelector('[data-confirm-button]');
+
+        dialog.classList.toggle('confirm-dialog--primary', !danger);
+        dialog.querySelector('[data-confirm-title]').textContent = opts.title || 'Are you sure?';
+        dialog.querySelector('[data-confirm-message]').textContent = opts.message || '';
+        dialog.querySelector('[data-confirm-cancel]').textContent = opts.cancel || 'Cancel';
+        button.textContent = opts.ok || 'Confirm';
+        button.className = danger ? 'danger-btn' : 'primary-btn';
         dialog.returnValue = '';
         dialog.showModal();
 
         dialog.addEventListener('close', function onClose() {
             dialog.removeEventListener('close', onClose);
-            if (dialog.returnValue !== 'confirm') { return; }
+            if (dialog.returnValue === 'confirm') { onYes(); }
+        });
+    }
 
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-confirm')) { return; }
+        if (form.dataset.confirmed === '1') { return; }
+
+        e.preventDefault();
+        askConfirm({
+            title: form.getAttribute('data-confirm-title'),
+            message: form.getAttribute('data-confirm'),
+            ok: form.getAttribute('data-confirm-ok'),
+            tone: form.getAttribute('data-confirm-tone')
+        }, function () {
             form.dataset.confirmed = '1';
             setLoading(form.querySelector('button[type="submit"]'), true);
             form.submit();
@@ -393,25 +500,6 @@
         }
     });
 
-    /* ---------- 11. Live list filter ---------- */
-
-    document.querySelectorAll('[data-filter-list]').forEach(function (input) {
-        var list = document.querySelector(input.getAttribute('data-filter-list'));
-        if (!list) { return; }
-        var empty = list.parentNode.querySelector('[data-filter-empty]');
-
-        input.addEventListener('input', function () {
-            var term = input.value.trim().toLowerCase();
-            var shown = 0;
-            list.querySelectorAll('[data-filter-item]').forEach(function (item) {
-                var match = term === '' || (item.getAttribute('data-filter-item') || '').indexOf(term) !== -1;
-                item.hidden = !match;
-                if (match) { shown++; }
-            });
-            if (empty) { empty.hidden = shown > 0; }
-        });
-    });
-
     /* ---------- 12. Field errors ---------- */
 
     // A stale "Enter the amount" under a field the user is now filling in is
@@ -445,27 +533,323 @@
         return cents === null ? whole : whole + '.' + cents;
     }
 
+    function padMoney(value) {
+        var parts = formatMoney(value).split('.');
+        return (parts[0] || '0') + '.' + ((parts[1] || '') + '00').slice(0, 2);
+    }
+
     document.querySelectorAll('input[data-money]').forEach(function (input) {
-        if (input.value !== '') { input.value = formatMoney(input.value); }
+        if (input.value !== '') { input.value = padMoney(input.value); }
+    });
 
-        input.addEventListener('input', function () {
-            // Keep the caret after the same digit once commas move around.
-            var caret = input.selectionStart || 0;
-            var before = input.value.slice(0, caret).replace(/,/g, '').length;
-            var next = formatMoney(input.value);
-            input.value = next;
+    // Delegated, so rows added later (invoice items) are formatted too.
+    document.addEventListener('input', function (e) {
+        var input = e.target;
+        if (!(input instanceof HTMLInputElement) || !input.hasAttribute('data-money') || input.readOnly) { return; }
 
-            var pos = 0;
-            for (var seen = 0; pos < next.length && seen < before; pos++) {
-                if (next.charAt(pos) !== ',') { seen++; }
+        // Keep the caret after the same digit once commas move around.
+        var caret = input.selectionStart || 0;
+        var before = input.value.slice(0, caret).replace(/,/g, '').length;
+        var next = formatMoney(input.value);
+        input.value = next;
+
+        var pos = 0;
+        for (var seen = 0; pos < next.length && seen < before; pos++) {
+            if (next.charAt(pos) !== ',') { seen++; }
+        }
+        input.setSelectionRange(pos, pos);
+    });
+
+    document.addEventListener('focusout', function (e) {
+        var input = e.target;
+        if (!(input instanceof HTMLInputElement) || !input.hasAttribute('data-money') || input.value === '') { return; }
+        input.value = padMoney(input.value);
+    });
+
+    /* ---------- 14. AI preview ---------- */
+
+    document.querySelectorAll('[data-ai-preview]').forEach(function (panel) {
+        var list = panel.querySelector('[data-ai-status]');
+        var dialogEl = document.querySelector('[data-ai-preview-dialog]');
+        var loaded = null;
+
+        function row(ok, title, text) {
+            var li = document.createElement('li');
+            li.innerHTML = '<span class="item-icon"><i class="fa-solid ' + (ok ? 'fa-circle-check' : 'fa-triangle-exclamation') + '"></i></span><span><strong></strong><small></small></span>';
+            li.querySelector('.item-icon').classList.add(ok ? 'item-icon--ok' : 'item-icon--warn');
+            li.querySelector('strong').textContent = title;
+            li.querySelector('small').textContent = text;
+            return li;
+        }
+
+        fetch(panel.getAttribute('data-ai-preview'), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (result) {
+                var d = result.data || {};
+                loaded = d;
+                list.innerHTML = '';
+                list.appendChild(row(d.flowise_configured, 'Flowise', d.flowise_configured ? 'Connected in .env' : 'Not set up yet (FLOWISE_API_URL / FLOWISE_CHATFLOW_ID)'));
+                list.appendChild(row(d.enabled, 'Assistant', d.enabled ? 'Switched on' : 'Switched off or not saved'));
+                list.appendChild(row(true, 'Model', (d.model || '?') + ' (' + (d.provider || '?') + '), temperature ' + d.temperature));
+                (d.problems || []).forEach(function (p) { list.appendChild(row(false, 'To do', p)); });
+            })
+            .catch(function () {
+                list.innerHTML = '';
+                list.appendChild(row(false, 'Could not load', 'Refresh the page to try again.'));
+            });
+
+        var open = panel.querySelector('[data-ai-preview-open]');
+        if (open && dialogEl) {
+            open.addEventListener('click', function () {
+                if (!loaded) { toast('Still loading, try again in a moment.'); return; }
+                dialogEl.querySelector('[data-ai-preview-system]').textContent = loaded.system_message || '';
+                dialogEl.querySelector('[data-ai-preview-payload]').textContent = JSON.stringify(loaded.payload || {}, null, 2);
+                dialogEl.showModal();
+            });
+            dialogEl.querySelector('[data-ai-preview-close]').addEventListener('click', function () { dialogEl.close(); });
+            dialogEl.addEventListener('click', function (e) { if (e.target === dialogEl) { dialogEl.close(); } });
+        }
+    });
+
+    /* ---------- 15. Popups ---------- */
+
+    // <a href="fallback" data-modal-open="#id"> opens <dialog id="id" class="modal">.
+    // The link still works without JavaScript (the page renders the popup open).
+    function openModal(modal) {
+        if (!modal || typeof modal.showModal !== 'function') { return false; }
+        if (!modal.open) { modal.showModal(); }
+        return true;
+    }
+
+    document.addEventListener('click', function (e) {
+        var opener = e.target.closest('[data-modal-open]');
+        if (opener) {
+            if (openModal(document.querySelector(opener.getAttribute('data-modal-open')))) { e.preventDefault(); }
+            return;
+        }
+
+        var closer = e.target.closest('[data-modal-close]');
+        if (closer && closer.closest('dialog')) { closer.closest('dialog').close(); }
+    });
+
+    document.querySelectorAll('dialog.modal').forEach(function (modal) {
+        if (modal.hasAttribute('data-modal-autoopen')) { openModal(modal); }
+
+        modal.addEventListener('close', function () {
+            // An edit popup belongs to its URL: closing it goes back to the plain list.
+            var back = modal.getAttribute('data-modal-return');
+            if (back) { window.location.replace(back); return; }
+
+            // Drop ?new=1 so a refresh does not reopen the popup.
+            if (/[?&]new=/.test(window.location.search) && window.history.replaceState) {
+                var url = new URL(window.location.href);
+                url.searchParams.delete('new');
+                window.history.replaceState(null, '', url.toString());
             }
-            input.setSelectionRange(pos, pos);
+        });
+    });
+
+    /* ---------- 16. File preview ---------- */
+
+    // Shows the chosen PDF or image next to the form, so details can be checked against it.
+    document.querySelectorAll('[data-file-preview]').forEach(function (pane) {
+        var input = pane.querySelector('[data-file-input]');
+        var frame = pane.querySelector('[data-preview-frame]');
+        var img = pane.querySelector('[data-preview-img]');
+        var pdf = pane.querySelector('[data-preview-pdf]');
+        var empty = pane.querySelector('[data-preview-empty]');
+        var remove = pane.querySelector('input[name="remove_file"], input[name="remove_receipt"]');
+        if (!input || !frame || !img || !pdf) { return; }
+
+        var initial = { shown: !frame.hidden, pdf: !pdf.hidden, src: pdf.hidden ? img.getAttribute('src') : pdf.getAttribute('src') };
+        var objectUrl = null;
+
+        function show(kind, src) {
+            img.hidden = kind !== 'img';
+            pdf.hidden = kind !== 'pdf';
+            if (kind === 'img') { img.src = src; }
+            if (kind === 'pdf') { pdf.src = src; }
+            frame.hidden = !kind;
+            if (empty) { empty.hidden = !!kind; }
+        }
+
+        function restore() {
+            if (initial.shown) { show(initial.pdf ? 'pdf' : 'img', initial.src); } else { show(null); }
+        }
+
+        input.addEventListener('change', function () {
+            var file = input.files && input.files[0];
+            if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+            if (!file) { restore(); return; }
+
+            if (remove) { remove.checked = false; }
+            objectUrl = URL.createObjectURL(file);
+            if (file.type === 'application/pdf') {
+                show('pdf', objectUrl);
+            } else if (/^image\//.test(file.type)) {
+                show('img', objectUrl);
+            } else {
+                show(null);
+            }
         });
 
-        input.addEventListener('blur', function () {
-            if (input.value === '') { return; }
-            var parts = formatMoney(input.value).split('.');
-            input.value = (parts[0] || '0') + '.' + ((parts[1] || '') + '00').slice(0, 2);
+        if (remove) {
+            remove.addEventListener('change', function () {
+                if (remove.checked) {
+                    input.value = '';
+                    show(null);
+                } else {
+                    restore();
+                }
+            });
+        }
+    });
+
+    /* ---------- 17. Submit confirm ---------- */
+
+    // <form data-submit-confirm="Message"> asks once ("Yes, submit" / "Review again")
+    // before sending - used where the sender cannot change the record afterwards.
+    // Runs before the AJAX handler (capture phase) and hands back to it on "yes".
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-submit-confirm')) { return; }
+
+        if (form.dataset.submitConfirmed === '1') {
+            delete form.dataset.submitConfirmed;
+            return;
+        }
+
+        // Required fields still empty: let the server's field errors show first.
+        var missing = Array.prototype.some.call(form.querySelectorAll('[required]'), function (field) {
+            return String(field.value || '').trim() === '';
         });
+        if (missing) { return; }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        askConfirm({
+            title: form.getAttribute('data-submit-confirm-title') || 'Submit now?',
+            message: form.getAttribute('data-submit-confirm'),
+            ok: 'Yes, submit',
+            cancel: 'Review again',
+            tone: 'primary'
+        }, function () {
+            form.dataset.submitConfirmed = '1';
+            if (typeof form.requestSubmit === 'function') { form.requestSubmit(); } else { form.submit(); }
+        });
+    }, true);
+
+    /* ---------- 18. Invoice items ---------- */
+
+    // Add / remove item rows and show the sums live: line = qty x price - disc,
+    // total = subtotal - discount + SST. The server recalculates on save; this
+    // is only what the user sees while typing. window.App.setInvoiceItems(rows)
+    // lets other code (e.g. AI auto-fill) fill the table.
+    document.querySelectorAll('[data-items]').forEach(function (editor) {
+        var body = editor.querySelector('[data-items-body]');
+        var template = editor.querySelector('[data-item-template]');
+        var empty = editor.querySelector('[data-items-empty]');
+        var form = editor.closest('form');
+        var amount = form.querySelector('[data-total-amount]');
+        var next = body.querySelectorAll('[data-item-row]').length;
+
+        function toCents(value) {
+            var n = parseFloat(String(value || '').replace(/,/g, ''));
+            return isNaN(n) ? 0 : Math.round(n * 100);
+        }
+
+        function show(cents) {
+            return padMoney((cents / 100).toFixed(2));
+        }
+
+        function rowHasValue(row) {
+            return Array.prototype.some.call(row.querySelectorAll('input'), function (input) {
+                return input.value.trim() !== '';
+            });
+        }
+
+        function recalc() {
+            var rows = body.querySelectorAll('[data-item-row]');
+            var subtotal = 0;
+            var active = false;
+
+            rows.forEach(function (row, i) {
+                row.querySelector('[data-item-num]').textContent = String(i + 1);
+
+                var qty = parseFloat(String(row.querySelector('[data-item-qty]').value).replace(/,/g, '')) || 0;
+                var line = Math.max(0, Math.round(qty * toCents(row.querySelector('[data-item-price]').value))
+                    - toCents(row.querySelector('[data-item-disc]').value));
+                row.querySelector('[data-item-total]').textContent = show(line);
+
+                if (rowHasValue(row)) {
+                    active = true;
+                    subtotal += line;
+                }
+            });
+
+            if (empty) { empty.hidden = rows.length > 0; }
+
+            editor.querySelectorAll('[data-when-items]').forEach(function (el) { el.hidden = !active; });
+            amount.readOnly = active;
+            amount.classList.toggle('is-computed', active);
+            if (!active) { return; }
+
+            var discount = Math.min(toCents(form.querySelector('[name="discount_amount"]').value), subtotal);
+            var rate = parseFloat(String(form.querySelector('[name="sst_rate"]').value).replace(/[,%\s]/g, '')) || 0;
+            var sst = Math.round((subtotal - discount) * Math.min(Math.max(rate, 0), 100) / 100);
+
+            editor.querySelector('[data-total-subtotal]').textContent = show(subtotal);
+            editor.querySelector('[data-total-sst]').textContent = show(sst);
+            amount.value = show(subtotal - discount + sst);
+        }
+
+        function addRow(values) {
+            var holder = document.createElement('tbody');
+            holder.innerHTML = template.innerHTML.replace(/__i__/g, String(next++));
+            var row = holder.firstElementChild;
+
+            Object.keys(values || {}).forEach(function (key) {
+                var input = row.querySelector('[name$="[' + key + ']"]');
+                if (input && values[key] !== null && values[key] !== undefined) {
+                    input.value = input.hasAttribute('data-money') && values[key] !== '' ? padMoney(String(values[key])) : String(values[key]);
+                }
+            });
+
+            body.appendChild(row);
+            return row;
+        }
+
+        editor.querySelector('[data-item-add]').addEventListener('click', function () {
+            var row = addRow();
+            recalc();
+            row.querySelector('[name$="[description]"]').focus();
+        });
+
+        editor.addEventListener('click', function (e) {
+            var remove = e.target.closest('[data-item-remove]');
+            if (!remove) { return; }
+            remove.closest('[data-item-row]').remove();
+            recalc();
+        });
+
+        form.addEventListener('input', recalc);
+        form.addEventListener('focusout', function () { setTimeout(recalc, 0); });
+
+        // Purchase / Sales: the other party is a Supplier or a Customer.
+        form.querySelectorAll('[data-invoice-type] input[name="type"]').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                var label = form.querySelector('[data-party-label]');
+                if (label && radio.checked) { label.textContent = radio.getAttribute('data-party'); }
+            });
+        });
+
+        window.App.setInvoiceItems = function (rows) {
+            body.innerHTML = '';
+            (rows || []).forEach(function (r) { addRow(r); });
+            recalc();
+        };
+
+        recalc();
     });
 })();

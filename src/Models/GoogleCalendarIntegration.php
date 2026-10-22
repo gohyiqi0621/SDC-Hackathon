@@ -20,6 +20,7 @@ final class GoogleCalendarIntegration extends UserSettingsRow
     protected function writable(): array
     {
         return ['google_account_email', 'calendar_id', 'access_token_encrypted', 'refresh_token_encrypted',
-                'connection_status', 'default_appointment_duration_minutes', 'timezone', 'is_enabled'];
+                'connection_status', 'default_appointment_duration_minutes', 'timezone', 'is_enabled',
+                'booking_mode', 'slot_capacity', 'capacity_unit', 'open_time', 'close_time', 'open_days'];
     }
 }
