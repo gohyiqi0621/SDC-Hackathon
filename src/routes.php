@@ -51,14 +51,98 @@ $router->post(
     $auth
 );
 
+$router->post(
+    'ai/regenerate',
+    [AIController::class, 'regenerate'],
+    $auth
+);
 
-    // Gmail inbox on the dashboard (read-only OAuth connection)
-    $router->get('gmail/connect', [GmailController::class, 'connect'], $auth);
-    $router->get('gmail/callback', [GmailController::class, 'callback'], $auth);
-    $router->get('gmail/inbox', [GmailController::class, 'inbox'], $auth);
-    $router->post('gmail/disconnect', [GmailController::class, 'disconnect'], $auth);
-    $router->post('dashboard/test_email', [DashboardController::class, 'testEmail'], $auth);
-    $router->get('gmail/message',[GmailController::class, 'message'],$auth);
+
+    
+    /* ------------------------------------------------------- Gmail --- */
+
+    // Gmail OAuth connection
+    $router->get(
+        'gmail/connect',
+        [GmailController::class, 'connect'],
+        $auth
+    );
+
+    $router->get(
+        'gmail/callback',
+        [GmailController::class, 'callback'],
+        $auth
+    );
+
+    $router->post(
+        'gmail/disconnect',
+        [GmailController::class, 'disconnect'],
+        $auth
+    );
+
+    // Gmail folders
+    $router->get(
+        'gmail/inbox',
+        [GmailController::class, 'inbox'],
+        $auth
+    );
+
+    $router->get(
+        'gmail/sent',
+        [GmailController::class, 'sent'],
+        $auth
+    );
+
+    $router->get(
+        'gmail/spam',
+        [GmailController::class, 'spam'],
+        $auth
+    );
+
+    $router->get(
+        'gmail/trash',
+        [GmailController::class, 'trash'],
+        $auth
+    );
+
+    // Gmail message details
+    $router->get(
+        'gmail/message',
+        [GmailController::class, 'message'],
+        $auth
+    );
+
+    // Gmail conversation threads
+    $router->get(
+        'gmail/thread',
+        [GmailController::class, 'thread'],
+        $auth
+    );
+
+    // Send Gmail reply
+    $router->post(
+        'gmail/send',
+        [GmailController::class, 'send'],
+        $auth
+    );
+
+    // Gmail actions:
+    // star, unstar, archive, trash, restore,
+    // read, unread, spam, not_spam,
+    // important, not_important
+    $router->post(
+        'gmail/action',
+        [GmailController::class, 'action'],
+        $auth
+    );
+
+    // Dashboard test email
+    $router->post(
+        'dashboard/test_email',
+        [DashboardController::class, 'testEmail'],
+        $auth
+    );
+
 
 
     /* ------------------------------------------------------- financial --- */

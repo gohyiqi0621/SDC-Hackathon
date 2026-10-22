@@ -15,7 +15,7 @@ $hour      = (int) date('G');
 
 view('layouts/header', [
     'title'  => 'Dashboard',
-    'search' => true,
+    'search' => false,
     'styles' => ['assets/css/dashboard.css'],
 ]);
 ?>
@@ -51,10 +51,21 @@ view('layouts/header', [
 
 <div class="page-body" id="dashboardRoot"
      data-user-id="<?= (int) $user['id'] ?>"
-     data-gmail-inbox="<?= $gmailEmail ? e(url('gmail', ['action' => 'inbox'])) : '' ?>"
+     data-csrf-token="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>"
+     data-gmail-send="<?= htmlspecialchars(url('gmail', ['action' => 'send']), ENT_QUOTES, 'UTF-8') ?>"     data-gmail-inbox="<?= $gmailEmail ? e(url('gmail', ['action' => 'inbox'])) : '' ?>"
      data-gmail-message="<?= $gmailEmail ? e(url('gmail', ['action' => 'message'])) : '' ?>"
-     data-ai-summarize="<?= e(url('ai', ['action' => 'summarize'])) ?>">
+     data-ai-summarize="<?= htmlspecialchars(url('ai', ['action' => 'summarize']), ENT_QUOTES, 'UTF-8') ?>"
+     data-ai-regenerate="<?= htmlspecialchars(url('ai', ['action' => 'regenerate']), ENT_QUOTES, 'UTF-8') ?>"
+    data-gmail-sent="<?= $gmailEmail ? e(url('gmail', ['action' => 'sent'])) : '' ?>"
+    data-gmail-action="<?= $gmailEmail ? e(url('gmail', ['action' => 'action'])) : '' ?>"
+    data-gmail-thread="<?= $gmailEmail ? e(url('gmail', ['action' => 'thread'])) : '' ?>"
 
+    data-gmail-action="<?= e(url('gmail', ['action' => 'action'])) ?>"
+    data-gmail-spam="<?= e(url('gmail', ['action' => 'spam'])) ?>"
+    data-gmail-trash="<?= e(url('gmail', ['action' => 'trash'])) ?>"
+
+     >
+    
     <!-- ========== GMAIL CONNECTION ========== -->
     <section class="brevo-strip gmail-strip" aria-label="Gmail connection">
         <div class="brevo-strip__info">
@@ -64,14 +75,14 @@ view('layouts/header', [
                 <?php if ($gmailEmail): ?>
                     <span class="badge badge--success"><i class="fa-solid fa-circle-check"></i> Connected</span>
                 <?php else: ?>
-                    <span class="badge badge--muted">Demo emails</span>
+                    <span class="badge badge--muted">Not Connected</span>
                 <?php endif; ?>
             </strong>
             <span id="gmailStatus">
                 <?php if ($gmailEmail): ?>
                     Showing the latest emails from <?= e($gmailEmail) ?> (read-only).
                 <?php elseif ($gmailReady): ?>
-                    Connect your Gmail to see your real inbox here. Access is read-only.
+                    Connect your Gmail account to view and manage your emails.
                 <?php elseif (!($gmailTable ?? true)): ?>
                     The Gmail table is not in the database yet. Run
                     <code>php bin/migrate.php</code> (or migration <code>003</code> in Adminer).
@@ -314,27 +325,48 @@ view('layouts/header', [
 
             </div>
 
+            <!-- Inbox Search -->
+            <div class="inbox-search-wrapper">
+                <i class="fa-solid fa-magnifying-glass"></i>
+
+                <input
+                    type="search"
+                    id="searchInput"
+                    placeholder="Search emails by sender, subject..."
+                    autocomplete="off"
+                    aria-label="Search emails"
+                >
+            </div>
+
 
             <!-- Email Tabs -->
+            
             <div class="email-tabs">
-
-                <button class="tab active" data-filter="all">
-                    All (24)
+                <button type="button" class="tab active" data-filter="all">
+                    All
                 </button>
 
-                <button class="tab" data-filter="unread">
-                    Unread (12)
+                <button type="button" class="tab" data-filter="unread">
+                    Unread
                 </button>
 
-                <button class="tab" data-filter="important">
-                    Important (7)
+                <button type="button" class="tab" data-filter="important">
+                    Important
                 </button>
 
-                <button class="tab" data-filter="mentions">
-                    Mentions (3)
+                <button type="button" class="tab" data-filter="sent">
+                    Sent
                 </button>
 
+                <button type="button" class="tab" data-filter="spam">
+                    Spam
+                </button>
+
+                <button type="button" class="tab" data-filter="trash">
+                    Trash
+                </button>
             </div>
+
 
 
             <!-- Email List -->
@@ -386,6 +418,38 @@ view('layouts/header', [
                             aria-label="More options">
                         <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
+
+
+                <div id="emailMoreMenu" class="email-more-menu" hidden>
+                    <button type="button" data-gmail-action="read">
+                        Mark as Read
+                    </button>
+
+                    <button type="button" data-gmail-action="unread">
+                        Mark as Unread
+                    </button>
+
+                    <button type="button" data-gmail-action="important">
+                        Mark as Important
+                    </button>
+
+                    <button type="button" data-gmail-action="not_important">
+                        Remove Important
+                    </button>
+
+                    <button type="button" data-gmail-action="spam">
+                        Report Spam
+                    </button>
+
+                    <button type="button" data-gmail-action="not_spam">
+                        Not Spam
+                    </button>
+
+                    <button type="button" data-gmail-action="restore">
+                        Restore Email
+                    </button>
+                </div>
+
 
                 </div>
 
@@ -447,8 +511,16 @@ view('layouts/header', [
                 </p>
 
             </div>
-
-
+        <button
+            type="button"
+            id="emailViewMoreBtn"
+            class="email-view-more-btn"
+            aria-expanded="false"
+            hidden
+        >
+            <span>View More</span>
+            <i class="fa-solid fa-chevron-down"></i>
+        </button>
 
             <!-- ========== AI SUMMARY ========== -->
             <div class="ai-summary-card">
@@ -494,60 +566,102 @@ view('layouts/header', [
             </div>
 
 
+<!-- ========== AI REPLY ========== -->
+<div class="ai-reply-card">
 
-            <!-- ========== AI REPLY ========== -->
-            <div class="ai-reply-card">
+    <div class="ai-card-header">
+        <h3>
+            <i class="fa-solid fa-robot"></i>
+            AI Reply (Draft)
+        </h3>
 
-                <div class="ai-card-header">
+        <select id="replyTone">
+            <option value="formal">Formal</option>
+            <option value="friendly">Friendly</option>
+            <option value="concise">Concise</option>
+        </select>
+    </div>
 
-                    <h3>
-                        <i class="fa-solid fa-robot"></i>
-                        AI Reply (Draft)
-                    </h3>
+    <div class="gmail-reply-editor">
 
-                    <select id="replyTone">
-                        <option value="formal">Formal</option>
-                        <option value="friendly">Friendly</option>
-                        <option value="concise">Concise</option>
-                    </select>
+        <div class="gmail-reply-to">
+            <i class="fa-solid fa-reply"></i>
+            <span>Reply to</span>
+            <strong id="replyRecipient">Selected sender</strong>
+        </div>
 
-                </div>
+        <textarea
+            id="replyDraft"
+            rows="8"
+            placeholder="Write your reply..."
+        ></textarea>
 
+        <div id="replyAttachmentList"
+             class="reply-attachment-list"></div>
 
-                <textarea id="replyDraft" rows="7">
-Hi Amanda,
+        <input
+            type="file"
+            id="replyFileInput"
+            multiple
+            hidden
+        >
 
-Thank you for reaching out and for your interest in a partnership.
+        <div class="gmail-reply-toolbar">
 
-I'd be happy to discuss this further. How about next week? Please let me know a few time slots that work for you.
+            <button type="button"
+                    id="attachReplyBtn"
+                    title="Attach files">
+                <i class="fa-solid fa-paperclip"></i>
+                <span>Attach</span>
+            </button>
 
-Best regards,
-Sze Yen
-                </textarea>
+            <button type="button"
+                    id="insertSignatureBtn"
+                    title="Insert signature">
+                <i class="fa-solid fa-signature"></i>
+                <span>Signature</span>
+            </button>
 
+            <button type="button"
+                    id="editSignatureBtn"
+                    title="Edit signature">
+                <i class="fa-solid fa-pen"></i>
+                <span>Edit Signature</span>
+            </button>
 
-                <div class="reply-actions">
+            <span id="replyDraftStatus">
+                Draft not saved
+            </span>
 
-                    <button class="primary-btn" id="sendReplyBtn">
-                        <i class="fa-regular fa-paper-plane"></i>
-                        Send Reply
-                    </button>
+        </div>
 
-                    <button class="secondary-btn"
-                            id="regenerateReplyBtn">
-                        <i class="fa-solid fa-rotate"></i>
-                        Regenerate
-                    </button>
+    </div>
 
-                    <button class="secondary-btn"
-                            id="adjustReplyBtn">
-                        <i class="fa-solid fa-sliders"></i>
-                        Adjust
-                    </button>
+    <div class="reply-actions">
+        <button type="button"
+                class="primary-btn"
+                id="sendReplyBtn">
+            <i class="fa-regular fa-paper-plane"></i>
+            Send Reply
+        </button>
 
-                </div>
+        <button type="button"
+                class="secondary-btn"
+                id="regenerateReplyBtn">
+            <i class="fa-solid fa-rotate"></i>
+            Regenerate
+        </button>
 
-            </div>
+        <button type="button"
+                class="secondary-btn"
+                id="adjustReplyBtn">
+            <i class="fa-solid fa-sliders"></i>
+            Adjust
+        </button>
+    </div>
+
+</div>
+
 
             <!-- Create a planner task from the selected email (requires user confirmation). -->
             <div class="wp-email-task-action" style="margin:12px 0;text-align:right">
@@ -582,6 +696,42 @@ Sze Yen
         </section>
 
     </div>
+
+    <!-- SEND REPLY CONFIRMATION MODAL -->
+<div class="send-modal-backdrop" id="sendConfirmModal" hidden>
+    <div class="send-modal"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="sendConfirmTitle">
+
+        <div class="send-modal-icon">
+            <i class="fa-regular fa-paper-plane"></i>
+        </div>
+
+        <h3 id="sendConfirmTitle">Send Email Reply?</h3>
+
+        <p>
+            Are you sure you want to send this reply?
+            This action cannot be undone.
+        </p>
+
+        <div class="send-modal-actions">
+            <button type="button"
+                    class="secondary-btn"
+                    id="cancelSendBtn">
+                Cancel
+            </button>
+
+            <button type="button"
+                    class="primary-btn"
+                    id="confirmSendBtn">
+                <i class="fa-regular fa-paper-plane"></i>
+                Send Reply
+            </button>
+        </div>
+
+    </div>
+</div>
 
 
     <!-- ========== FOLLOW-UP HISTORY ========== -->
