@@ -53,6 +53,12 @@ and credentials. These services are not configured by the import setup.
 The existing dashboard may show demo email content until Gmail is connected.
 Use Replit Secrets for credentials rather than adding them to this file.
 
+The local preview uses PHP's built-in server. Published builds use Nginx and
+PHP-FPM through `bin/start-production.sh`; the Nginx configuration serves
+`public/` only and retains the app's clean-URL routing.
+
 The Python AI service and RunPod handler are separate optional components.
-They are not started by the portal workflow. PHP's built-in server is for
-development, not a production hosting configuration.
+They are not started by the portal workflow.
+The RunPod handler's Python dependency list lives at `runpod/requirements.txt`
+and should be installed in the separate RunPod endpoint environment, not in
+the PHP portal's Replit publish build.

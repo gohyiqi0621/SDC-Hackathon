@@ -60,10 +60,11 @@ Explain how your project uses AI to solve the problem and what makes it valuable
 
 ```
 .
-├── bin/                         # CLI: migrate, create-user, check
+├── bin/                         # CLI utilities and local/production server launchers
 ├── database/
 │   ├── schema.sql               # PostgreSQL schema (users + password resets)
 │   └── migrations/              # numbered migrations (001_, 002_, ...)
+├── deployment/                  # Nginx and PHP-FPM production configuration
 ├── docs/
 │   └── AUTH.md                  # authentication & profile documentation
 ├── public/                      # web root - the only folder Apache serves
@@ -78,7 +79,8 @@ Explain how your project uses AI to solve the problem and what makes it valuable
 │       ├── js/dashboard.js      # inbox demo data + interactions
 │       └── logo.webp
 ├── runpod/
-│   └── handler.py               # RunPod serverless handler (GPU workload)
+│   ├── handler.py               # RunPod serverless handler (GPU workload)
+│   └── requirements.txt         # Dependencies for the separate RunPod endpoint
 ├── src/                         # all application source code
 │   ├── bootstrap.php            # env, autoloader, session, config
 │   ├── routes.php               # every URL -> controller + middleware
@@ -107,7 +109,6 @@ Explain how your project uses AI to solve the problem and what makes it valuable
 ├── .env.example
 ├── .htaccess                    # blocks src/, .env etc. from the web
 ├── LICENSE
-├── requirements.txt
 └── README.md
 ```
 
@@ -299,8 +300,8 @@ cd your-project
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 
-# 3. Install dependencies
-pip install -r requirements.txt
+# 3. Install the RunPod handler dependency only if you are setting up its separate endpoint
+pip install -r runpod/requirements.txt
 
 # 4. Configure environment variables
 cp .env.example .env            # then fill in your values
@@ -332,7 +333,7 @@ Describe how your team used Replit. For example:
 Describe how your team used RunPod. For example:
 
 - **Workload:** Model inference (e.g. text generation, image processing) runs on a RunPod GPU.
-- **Setup:** `runpod/handler.py` is deployed as a **RunPod Serverless Endpoint**.
+- **Setup:** `runpod/handler.py` and `runpod/requirements.txt` are deployed as a **RunPod Serverless Endpoint**. Its Python dependencies are kept separate from the PHP portal so the Replit portal build does not try to install them.
 - **Integration:** The Replit app sends requests to the endpoint using `RUNPOD_API_KEY` and `RUNPOD_ENDPOINT_ID`.
 
 Example request:

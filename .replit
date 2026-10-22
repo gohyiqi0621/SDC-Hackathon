@@ -4,6 +4,7 @@ modules = ["php-8.2", "web", "nodejs-20", "postgresql-16", "python-base-3.13"]
 
 [nix]
 channel = "stable-25_05"
+packages = ["nginx"]
 
 [userenv]
 
@@ -37,3 +38,7 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[deployment]
+deploymentTarget = "cloudrun"
+run = "php -S 0.0.0.0:5000 -t public bin/serve.php"

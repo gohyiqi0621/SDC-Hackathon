@@ -9,6 +9,12 @@ $public = realpath(dirname(__DIR__) . '/public');
 $path = rawurldecode((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH));
 $file = realpath($public . $path);
 
+// Cloud Run probes GET / and expects a 200. Show the existing sign-in page
+// directly for an unauthenticated bare-root request instead of redirecting.
+if ($path === '/' && $_SERVER['REQUEST_METHOD'] === 'GET' && $_GET === []) {
+    $_GET = ['page' => 'auth', 'action' => 'login'];
+}
+
 if (preg_match('#(?:^|/)\.#', $path)
     || preg_match('#^/uploads/.*\.(?:php[0-9]?|phtml|phar)(?:/|$)#i', $path)) {
     http_response_code(403);
