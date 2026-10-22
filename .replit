@@ -11,6 +11,9 @@ packages = ["nginx"]
 [userenv.development]
 APP_ENV = "development"
 
+[userenv.shared]
+GMAIL_CLIENT_ID = "838167772236-n24261gbvd3hc5kgbugeit8a547m5i72.apps.googleusercontent.com"
+
 [workflows]
 runButton = "Project"
 
