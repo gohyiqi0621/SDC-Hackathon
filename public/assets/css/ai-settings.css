@@ -1043,3 +1043,35 @@
 .staff-ai-heading h2 { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 800; }
 .staff-ai-heading h2 i { color: var(--primary); }
 .staff-ai-heading p { margin-top: 4px; color: var(--text-soft); font-size: 13px; }
+
+/* ---- Staff assistant: Functions checkboxes ------------------------------ */
+.function-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.function-option { position: relative; display: block; cursor: pointer; }
+.function-option input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.function-card {
+    display: flex; align-items: center; gap: 12px;
+    height: 100%; padding: 14px 16px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff;
+    transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.function-icon {
+    display: grid; place-items: center; flex-shrink: 0;
+    width: 40px; height: 40px; border-radius: 12px;
+    background: #f1f2f8; color: var(--muted); font-size: 16px;
+    transition: background .15s, color .15s;
+}
+.function-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.function-text strong { font-size: 14px; color: var(--text); }
+.function-text small { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.function-check {
+    display: grid; place-items: center; flex-shrink: 0;
+    width: 22px; height: 22px; border-radius: 6px;
+    border: 1.5px solid var(--border); color: transparent; font-size: 11px;
+    transition: background .15s, border-color .15s, color .15s;
+}
+.function-option:hover .function-card { border-color: #d5d0ff; }
+.function-option input:checked + .function-card { border-color: var(--primary); background: var(--primary-light); box-shadow: 0 0 0 1px var(--primary) inset; }
+.function-option input:checked + .function-card .function-icon { background: var(--primary); color: #fff; }
+.function-option input:checked + .function-card .function-check { background: var(--primary); border-color: var(--primary); color: #fff; }
+.function-option input:focus-visible + .function-card { outline: 2px solid var(--primary); outline-offset: 2px; }
+@media (max-width: 700px) { .function-grid { grid-template-columns: 1fr; } }

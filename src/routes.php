@@ -153,6 +153,10 @@ $router->post(
     $router->post('tools/buy_product', [ToolController::class, 'buyProduct'], [], false);
     $router->post('tools/check_availability', [ToolController::class, 'checkAvailability'], [], false);
     $router->post('tools/make_booking', [ToolController::class, 'makeBooking'], [], false);
+    // Staff assistant tools (staff tokens only, read-only).
+    $router->post('tools/check_invoice', [ToolController::class, 'checkInvoice'], [], false);
+    $router->post('tools/check_claims', [ToolController::class, 'checkClaims'], [], false);
+    $router->post('tools/check_orders', [ToolController::class, 'checkOrders'], [], false);
 
     // Preview of the system message built from AI Settings.
     $router->get('customer/system_message', [ChatbotController::class, 'customerSystemMessage'], $auth);
@@ -160,10 +164,15 @@ $router->post(
     /* ----------------------------------------------- AI chatbot: staff --- */
     $router->get('staff/settings', [ChatbotController::class, 'staffSettings'], $auth);
     $router->get('staff/chat', [ChatbotController::class, 'staffChat'], $auth);
+    $router->post('staff/chat_send', [ChatbotController::class, 'staffChatSend'], $auth);
+    $router->get('staff/system_message', [ChatbotController::class, 'staffSystemMessage'], $auth);
 
     /* -------------------------------------------------------- profile --- */
     $router->get('profile', [ProfileController::class, 'index'], $auth);
     $router->get('system/settings', [SystemController::class, 'settings'], $auth);
+    // Flow log: signed-in owner, or ?key=<LOG_VIEW_KEY> (checked in SystemController).
+    $router->get('system/logs', [SystemController::class, 'logs']);
+    $router->get('system/logs_feed', [SystemController::class, 'logsFeed']);
     $router->post('profile/update', [ProfileController::class, 'update'], $auth);
     $router->post('profile/password', [ProfileController::class, 'password'], $auth);
 

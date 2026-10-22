@@ -5,7 +5,8 @@
  * Expects (from ChatbotController): $title, $audience, $sub, $assistant,
  * $integrations [[icon, name, text, state]] (state: true = connected, 'setup' = available
  * but not configured, false = coming soon), $chatUrl, $productCount (Customer only).
- * Optional: $aiModels + $aiEndpoints - adds the full AI Assistant Settings form
+ * Optional: $aiModels + $aiEndpoints - the page then shows ONLY the AI Assistant
+ * Settings (staff-ai-settings); without them it shows the preview cards. The form
  * (ai_settings/_ai_assistant_settings_form.php) below Assistant and Integrations,
  * loaded and saved by assets/js/ai-settings.js through those endpoints.
  * Saving assistant settings and connecting channels is the next integration
@@ -31,6 +32,8 @@ view('layouts/header', [
 </section>
 
 <div class="page-body">
+
+    <?php if ($aiEndpoints === null): ?>
 
     <div class="flash flash--info" role="status">
         <i class="fa-solid fa-circle-info"></i>
@@ -117,6 +120,8 @@ view('layouts/header', [
         </section>
 
     </div>
+
+    <?php endif; ?>
 
     <?php if ($aiEndpoints !== null): ?>
         <div class="ai-settings staff-ai-settings"

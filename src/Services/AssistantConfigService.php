@@ -19,6 +19,8 @@ use RuntimeException;
 use Src\Controllers\AiSettingsController;
 use Src\Models\AiAssistantSetting;
 use Src\Models\CompanyProfile;
+use Src\Models\StaffAiAssistantSetting;
+use Src\Models\UserSettingsRow;
 use Src\Support\Crypto;
 
 final class AssistantConfigService
@@ -51,8 +53,34 @@ final class AssistantConfigService
      */
     public function forUser(int $userId): array
     {
+        return $this->build($userId, new AiAssistantSetting());
+    }
+
+    /**
+     * The staff assistant (Staff > Setting & Integration): same shape, read
+     * from staff_ai_assistant_settings, plus 'functions' (the ticked checks,
+     * e.g. ['check_invoice', 'check_orders']).
+     */
+    public function forStaff(int $userId): array
+    {
+        $config = $this->build($userId, new StaffAiAssistantSetting());
+        $row    = (new StaffAiAssistantSetting())->find($userId) ?? [];
+        $config['functions'] = array_key_exists('functions', $row)
+            ? array_values(array_filter(explode(',', (string) $row['functions'])))
+            : array_keys(AiSettingsController::STAFF_FUNCTIONS);   // migration 016 not run: all on
+        $config['problems'] = str_replace('AI assistant settings are not saved yet.',
+            'Staff AI assistant settings are not saved yet (Staff > Setting & Integration).', $config['problems']);
+        return $config;
+    }
+
+    private function build(int $userId, UserSettingsRow $settings): array
+    {
         $company   = (new CompanyProfile())->find($userId) ?? [];
-        $assistant = (new AiAssistantSetting())->find($userId) ?? [];
+        try {
+            $assistant = $settings->find($userId) ?? [];
+        } catch (\PDOException $e) {
+            $assistant = [];   // table not created yet (run the migrations)
+        }
         $problems  = [];
 
         if ($company === []) {

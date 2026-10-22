@@ -65,7 +65,7 @@ final class ChatMessage
                     $nameSql AS customer_name,
                     $userSql AS customer_username
                FROM (SELECT user_id, channel, chat_id, COUNT(*) AS messages, MAX(created_at) AS last_at
-                       FROM chat_messages WHERE user_id = ?
+                       FROM chat_messages WHERE user_id = ? AND channel <> 'staff'
                       GROUP BY user_id, channel, chat_id) c
               ORDER BY c.last_at DESC
               LIMIT " . max(1, min(500, $limit))
