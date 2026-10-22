@@ -21,6 +21,7 @@ use Src\Controllers\GmailController;
 use Src\Controllers\OrderController;
 use Src\Controllers\ProductController;
 use Src\Controllers\ProfileController;
+use Src\Controllers\SystemController;
 use Src\Controllers\TelegramWebhookController;
 use Src\Controllers\ToolController;
 use Src\Middleware\AuthMiddleware;
@@ -162,6 +163,7 @@ $router->post(
 
     /* -------------------------------------------------------- profile --- */
     $router->get('profile', [ProfileController::class, 'index'], $auth);
+    $router->get('system/settings', [SystemController::class, 'settings'], $auth);
     $router->post('profile/update', [ProfileController::class, 'update'], $auth);
     $router->post('profile/password', [ProfileController::class, 'password'], $auth);
 
