@@ -199,8 +199,10 @@
         el.ordersList.textContent = '';
 
         var review = orders.filter(function (o) { return o.status === 'payment_submitted'; }).length;
-        el.ordersAlert.hidden = review === 0;
-        el.ordersAlert.textContent = review + ' to review';
+        if (el.ordersAlert) {
+            el.ordersAlert.hidden = review === 0;
+            el.ordersAlert.textContent = review + ' to review';
+        }
 
         if (!orders.length) {
             el.ordersList.appendChild(node('li', 'msgr-orders__empty', 'No orders from this customer today.'));

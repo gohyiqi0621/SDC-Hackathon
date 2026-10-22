@@ -237,10 +237,6 @@ $sections = [
 
                             <div class="sop-footer">
                                 <span class="char-count" data-sop-count></span>
-                                <details class="sop-combined">
-                                    <summary>Show the combined text that will be saved</summary>
-                                    <pre data-sop-combined></pre>
-                                </details>
                             </div>
                             <p class="field-error" data-error-for="system_instructions"></p>
                         </div>

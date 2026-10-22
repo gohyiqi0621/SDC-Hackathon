@@ -768,7 +768,7 @@
             if (!hasSop) { return; }
             var text = compose();
             output.value = text;
-            combined.textContent = text || '(nothing yet)';
+            if (combined) { combined.textContent = text || '(nothing yet)'; }
             count.textContent = text.length.toLocaleString() + ' / ' + MAX_INSTRUCTIONS.toLocaleString() + ' characters';
             count.classList.toggle('is-near', text.length > MAX_INSTRUCTIONS * 0.9);
             SOP.forEach(function (s) {
