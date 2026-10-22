@@ -507,6 +507,25 @@ ALTER TABLE orders ADD CONSTRAINT orders_status_check
 COMMIT;
 
 -- ----------------------------------------------------------------------------
+-- 018_reconcile_invoice_items_print_columns.sql
+-- ----------------------------------------------------------------------------
+BEGIN;
+ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS sku VARCHAR(100) NULL;
+ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS quantity NUMERIC(12,3) NULL;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+         WHERE table_schema = current_schema()
+           AND table_name = 'invoice_items'
+           AND column_name = 'qty'
+    ) THEN
+        EXECUTE 'UPDATE invoice_items SET quantity = NULLIF(BTRIM(qty::text), '''')::numeric WHERE quantity IS NULL AND BTRIM(qty::text) ~ ''^[0-9]+([.][0-9]+)?$''';
+    END IF;
+END $$;
+COMMIT;
+
+-- ----------------------------------------------------------------------------
 -- Check the result - every table should be listed:
 --
 --   SELECT table_name FROM information_schema.tables

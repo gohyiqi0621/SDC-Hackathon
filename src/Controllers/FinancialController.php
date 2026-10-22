@@ -202,6 +202,21 @@ final class FinancialController
         );
     }
 
+    /** GET /?page=financial&action=print&id=N - open the saved invoice as a PDF. */
+    public function print(): void
+    {
+        $user = require_login();
+        $invoice = $this->ownedOr404($user, (int) ($_GET['id'] ?? 0));
+        $items = (new InvoiceItem())->forInvoice((int) $invoice['id']);
+        $pdf = (new \Src\Services\InvoicePdfService())->render($invoice, $items);
+
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . rawurlencode('Invoice-' . $invoice['invoice_number'] . '.pdf') . '"');
+        header('Content-Length: ' . strlen($pdf));
+        echo $pdf;
+        exit;
+    }
+
     /**
      * POST /?page=financial&action=extract  (kind = invoice|claim, pages[] = page images as data URLs)
      *

@@ -182,18 +182,9 @@ $today     = date('Y-m-d');
                                 <td data-label="Amount" class="num"><?= e(format_money($row['amount'], $row['currency'])) ?></td>
                                 <td data-label="Status"><span class="badge <?= e($statusClass) ?>"><?= e($statusLabel) ?></span></td>
                                 <td class="actions">
-                                    <?php
-                                    /*
-                                     * PRINT BUTTON (template owner): add it here, for both User and
-                                     * Supervisor, before the Supervisor buttons. Suggested:
-                                     *   <a class="icon-btn" href="<?= e(url('financial', ['action' => 'print', 'id' => $row['id']])) ?>"
-                                     *      target="_blank" rel="noopener" title="Print" aria-label="Print ...">
-                                     *       <i class="fa-solid fa-print"></i></a>
-                                     * Data for the template: Invoice::find($userId, $id) (header, totals,
-                                     * party address / phone / terms / reference) + InvoiceItem::forInvoice($id)
-                                     * (sku, description, uom, quantity, unit_price, discount, amount).
-                                     */
-                                    ?>
+                                    <a class="icon-btn" href="<?= e(url('financial', ['action' => 'print', 'id' => $row['id']])) ?>" target="_blank" rel="noopener" title="Print receipt" aria-label="Print receipt for <?= e($row['invoice_number']) ?>">
+                                        <i class="fa-solid fa-print"></i>
+                                    </a>
                                 <?php if ($supervisor): ?>
                                         <?php if ($row['status'] !== 'paid'): ?>
                                             <form method="post" action="<?= e(url('financial', ['action' => 'mark_paid'])) ?>"

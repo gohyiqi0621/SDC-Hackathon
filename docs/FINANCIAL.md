@@ -28,7 +28,8 @@ in `src/Support/helpers.php`.
 ## Data model (PostgreSQL)
 
 Migrations: `database/migrations/005_create_invoices.sql`, `006_create_claims.sql`,
-`016_add_invoice_details_and_items.sql` (all also in `database/all_migrations.sql`).
+`016_add_invoice_details_and_items.sql`, `018_reconcile_invoice_items_print_columns.sql`
+(all also in `database/all_migrations.sql`).
 After pulling, run: `C:\xampp\php\php.exe bin\migrate.php`
 
 ### `invoices` (one row per invoice, owned by `user_id`)
