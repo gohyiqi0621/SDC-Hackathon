@@ -25,7 +25,7 @@ view('layouts/header', ['title' => $title, 'styles' => $tab !== null ? ['assets/
     </div>
     <div class="welcome-actions">
         <a class="secondary-btn" href="<?= e($settingsUrl) ?>">
-            <i class="fa-solid fa-sliders"></i> Setting &amp; Integration
+            <i class="fa-solid fa-sliders"></i> Setup
         </a>
     </div>
 </section>

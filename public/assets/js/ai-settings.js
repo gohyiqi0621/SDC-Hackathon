@@ -692,6 +692,7 @@
 
     var Assistant = (function () {
         var section = $('[data-section="assistant"]', root);
+        if (!section) { return null; }   // this page does not have this section (Company Profile, Connections)
         var form = $('[data-form="assistant"]', section);
         var output = $('[data-sop-output]', form);
         var combined = $('[data-sop-combined]', form);

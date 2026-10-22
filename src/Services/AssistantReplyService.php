@@ -24,7 +24,10 @@ use Throwable;
 
 final class AssistantReplyService
 {
-    public const FALLBACK_REPLY = 'Sorry, our assistant is not available right now. Our team will get back to you as soon as possible.';
+    // What the customer sees when the AI cannot answer: a way forward, never the technical reason
+    // (staff see the reason and the fix in Chat Interface).
+    public const FALLBACK_REPLY = "Sorry, I can't reply right now. Please try again in a few minutes. "
+        . 'You can also leave your question here and our team will get back to you as soon as possible.';
 
     /**
      * @param string $channel 'telegram' or 'web'
@@ -55,6 +58,8 @@ final class AssistantReplyService
 
         if (!$config['enabled']) {
             $this->log($messages, $userId, $channel, $chatId, 'assistant', '(assistant is switched off - no reply sent)', 'skipped');
+            $messages->setError($userId, $channel, $chatId, in_array('AI assistant settings are not saved yet.', $config['problems'], true)
+                ? 'AI assistant settings are not saved yet.' : 'The AI assistant is switched off.');
             FlowLog::write('system.skipped', ['reason' => in_array('AI assistant settings are not saved yet.', $config['problems'], true)
                 ? 'AI assistant settings are not saved yet: open AI Settings > AI Assistant Settings and click Save.'
                 : 'The AI assistant is switched off (AI Assistant Settings > Enabled).']);
@@ -91,6 +96,8 @@ final class AssistantReplyService
         }
 
         $this->log($messages, $userId, $channel, $chatId, 'assistant', self::FALLBACK_REPLY, 'error');
+        $messages->setError($userId, $channel, $chatId, trim((string) $result['error']
+            . ($config['problems'] !== [] ? ' | Setup: ' . implode(' ', $config['problems']) : '')));
 
         return ['status' => 'error', 'reply' => self::FALLBACK_REPLY, 'error' => $result['error'], 'problems' => $config['problems']];
     }

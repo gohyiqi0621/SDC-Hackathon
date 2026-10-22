@@ -21,13 +21,15 @@ view('layouts/header', [
 ?>
 <section class="welcome-banner welcome-banner--compact">
     <div class="welcome-text">
-        <h1><?= e($audience) ?> Setting &amp; Integration</h1>
+        <h1><?= e($audience) ?> Assistant Setup</h1>
         <p><?= e($sub) ?></p>
     </div>
     <div class="welcome-actions">
-        <a class="primary-btn" href="<?= e($chatUrl) ?>">
-            <i class="fa-regular fa-comments"></i> Open chat interface
-        </a>
+        <?php if (!empty($connectionsUrl)): ?>
+            <a class="secondary-btn" href="<?= e($connectionsUrl) ?>"><i class="fa-solid fa-plug"></i> Connections</a>
+        <?php else: ?>
+            <a class="primary-btn" href="<?= e($chatUrl) ?>"><i class="fa-regular fa-comments"></i> Open chat interface</a>
+        <?php endif; ?>
     </div>
 </section>
 
@@ -123,8 +125,12 @@ view('layouts/header', [
 
     <?php endif; ?>
 
+    <?php if (!empty($steps)): ?>
+        <?php view('partials/setup_checklist', ['steps' => $steps, 'tryUrl' => $chatUrl, 'tryLabel' => 'Open staff chat']); ?>
+    <?php endif; ?>
+
     <?php if ($aiEndpoints !== null): ?>
-        <div class="ai-settings staff-ai-settings"
+        <div class="ai-settings staff-ai-settings" id="assistant"
              data-ai-settings
              data-endpoints="<?= e(json_encode($aiEndpoints, JSON_UNESCAPED_SLASHES)) ?>">
             <div class="staff-ai-heading">

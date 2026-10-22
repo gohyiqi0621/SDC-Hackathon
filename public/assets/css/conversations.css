@@ -383,3 +383,179 @@
     .msgr--staff .msgr-main { display: flex; }
     .staff-head-settings { display: inline-grid; }
 }
+
+/* Why the AI did not answer (staff only) */
+.msgr-problem {
+    max-width: min(78%, 600px); margin: 2px 0 8px; padding: 10px 12px;
+    border: 1px solid #ffd3dc; border-radius: 12px; background: #fff7f9;
+    color: var(--text-soft); font-size: 12.5px; line-height: 1.5;
+}
+.msgr-problem--right { align-self: flex-end; }
+.msgr-problem--left { align-self: flex-start; }
+.msgr-problem__head { display: flex; align-items: center; gap: 8px; color: var(--danger); }
+.msgr-problem__head strong { font-size: 13px; }
+.msgr-problem__tag { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: #fff; border: 1px solid #ffd3dc; color: var(--muted); font-size: 10.5px; font-weight: 700; }
+.msgr-problem p { margin: 6px 0 0; }
+.msgr-problem__fix { color: var(--text); }
+.msgr-problem details { margin-top: 6px; }
+.msgr-problem summary { cursor: pointer; color: var(--muted); font-size: 11.5px; }
+.msgr-problem code { display: block; margin-top: 4px; padding: 6px 8px; border-radius: 8px; background: #fff; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Staff chat: sessions ("New chat" + Chats list) */
+.staff-new {
+    display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 12px; border-radius: 12px;
+    background: var(--primary); color: #fff; font-weight: 700; font-size: 13px; text-decoration: none;
+    box-shadow: 0 6px 16px rgba(91, 76, 219, .18);
+}
+.staff-new:hover { background: var(--primary-dark); color: #fff; }
+.staff-side__body { display: flex; flex-direction: column; }
+.staff-side__body > * { flex-shrink: 0; }
+.staff-sessions { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 236px; overflow-y: auto; }
+.staff-session {
+    display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: 10px; color: var(--text);
+    text-decoration: none; font-size: 13px;
+}
+.staff-session > i { margin-top: 3px; color: var(--muted); font-size: 12px; }
+.staff-session span { display: grid; min-width: 0; }
+.staff-session strong { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.staff-session small { color: var(--muted); font-size: 11px; }
+.staff-session:hover { background: #f4f5fb; }
+.staff-session.is-current { background: var(--primary-light); }
+.staff-session.is-current > i, .staff-session.is-current strong { color: var(--primary); }
+.staff-sessions__empty { padding: 6px 10px; color: var(--muted); font-size: 12px; }
+.staff-head-new {
+    display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 7px 12px; border: 1px solid var(--border);
+    border-radius: 999px; background: #fff; color: var(--text); font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap;
+}
+.staff-head-new:hover { border-color: var(--primary); color: var(--primary); }
+.staff-head-new + .staff-head-settings { margin-left: 6px; }
+
+/* Email draft inside a reply ("> " lines) */
+.msgr-draft {
+    margin: 8px 0 4px; padding: 10px 12px; border: 1px solid #e3e1fb; border-left: 3px solid var(--primary);
+    border-radius: 10px; background: #faf9ff; color: var(--text);
+}
+.msgr-draft p { margin: 0 0 4px; }
+.msgr-draft p:last-child { margin-bottom: 0; }
+.msgr-draft__gap { height: 6px; }
+.msgr-draft__actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
+.msgr-draft__actions button {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font: inherit;
+    font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.msgr-draft__send { border: 0; background: var(--primary); color: #fff; }
+.msgr-draft__send:hover { background: var(--primary-dark); }
+.msgr-draft__edit { border: 1px solid var(--border); background: #fff; color: var(--text); }
+.msgr-draft__edit:hover { border-color: var(--primary); color: var(--primary); }
+@media (max-width: 860px) {
+    .staff-head-new { padding: 6px 10px; }
+}
+
+/* Staff chat: quotes, code and email cards */
+.msgr-quote { margin: 6px 0; padding: 6px 10px; border-left: 3px solid #d9dbe8; color: var(--muted); }
+.msgr-quote p { margin: 0 0 2px; }
+.msgr-code { margin: 6px 0; padding: 8px 10px; border-radius: 8px; background: #f4f5fb; font-size: 12px; white-space: pre-wrap; }
+.msgr-bubble--cards { width: min(100%, 620px); max-width: min(92%, 620px); }
+.mcards { display: grid; gap: 8px; margin-bottom: 8px; }
+.mcard { border: 1px solid var(--border); border-radius: 12px; background: #fff; color: var(--text); overflow: hidden; }
+.mcard__head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--border); background: #fafaff; font-size: 13px; }
+.mcard__head > i { color: var(--primary); }
+.mcard__count { color: var(--muted); font-size: 12px; }
+.mcard__chip { padding: 1px 8px; border-radius: 999px; background: var(--primary-light); color: var(--primary); font-size: 11px; font-weight: 700; }
+.mcard__empty { margin: 0; padding: 12px; color: var(--muted); font-size: 13px; }
+.mcard__list { list-style: none; margin: 0; padding: 0; }
+.mcard__list li + li { border-top: 1px solid #f0f1f7; }
+.mcard__row {
+    display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 10px 12px; border: 0; background: none;
+    color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.mcard__row:hover { background: #f7f7fd; }
+.mcard__no { min-width: 18px; margin-top: 7px; color: var(--muted); font-size: 11px; font-weight: 700; text-align: right; }
+.mcard__avatar {
+    display: grid; flex: 0 0 auto; place-items: center; width: 32px; height: 32px; border-radius: 50%;
+    background: var(--primary-light); color: var(--primary); font-size: 13px; font-weight: 800;
+}
+.mcard__avatar--lg { width: 38px; height: 38px; font-size: 15px; }
+.mcard__main { display: grid; flex: 1; min-width: 0; gap: 1px; }
+.mcard__top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.mcard__from { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.mcard__tag { padding: 0 6px; border-radius: 4px; background: #fff4d6; color: #a46a00; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.mcard__date { margin-left: auto; padding-left: 8px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.mcard__subject { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.mcard__snippet { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.mcard__row.is-unread .mcard__from, .mcard__row.is-unread .mcard__subject { font-weight: 800; }
+.mcard__row.is-unread .mcard__no { color: var(--primary); }
+.mcard__row.is-unread .mcard__no::before { content: '●'; margin-right: 3px; font-size: 8px; vertical-align: middle; }
+.mcard__mail-head { display: flex; gap: 10px; padding: 12px; border-bottom: 1px solid var(--border); background: #fafaff; }
+.mcard__mail-who { display: grid; gap: 2px; min-width: 0; }
+.mcard__mail-who strong { font-size: 14px; }
+.mcard__mail-who small { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.mcard__mail-who small b { color: var(--text); }
+.mcard__body { padding: 12px; font-size: 13px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mcard__body.is-clipped { max-height: 170px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+.mcard__actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 12px; }
+.mcard__btn {
+    padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: #fff; color: var(--text);
+    font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.mcard__btn:hover { border-color: var(--primary); color: var(--primary); }
+.mcard__btn--primary { border-color: var(--primary); background: var(--primary); color: #fff; }
+.mcard__btn--primary:hover { background: var(--primary-dark); color: #fff; }
+.mcard--sent { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-color: #c9ecd6; background: #effaf3; }
+.mcard--sent > i { color: var(--success, #1f9d55); font-size: 18px; }
+.mcard--sent span { display: grid; }
+.mcard--sent small { color: var(--muted); font-size: 12px; }
+.msgr-draft::before { content: 'Draft'; display: block; margin-bottom: 4px; color: var(--primary); font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+
+/* Staff chat: payment receipt review card */
+.rcpt-pill { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+.rcpt-pill--ok { background: #e6f7ec; color: #1f8a4c; }
+.rcpt-pill--bad { background: #fde8ec; color: #c42b4b; }
+.rcpt-pill--warn { background: #fff4d6; color: #a46a00; }
+.rcpt { display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding: 12px; }
+.rcpt__pic { display: block; overflow: hidden; height: 200px; border: 1px solid var(--border); border-radius: 10px; background: #f4f5fb; }
+.rcpt__pic img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.rcpt__pic:hover { border-color: var(--primary); }
+.rcpt__pic--file { display: grid; place-content: center; gap: 6px; color: var(--primary); font-size: 12px; font-weight: 700; text-align: center; text-decoration: none; }
+.rcpt__pic--file i { font-size: 32px; }
+.rcpt__info { display: grid; align-content: start; gap: 8px; min-width: 0; }
+.rcpt__items { margin: 0; color: var(--muted); font-size: 12px; }
+.rcpt__checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.rcpt__checks li { display: flex; gap: 8px; align-items: flex-start; }
+.rcpt__checks li > i { display: grid; flex: 0 0 auto; place-items: center; width: 18px; height: 18px; margin-top: 1px; border-radius: 50%; font-size: 10px; }
+.rcpt__checks .is-ok > i { background: #e6f7ec; color: #1f8a4c; }
+.rcpt__checks .is-bad > i { background: #fde8ec; color: #c42b4b; }
+.rcpt__checks .is-warn > i { background: #fff4d6; color: #a46a00; }
+.rcpt__checks b { font-weight: 700; }
+.rcpt__meta { margin: 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.mcard__btn--ok { border-color: #1f8a4c; background: #1f8a4c; color: #fff; }
+.mcard__btn--ok:hover { background: #18713e; color: #fff; }
+.mcard__btn--bad { border-color: #f3c2cd; color: #c42b4b; }
+.mcard__btn--bad:hover { border-color: #c42b4b; color: #c42b4b; }
+.mcard--rejected { border-color: #f3c2cd; background: #fff4f6; }
+.mcard--rejected > i { color: #c42b4b; }
+@media (max-width: 560px) { .rcpt { grid-template-columns: 1fr; } .rcpt__pic { height: 240px; } }
+
+/* Receipt card v2: staff look at the picture and decide */
+.mcard--receipt .rcpt { grid-template-columns: 220px 1fr; }
+.mcard--receipt .rcpt__pic { position: relative; height: 300px; background: #f4f5fb; }
+.mcard--receipt .rcpt__pic img { object-fit: contain; object-position: center; background: #fff; }
+.rcpt__zoom { position: absolute; right: 6px; bottom: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(20, 22, 40, .65); color: #fff; font-size: 11px; }
+dl.rcpt__info { display: grid; grid-template-columns: auto 1fr; align-content: start; gap: 6px 12px; margin: 0; font-size: 13px; }
+dl.rcpt__info dt { color: var(--muted); }
+dl.rcpt__info dd { margin: 0; overflow-wrap: anywhere; }
+dd.rcpt__total { font-size: 16px; font-weight: 800; }
+.rcpt__actions { align-items: center; }
+.rcpt__reason { flex: 1 1 260px; min-width: 0; padding: 7px 12px; border: 1px solid var(--border); border-radius: 999px; font: inherit; font-size: 13px; }
+.rcpt__reason:focus { outline: 0; border-color: #c42b4b; box-shadow: 0 0 0 3px #fde8ec; }
+.rcpt__msg { margin: 0; padding: 0 12px 10px; font-size: 12px; }
+.rcpt__msg:empty { display: none; }
+.rcpt__msg.is-ok { color: #1f8a4c; }
+.rcpt__msg.is-bad { color: #c42b4b; }
+.rcpt__more { margin: 0; padding: 8px 12px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+.mcard__btn:disabled { opacity: .6; cursor: default; }
+/* Markdown tables in replies */
+.msgr-table { width: 100%; margin: 6px 0; border-collapse: collapse; font-size: 13px; }
+.msgr-table th, .msgr-table td { padding: 5px 8px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+.msgr-table th { background: #f4f5fb; font-weight: 700; }
+@media (max-width: 560px) { .mcard--receipt .rcpt { grid-template-columns: 1fr; } }

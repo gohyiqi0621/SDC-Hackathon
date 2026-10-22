@@ -18,6 +18,7 @@
   16. File preview      [data-file-preview] shows the chosen PDF / image
   17. Submit confirm    <form data-submit-confirm="Message"> asks once before sending
   18. Invoice items     [data-items] line-item rows with live totals
+  19. AI auto-fill      [data-ai-fill] reads the chosen file and fills the popup form
 ===================================== */
 
 (function () {
@@ -850,6 +851,232 @@
             recalc();
         };
 
+        window.App.invoiceHasItems = function () {
+            return Array.prototype.some.call(body.querySelectorAll('[data-item-row]'), rowHasValue);
+        };
+
         recalc();
+    });
+
+    /* ---------- 19. AI auto-fill ---------- */
+
+    // When a file is chosen in an upload popup, the browser turns it into page
+    // images (pdf.js for PDFs, a resize for photos), POSTs them to the
+    // extract endpoint, and fills the form. Fields the user already typed are
+    // kept; "Read again" overwrites. Nothing is saved until the user submits.
+    var PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+    var pdfjsLoading = null;
+    var MAX_PAGES = 4;
+    var MAX_SIDE = 1600;
+
+    function loadPdfJs() {
+        if (window.pdfjsLib) { return Promise.resolve(window.pdfjsLib); }
+        if (!pdfjsLoading) {
+            pdfjsLoading = new Promise(function (resolve, reject) {
+                var s = document.createElement('script');
+                s.src = PDFJS + 'pdf.min.js';
+                s.onload = function () {
+                    window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js';
+                    resolve(window.pdfjsLib);
+                };
+                s.onerror = function () { pdfjsLoading = null; reject(new Error('Could not load the PDF reader. Check the internet connection.')); };
+                document.head.appendChild(s);
+            });
+        }
+        return pdfjsLoading;
+    }
+
+    function canvasJpeg(canvas) { return canvas.toDataURL('image/jpeg', 0.85); }
+
+    function imageToPages(blob) {
+        return new Promise(function (resolve, reject) {
+            var url = URL.createObjectURL(blob);
+            var img = new Image();
+            img.onload = function () {
+                var scale = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+                var c = document.createElement('canvas');
+                c.width = Math.round(img.naturalWidth * scale);
+                c.height = Math.round(img.naturalHeight * scale);
+                var g = c.getContext('2d');
+                g.fillStyle = '#fff';
+                g.fillRect(0, 0, c.width, c.height);
+                g.drawImage(img, 0, 0, c.width, c.height);
+                URL.revokeObjectURL(url);
+                resolve([canvasJpeg(c)]);
+            };
+            img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('This image could not be opened.')); };
+            img.src = url;
+        });
+    }
+
+    function pdfToPages(blob) {
+        return Promise.all([loadPdfJs(), blob.arrayBuffer()]).then(function (r) {
+            return r[0].getDocument({ data: r[1] }).promise;
+        }).then(function (pdf) {
+            var pages = [];
+            var chain = Promise.resolve();
+            for (var n = 1; n <= Math.min(pdf.numPages, MAX_PAGES); n++) {
+                (function (num) {
+                    chain = chain.then(function () { return pdf.getPage(num); }).then(function (page) {
+                        var base = page.getViewport({ scale: 1 });
+                        var vp = page.getViewport({ scale: Math.min(2.5, MAX_SIDE / Math.max(base.width, base.height)) });
+                        var c = document.createElement('canvas');
+                        c.width = Math.round(vp.width);
+                        c.height = Math.round(vp.height);
+                        var g = c.getContext('2d');
+                        g.fillStyle = '#fff';
+                        g.fillRect(0, 0, c.width, c.height);
+                        return page.render({ canvasContext: g, viewport: vp }).promise.then(function () { pages.push(canvasJpeg(c)); });
+                    });
+                })(n);
+            }
+            return chain.then(function () { return pages; });
+        });
+    }
+
+    function toPages(blob) {
+        if (blob.type === 'application/pdf') { return pdfToPages(blob); }
+        if (/^image\//.test(blob.type)) { return imageToPages(blob); }
+        return Promise.reject(new Error('AI can read PDF, JPG, PNG or WebP files.'));
+    }
+
+    document.querySelectorAll('[data-ai-fill]').forEach(function (box) {
+        var form = box.closest('form');
+        var input = form.querySelector('[data-file-input]');
+        var kind = box.getAttribute('data-ai-kind');
+        var message = box.querySelector('[data-ai-message]');
+        var icon = box.querySelector('[data-ai-icon]');
+        var runBtn = box.querySelector('[data-ai-run]');
+        var runLabel = box.querySelector('[data-ai-run-label]');
+        var existing = box.getAttribute('data-ai-existing');
+        var lastFile = null;
+        var busy = false;
+
+        function status(state, text) {
+            box.setAttribute('data-state', state);
+            message.textContent = text;
+            icon.className = 'ai-fill-icon fa-solid ' + ({
+                loading: 'fa-spinner fa-spin', ok: 'fa-circle-check', warn: 'fa-triangle-exclamation', error: 'fa-circle-exclamation'
+            }[state] || 'fa-wand-magic-sparkles');
+        }
+
+        // Fill one field unless the user already changed it (force = "Read again").
+        function put(name, value, force) {
+            var el = form.elements[name];
+            if (!el || value === '' || value === null || value === undefined) { return false; }
+            if (el instanceof RadioNodeList) {
+                var radio = Array.prototype.find.call(el, function (r) { return r.value === value; });
+                if (!radio) { return false; }
+                radio.checked = true;
+                radio.dispatchEvent(new Event('change', { bubbles: true }));
+                return true;
+            }
+            if (el.readOnly) { return false; }
+            var untouched = el.value.trim() === '' || el.value === el.defaultValue
+                || (el.tagName === 'SELECT' && el.selectedOptions[0] && el.selectedOptions[0].defaultSelected);
+            if (!force && !untouched) { return false; }
+            if (el.tagName === 'SELECT' && !Array.prototype.some.call(el.options, function (o) { return o.value === value; })) { return false; }
+
+            el.value = el.hasAttribute('data-money') ? padMoney(String(value)) : String(value);
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.classList.add('ai-filled');
+            return true;
+        }
+
+        function fillInvoice(f, force) {
+            var n = 0;
+            ['invoice_number', 'party_name', 'party_address', 'party_phone', 'payment_terms', 'reference_no',
+                'issue_date', 'due_date', 'currency'].forEach(function (k) { if (put(k, f[k], force)) { n++; } });
+            if (f.type && put('type', f.type, force)) { n++; }
+
+            var hasItems = window.App.invoiceHasItems && window.App.invoiceHasItems();
+            if (f.items && f.items.length && window.App.setInvoiceItems && (force || !hasItems)) {
+                window.App.setInvoiceItems(f.items);
+                n += f.items.length;
+                if (put('discount_amount', f.discount_amount, force)) { n++; }
+                if (put('sst_rate', f.sst_rate, force)) { n++; }
+            } else if (!hasItems && put('amount', f.total, force)) {
+                n++;
+            }
+            return n;
+        }
+
+        function fillClaim(f, force) {
+            var n = 0;
+            if (put('title', f.title || f.merchant, force)) { n++; }
+            ['expense_date', 'amount', 'currency', 'category'].forEach(function (k) { if (put(k, f[k], force)) { n++; } });
+            if (f.merchant && f.title && f.title.indexOf(f.merchant) === -1 && put('notes', 'Merchant: ' + f.merchant, false)) { n++; }
+            return n;
+        }
+
+        // The AI's own total vs the items it read: a gap means something was misread.
+        function totalWarning(f) {
+            if (kind !== 'invoice' || !f.total || !f.items || !f.items.length) { return ''; }
+            var shown = parseFloat(String(form.elements.amount.value).replace(/,/g, '')) || 0;
+            var read = parseFloat(f.total) || 0;
+            return Math.abs(shown - read) > 0.009
+                ? ' The invoice says total ' + padMoney(String(read)) + ' but the items add up to ' + padMoney(String(shown)) + ' - please check.'
+                : '';
+        }
+
+        function run(blob, force) {
+            if (busy) { return; }
+            busy = true;
+            runBtn.disabled = true;
+            status('loading', kind === 'claim' ? 'Reading the receipt...' : 'Reading the invoice...');
+
+            toPages(blob).then(function (pages) {
+                var data = new FormData();
+                data.append('kind', kind);
+                pages.forEach(function (p) { data.append('pages[]', p); });
+                return fetch(box.getAttribute('data-ai-url'), {
+                    method: 'POST',
+                    body: data,
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': csrfToken() }
+                }).then(function (r) {
+                    return r.json().catch(function () { throw new Error('Unexpected server response (HTTP ' + r.status + ').'); });
+                });
+            }).then(function (result) {
+                if (!result.success) { throw new Error(result.message || 'AI could not read this file.'); }
+                var f = result.data.fields || {};
+                var filled = kind === 'claim' ? fillClaim(f, force) : fillInvoice(f, force);
+                var warn = totalWarning(f);
+                if (filled === 0) {
+                    status('warn', 'AI found nothing new to fill. Please type the details.');
+                } else {
+                    status(warn ? 'warn' : 'ok', 'Filled ' + filled + ' field' + (filled === 1 ? '' : 's') + ' with ' + result.data.model + '. Please check every field.' + warn);
+                }
+            }).catch(function (err) {
+                status('error', (err && err.message ? err.message : 'AI could not read this file.') + ' You can still type the details.');
+            }).then(function () {
+                busy = false;
+                runBtn.disabled = false;
+                runBtn.hidden = false;
+                runLabel.textContent = 'Read again';
+            });
+        }
+
+        input.addEventListener('change', function () {
+            var file = input.files && input.files[0];
+            if (!file) { return; }
+            lastFile = file;
+            run(file, false);
+        });
+
+        runBtn.addEventListener('click', function () {
+            if (lastFile) { run(lastFile, true); return; }
+            if (!existing) { return; }
+            fetch(existing, { credentials: 'same-origin' }).then(function (r) {
+                if (!r.ok) { throw new Error('The saved file could not be opened.'); }
+                return r.blob();
+            }).then(function (blob) { lastFile = blob; run(blob, true); })
+              .catch(function (err) { status('error', err.message); });
+        });
+
+        // A field the user edits is theirs again: drop the AI highlight.
+        form.addEventListener('input', function (e) {
+            if (e.isTrusted && e.target.classList) { e.target.classList.remove('ai-filled'); }
+        });
     });
 })();

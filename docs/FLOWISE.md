@@ -331,12 +331,14 @@ Staff chat with their own assistant about the business's records. Flow:
 - **Settings:** Staff > Setting & Integration (`staff_ai_assistant_settings`): name, personality, tone, AI model,
   temperature, key, and the **Functions** ticked (`check_email`, `check_invoice`, `check_claims`, `check_orders`).
 - **Chatflow:** `FLOWISE_STAFF_CHATFLOW_ID` (Secret / .env). Not set: `FLOWISE_CHATFLOW_ID` is used.
-- **overrideConfig** sent: `sessionId` (`staff:<user>:staff-<user>`), `systemMessage` (src/Prompts/staff_system_message.md,
-  lists only the ticked tools), `modelName`, `temperature`, and `vars`: `tool_base_url`, `tool_token` (a **staff** token),
+- **Chat sessions:** "New chat" starts a new session; earlier chats stay under **Chats** and can be reopened.
+  Each session has its own `chat_id` (`staff-<user>` or `staff-<user>-<session>`) and Flowise memory.
+- **overrideConfig** sent: `sessionId` (`staff:<user>:<chat_id>`), `systemMessage` (src/Prompts/staff_system_message.md,
+  lists only the ticked tools; src/Prompts/staff_email_rules.md is added when Check email is ticked), `modelName`, `temperature`, and `vars`: `tool_base_url`, `tool_token` (a **staff** token),
   `channel` = `staff`, `staff_name`, `functions`, `company_name`, `assistant_name`, `provider`, `model`, `provider_api_key`.
-- **Tools** (read-only): they refuse customer tokens (403) and functions that are not ticked (success=false).
+- **Tools:** they refuse customer tokens (403) and functions that are not ticked (success=false). Invoices, claims and
+  orders are read-only; the only tool that changes anything is `send_email_reply` (see below).
 - **History:** `chat_messages` with channel `staff` (migration 017); never shown in Customer > Chat Interface.
-- Check the exact request on the Staff Chat Interface: **View system message**.
 
 ### Staff tool: `check_invoice`
 Description: *Look up the business's invoices. Use for any question about invoices, amounts owed, unpaid, partially paid,
@@ -393,6 +395,86 @@ for (const [k, v] of Object.entries({
 })) { if (v !== null && v !== undefined && String(v) !== '') body[k] = String(v); }
 
 const res = await httpFetch($vars.tool_base_url + '/check_orders', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + $vars.tool_token, 'ngrok-skip-browser-warning': 'true' },
+  body: JSON.stringify(body)
+});
+return await res.text();
+```
+
+### Staff tool for payment receipts (Function: Check orders)
+`review_receipt` shows the receipt picture the customer sent and the order on a card in the staff chat. The staff
+member looks at the picture and clicks **Approve payment** or **Reject** on the card (POST staff/order_decide, same
+as the Orders page; the customer is told on Telegram). The AI does not read, judge, approve or reject receipts.
+
+**`review_receipt`** - Description: *Show the payment receipt picture of an order in the chat so the staff member can
+check it and approve or reject it. Use when staff ask to see / check a receipt or a payment waiting for review.*
+
+| Property | Type | Description | Required |
+|---|---|---|---|
+| `order_no` | string | Order number, e.g. ORD-261021-25NJ (the last part is enough). Empty: the oldest receipt waiting | no |
+
+### Staff tools for email (Function: Check email)
+They use the Gmail account connected on the **Dashboard** (Connect Gmail). Add all four tools to the staff chatflow.
+
+**`check_email`** - Description: *List emails in the connected Gmail. Use when staff ask to see, find or categorise
+emails (important, unread, sent, spam, promotions...). Returns sender, subject, date, snippet and an id for each email.*
+
+| Property | Type | Description | Required |
+|---|---|---|---|
+| `folder` | string | inbox, important, unread, starred, sent, spam, trash, primary, social, promotions, updates or all (default inbox) | no |
+| `query` | string | Words or Gmail search, e.g. `from:ali`, `invoice`, `has:attachment` | no |
+| `period` | string | today, yesterday, this_week, last_week, last_7_days, last_30_days, this_month, last_month, this_year | no |
+| `date_from` / `date_to` | string | YYYY-MM-DD | no |
+| `limit` | number | How many to list, 1-25 (default 10) | no |
+
+**`read_email`** - Description: *Open one email by its id (from check_email) to read the full text. Use when staff
+want to see, summarise or reply to a specific email.*
+
+| Property | Type | Description | Required |
+|---|---|---|---|
+| `id` | string | The email id from check_email | yes |
+
+**`send_email_reply`** - Description: *Send a reply to an email, in the same thread, from the connected Gmail. Use ONLY
+after the staff member has seen the exact final draft and clearly said to send it.*
+
+| Property | Type | Description | Required |
+|---|---|---|---|
+| `id` | string | The email id being replied to | yes |
+| `body` | string | The final reply text, exactly as shown to the staff member (without "> ") | yes |
+
+**`send_email`** - Description: *Send a NEW email (not a reply) from the connected Gmail. Use when staff want to write
+to someone. Use ONLY after the staff member has seen the draft with the To address and subject and clearly said to send it.*
+
+| Property | Type | Description | Required |
+|---|---|---|---|
+| `to` | string | Recipient email address (several: separate with commas) | yes |
+| `subject` | string | Email subject | yes |
+| `body` | string | The message exactly as shown to the staff member (without "> ") | yes |
+| `cc` | string | CC addresses, separated by commas | no |
+
+The address must also appear in the chat (shown in the draft or typed by staff), or it is not sent.
+
+The website also checks before sending: the staff member's latest message must say to send (send / yes / ok / hantar /
+发送...) and not "wait / don't", and the text must be the draft the assistant just showed (or the text the staff member
+typed with **Edit**). Otherwise it answers `NOT SENT ...` and nothing is sent.
+
+**JavaScript Function** for the three email tools (change the path for each tool):
+```javascript
+const httpFetch = typeof globalThis.fetch === 'function' ? globalThis.fetch : require('node-fetch');
+const body = {};
+for (const [k, v] of Object.entries({
+  folder: typeof $folder !== 'undefined' ? $folder : '',
+  query: typeof $query !== 'undefined' ? $query : '',
+  period: typeof $period !== 'undefined' ? $period : '',
+  date_from: typeof $date_from !== 'undefined' ? $date_from : '',
+  date_to: typeof $date_to !== 'undefined' ? $date_to : '',
+  limit: typeof $limit !== 'undefined' ? $limit : '',
+  id: typeof $id !== 'undefined' ? $id : '',
+  body: typeof $body !== 'undefined' ? $body : ''
+})) { if (v !== null && v !== undefined && String(v) !== '') body[k] = String(v); }
+
+const res = await httpFetch($vars.tool_base_url + '/check_email', {   // or /read_email, /send_email_reply
   method: 'POST',
   headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + $vars.tool_token, 'ngrok-skip-browser-warning': 'true' },
   body: JSON.stringify(body)

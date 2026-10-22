@@ -1,79 +1,60 @@
 <?php
 /**
- * ai_settings/index.php - AI Settings & Integration.
+ * ai_settings/index.php - Customer Assistant > Setup.
  *
- * Reached from AI Chatbot > Customer > Setting & Integration
- * (/?page=customer&action=settings). Four tabs, each one a reusable partial:
+ * The setup checklist (SetupStatus::customer) and the AI Assistant Settings
+ * (model, key, personality, SOPs). Company information is on its own page
+ * (Settings > Company Profile) and Telegram / Google Calendar are on Customer
+ * Assistant > Connections; old links to #company, #telegram or #calendar on
+ * this page are sent there.
  *
- *   _company_information_form.php       company_profiles
- *   _ai_assistant_settings_form.php     ai_assistant_settings
- *   _telegram_integration_card.php      telegram_integrations
- *   _google_calendar_integration_card.php  google_calendar_integrations
+ * The form is loaded and saved by assets/js/ai-settings.js through
+ * $endpoints (ChatbotController::aiSettingsEndpoints()).
  *
- * The HTML is rendered empty; assets/js/ai-settings.js loads each section
- * through assets/js/ai-settings-api.js. $endpoints comes from
- * ChatbotController::aiSettingsEndpoints(), so every URL lives in one place.
- *
- * Expects: $user, $userId, $endpoints, $businessCategories, $timezones, $aiModels,
- *          $chatUrl.
+ * Expects: $userId, $endpoints, $aiModels, $chatUrl, $steps, $companyUrl,
+ *          $connectionsUrl.
  */
-$tabs = [
-    'company'   => ['Company Information',         'fa-solid fa-building'],
-    'assistant' => ['AI Assistant Settings',       'fa-solid fa-robot'],
-    'telegram'  => ['Telegram Integration',        'fa-brands fa-telegram'],
-    'calendar'  => ['Google Calendar Integration', 'fa-regular fa-calendar-check'],
-];
-
 view('layouts/header', [
-    'title'  => 'AI Settings & Integration',
+    'title'  => 'Customer Assistant Setup',
     'styles' => ['assets/css/ai-settings.css'],
 ]);
 ?>
+<script>
+    // Old links: Company Information / Telegram / Google Calendar moved to their own pages.
+    (function () {
+        var h = (location.hash || '').replace('#', ''), q = location.search;
+        if (h === 'company') { location.replace(<?= json_encode($companyUrl) ?>); }
+        else if (h === 'telegram' || h === 'calendar' || /[?&]gcal=/.test(q)) {
+            var to = <?= json_encode($connectionsUrl) ?>;
+            var gcal = q.match(/[?&](gcal=[^&#]*(?:&gcal_message=[^&#]*)?)/);
+            location.replace(to + (gcal ? '&' + gcal[1] : '') + '#' + (h || 'calendar'));
+        }
+    })();
+</script>
 <section class="welcome-banner welcome-banner--compact">
     <div class="welcome-text">
-        <h1>AI Settings &amp; Integration</h1>
-        <p>Tell the assistant about your business, shape how it talks, and connect the channels it works in.</p>
+        <h1>Customer Assistant Setup</h1>
+        <p>Get the assistant that chats with your customers ready: model, personality and instructions.</p>
     </div>
     <div class="welcome-actions">
-        <a class="primary-btn" href="<?= e($chatUrl) ?>">
-            <i class="fa-regular fa-comments"></i> Open chat interface
-        </a>
+        <a class="secondary-btn" href="<?= e($connectionsUrl) ?>"><i class="fa-solid fa-plug"></i> Connections</a>
     </div>
 </section>
 
-<div class="page-body ai-settings"
-     data-ai-settings
-     data-user-id="<?= (int) $userId ?>"
-     data-endpoints="<?= e(json_encode($endpoints, JSON_UNESCAPED_SLASHES)) ?>">
+<div class="page-body">
+    <?php view('partials/setup_checklist', ['steps' => $steps, 'tryUrl' => $chatUrl, 'tryLabel' => 'Open chats']); ?>
 
-    <div class="ai-tabs page-tabs" role="tablist" aria-label="AI settings sections">
-        <?php foreach ($tabs as $key => [$label, $icon]): ?>
-            <button class="page-tab<?= $key === 'company' ? ' active' : '' ?>" type="button" role="tab"
-                    id="ai-tab-<?= e($key) ?>" aria-controls="ai-panel-<?= e($key) ?>"
-                    aria-selected="<?= $key === 'company' ? 'true' : 'false' ?>"
-                    tabindex="<?= $key === 'company' ? '0' : '-1' ?>" data-tab="<?= e($key) ?>">
-                <i class="<?= e($icon) ?>" aria-hidden="true"></i>
-                <span><?= e($label) ?></span>
-                <span class="ai-tab-dot" data-tab-dirty="<?= e($key) ?>" hidden title="Unsaved changes"></span>
-            </button>
-        <?php endforeach; ?>
+    <div class="ai-settings staff-ai-settings" id="assistant"
+         data-ai-settings
+         data-user-id="<?= (int) $userId ?>"
+         data-endpoints="<?= e(json_encode($endpoints, JSON_UNESCAPED_SLASHES)) ?>">
+        <div class="staff-ai-heading">
+            <h2><i class="fa-solid fa-robot" aria-hidden="true"></i> AI Assistant Settings</h2>
+            <p>How the customer assistant talks, which AI model it uses, and the instructions (SOPs) it follows.</p>
+        </div>
+        <section class="ai-panel" data-panel="assistant">
+            <?php view('ai_settings/_ai_assistant_settings_form', ['aiModels' => $aiModels]); ?>
+        </section>
     </div>
-
-    <section class="ai-panel" role="tabpanel" id="ai-panel-company" aria-labelledby="ai-tab-company" tabindex="0" data-panel="company">
-        <?php view('ai_settings/_company_information_form', ['businessCategories' => $businessCategories]); ?>
-    </section>
-
-    <section class="ai-panel" role="tabpanel" id="ai-panel-assistant" aria-labelledby="ai-tab-assistant" tabindex="0" data-panel="assistant" hidden>
-        <?php view('ai_settings/_ai_assistant_settings_form', ['aiModels' => $aiModels]); ?>
-    </section>
-
-    <section class="ai-panel" role="tabpanel" id="ai-panel-telegram" aria-labelledby="ai-tab-telegram" tabindex="0" data-panel="telegram" hidden>
-        <?php view('ai_settings/_telegram_integration_card'); ?>
-    </section>
-
-    <section class="ai-panel" role="tabpanel" id="ai-panel-calendar" aria-labelledby="ai-tab-calendar" tabindex="0" data-panel="calendar" hidden>
-        <?php view('ai_settings/_google_calendar_integration_card', ['timezones' => $timezones]); ?>
-    </section>
-
 </div>
 <?php view('layouts/footer', ['scripts' => ['assets/js/ai-settings-api.js', 'assets/js/ai-settings.js']]); ?>
