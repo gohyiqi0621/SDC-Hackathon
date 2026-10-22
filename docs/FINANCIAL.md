@@ -28,7 +28,8 @@ in `src/Support/helpers.php`.
 ## Data model (PostgreSQL)
 
 Migrations: `database/migrations/005_create_invoices.sql`, `006_create_claims.sql`,
-`016_add_invoice_details_and_items.sql` (all also in `database/all_migrations.sql`).
+`016_add_invoice_details_and_items.sql`, `018_reconcile_invoice_items_print_columns.sql`
+(all also in `database/all_migrations.sql`).
 After pulling, run: `C:\xampp\php\php.exe bin\migrate.php`
 
 ### `invoices` (one row per invoice, owned by `user_id`)
@@ -109,9 +110,22 @@ Suggested wiring (both roles may print):
 Invoices saved without items (total only) have `subtotal = NULL` and no rows
 in `invoice_items`; the template should still print (show the total only).
 
-## Planned next (in progress elsewhere)
+## AI auto-fill
 
-- **AI auto-fill**: when a file is chosen in the upload popup, AI reads it and
-  fills the header and items (`window.App.setInvoiceItems(rows)` fills the
-  table). Uses the AI provider/key from AI Settings.
+Choosing a file in the invoice or claim popup reads it with AI and fills the
+form (header, items, totals / claim title, date, amount, category). Fields the
+user already typed are kept; "Read again" overwrites. Nothing is saved until
+the user submits, and the server still validates and recalculates everything.
+
+- Browser (`app.js` section 19): PDF pages are rendered to images with pdf.js
+  (cdnjs, loaded only when needed, max 4 pages); photos are shrunk to 1600px.
+- Server: `POST ?page=financial&action=extract` -> `src/Services/DocumentExtractService.php`.
+- Which AI: the model + key saved in **AI Settings (Staff assistant first,
+  then Customer assistant)**; otherwise `AGNES_API_KEY` from `.env` (testing).
+  Claude Haiku 5.5 uses structured JSON output at low effort; Agnes / GPT use
+  the OpenAI-style chat API. DeepSeek cannot read images.
+- Limit: 40 reads per hour per session.
+
+## Planned next
+
 - Optional: printable "claim voucher" for reimbursed claims.

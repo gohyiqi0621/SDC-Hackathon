@@ -152,12 +152,14 @@ $router->post(
     /* ------------------------------------------------------- financial --- */
     // Invoice: list + upload popup (?new=1, ?edit=N). Edit / mark paid / delete are Supervisor only.
     $router->get('financial/invoice', [FinancialController::class, 'invoice'], $auth);
+    $router->get('financial/print', [FinancialController::class, 'print'], $auth);
     $router->post('financial/role', [FinancialController::class, 'role'], $auth);
     $router->post('financial/store', [FinancialController::class, 'store'], $auth);
     $router->post('financial/update', [FinancialController::class, 'update'], $auth);
     $router->post('financial/mark_paid', [FinancialController::class, 'markPaid'], $auth);
     $router->post('financial/delete', [FinancialController::class, 'delete'], $auth);
     $router->get('financial/file', [FinancialController::class, 'file'], $auth);
+    $router->post('financial/extract', [FinancialController::class, 'extract'], $auth); // AI auto-fill (invoice + claim popups)
 
     // Claims: list + new-claim popup (?new=1, ?edit=N). Review / edit / delete are Supervisor only.
     $router->get('financial/claims', [ClaimController::class, 'index'], $auth);
