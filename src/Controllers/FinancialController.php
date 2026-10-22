@@ -12,8 +12,10 @@ declare(strict_types=1);
 namespace Src\Controllers;
 
 use PDOException;
+use RuntimeException;
 use Src\Models\Invoice;
 use Src\Models\InvoiceItem;
+use Src\Services\DocumentExtractService;
 use Src\Services\InvoiceService;
 
 final class FinancialController
@@ -198,6 +200,34 @@ final class FinancialController
             (string) ($invoice['file_name'] ?: 'invoice'),
             !empty($_GET['download'])
         );
+    }
+
+    /**
+     * POST /?page=financial&action=extract  (kind = invoice|claim, pages[] = page images as data URLs)
+     *
+     * AI auto-fill for the upload popups: reads the file and returns its
+     * fields as JSON. Saves nothing. Anyone who can upload may use it.
+     */
+    public function extract(): void
+    {
+        $user = require_login();
+        $kind = ($_POST['kind'] ?? '') === 'claim' ? 'claim' : 'invoice';
+
+        // A light brake on accidental loops: at most 40 reads per hour per session.
+        $now    = time();
+        $recent = array_values(array_filter((array) ($_SESSION['extract_calls'] ?? []), static fn ($t) => $t > $now - 3600));
+        if (count($recent) >= 40) {
+            json_response(false, null, 'Too many AI reads this hour. Please type the details, or try again later.', 429);
+        }
+        $_SESSION['extract_calls'] = array_merge($recent, [$now]);
+
+        try {
+            $result = (new DocumentExtractService())->extract((int) $user['id'], $kind, (array) ($_POST['pages'] ?? []));
+        } catch (RuntimeException $e) {
+            json_response(false, null, $e->getMessage(), 422);
+        }
+
+        json_response(true, $result, 'Filled by ' . $result['model'] . '. Please check every field.');
     }
 
     /* ---------------------------------------- old addresses (redirect) ---- */

@@ -1535,6 +1535,65 @@ code {
     grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
 }
 
+/* ---------- AI auto-fill status (inside the popup) ---------- */
+
+.ai-fill {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 13px;
+    border: 1px solid #e0dcff;
+    border-radius: 12px;
+    background: var(--primary-light);
+    color: #4c43b8;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.ai-fill-icon {
+    flex-shrink: 0;
+    font-size: 15px;
+}
+
+.ai-fill-text {
+    flex: 1;
+}
+
+.ai-fill-btn {
+    flex-shrink: 0;
+    height: 32px;
+    padding: 0 11px;
+    font-size: 12px;
+}
+
+.ai-fill[data-state="ok"] {
+    border-color: #bfead6;
+    background: var(--success-bg);
+    color: #0f7a51;
+}
+
+.ai-fill[data-state="warn"] {
+    border-color: #f5dfae;
+    background: var(--warning-bg);
+    color: #8a5a00;
+}
+
+.ai-fill[data-state="error"] {
+    border-color: #f8c7d0;
+    background: var(--danger-bg);
+    color: #b3263f;
+}
+
+/* A value the AI put in, until the user edits it. */
+.field input.ai-filled,
+.field textarea.ai-filled,
+.field select.ai-filled,
+.items-table input.ai-filled,
+.items-totals input.ai-filled {
+    background: #f6f4ff;
+    border-color: #c9c2ff;
+}
+
 /* ---------- Invoice line items (inside the popup) ---------- */
 
 .items-editor {

@@ -74,6 +74,7 @@ $router->post(
     $router->post('financial/mark_paid', [FinancialController::class, 'markPaid'], $auth);
     $router->post('financial/delete', [FinancialController::class, 'delete'], $auth);
     $router->get('financial/file', [FinancialController::class, 'file'], $auth);
+    $router->post('financial/extract', [FinancialController::class, 'extract'], $auth); // AI auto-fill (invoice + claim popups)
 
     // Claims: list + new-claim popup (?new=1, ?edit=N). Review / edit / delete are Supervisor only.
     $router->get('financial/claims', [ClaimController::class, 'index'], $auth);
