@@ -71,16 +71,25 @@ if (is_file($__envPath)) {
     }
 }
 
-// Real environment variables (Docker, Railway, CI) come first; a local .env
-// overrides them, which is what makes XAMPP development work unchanged.
-foreach ((getenv() ?: []) as $__key => $__value) {
-    if (is_string($__value) && preg_match('/^[A-Z][A-Z0-9_]*$/', (string) $__key)) {
-        $_ENV[$__key] = $__value;
+// Real environment variables (Replit Secrets, Docker, Railway) win. A .env
+// file only fills in what the environment does not set, so XAMPP works with
+// .env alone and a stray .env on a server can never blank out a Secret.
+// $_SERVER is read too: some PHP setups (php-fpm, Apache) only put the
+// environment there, and getenv() alone then returns nothing.
+foreach ([(getenv() ?: []), $_SERVER] as $__source) {
+    foreach ($__source as $__key => $__value) {
+        if (is_string($__value) && $__value !== '' && preg_match('/^[A-Z][A-Z0-9_]*$/', (string) $__key)
+            && !str_starts_with((string) $__key, 'HTTP_') && !isset($_ENV[$__key])) {
+            $_ENV[$__key] = $__value;
+        }
     }
 }
 foreach ($__envFile as $__key => $__value) {
-    $_ENV[(string) $__key] = $__value;
+    if (!isset($_ENV[$__key]) || $_ENV[$__key] === '') {
+        $_ENV[(string) $__key] = $__value;
+    }
 }
+unset($__source);
 unset($__envPath, $__envFile, $__key, $__value, $__line);
 
 /* --------------------------------------------------------------- config --- */
