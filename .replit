@@ -1,13 +1,56 @@
-# Replit: run the PHP app (public/ is the web root). Settings come from
-# Replit Secrets; do not upload a .env file.
-run = "php -S 0.0.0.0:8080 -t public public/router.php"
+run = "php -S 0.0.0.0:5000 -t public bin/serve.php"
 entrypoint = "public/index.php"
-modules = ["php-8.2", "postgresql-16"]
+modules = ["php-8.2", "web", "nodejs-20", "python-base-3.13", "postgresql-16"]
+
+[nix]
+channel = "stable-25_05"
+packages = ["nginx"]
+
+[userenv]
+
+[userenv.development]
+APP_ENV = "development"
+
+[userenv.shared]
+GMAIL_CLIENT_ID = "838167772236-n24261gbvd3hc5kgbugeit8a547m5i72.apps.googleusercontent.com"
+BREVO_SENDER_EMAIL = "gohyiqi1@gmail.com"
+BREVO_SENDER_NAME = "SMART SME"
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
+FLOWISE_API_URL = "https://flowise-production-d25d.up.railway.app"
+FLOWISE_CHATFLOW_ID = "32394a6e-fdd5-4e77-b2b7-3125c0265b68"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php -S 0.0.0.0:5000 -t public bin/serve.php"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [[ports]]
-localPort = 8080
+localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 5001
+externalPort = 3000
+
 [deployment]
-deploymentTarget = "vm"
-run = ["sh", "-c", "php -S 0.0.0.0:8080 -t public public/router.php"]
+deploymentTarget = "autoscale"
+run = ["bash", "bin/start-production.sh"]
