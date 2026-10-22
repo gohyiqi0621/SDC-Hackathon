@@ -39,6 +39,10 @@ outputType = "webview"
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 5001
+externalPort = 3000
+
 [deployment]
-deploymentTarget = "cloudrun"
-run = "php -S 0.0.0.0:5000 -t public bin/serve.php"
+deploymentTarget = "autoscale"
+run = ["bash", "bin/start-production.sh"]

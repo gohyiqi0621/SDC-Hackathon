@@ -1,5 +1,5 @@
 worker_processes 1;
-error_log /dev/stderr warn;
+error_log __NGINX_ERROR_LOG__ warn;
 pid __NGINX_PID__;
 
 events {
@@ -10,7 +10,7 @@ http {
     include __NGINX_CONFIG_DIR__/mime.types;
     default_type application/octet-stream;
 
-    access_log /dev/stdout;
+    access_log __NGINX_ACCESS_LOG__;
     sendfile on;
     client_max_body_size 20m;
 
@@ -21,7 +21,10 @@ http {
         index index.php;
 
         location = / {
-            rewrite ^ /index.php?page=auth&action=login last;
+            if ($query_string = "") {
+                rewrite ^ /index.php?page=auth&action=login last;
+            }
+            rewrite ^ /index.php last;
         }
 
         location ~* ^/uploads/.*\.(php[0-9]?|phtml|phar)(/|$) {
