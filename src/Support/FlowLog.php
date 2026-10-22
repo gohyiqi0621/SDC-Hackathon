@@ -50,6 +50,15 @@ final class FlowLog
                 @mkdir($dir, 0775, true);
             }
             @file_put_contents($dir . '/telegram-flow-' . date('Y-m-d') . '.log', $json . PHP_EOL, FILE_APPEND | LOCK_EX);
+
+            // Hosted (Replit, Railway): also one short line in the server log, so it shows in the
+            // host's Logs tab. FLOW_LOG_STDERR=true/false overrides the automatic choice.
+            $mirror = env('FLOW_LOG_STDERR', '');
+            $mirror = $mirror === '' ? (getenv('REPL_ID') !== false || getenv('RAILWAY_ENVIRONMENT') !== false)
+                                     : filter_var($mirror, FILTER_VALIDATE_BOOL);
+            if ($mirror) {
+                error_log('[flow] ' . mb_strimwidth($json, 0, 2000, '…'));
+            }
         } catch (Throwable $e) {
             error_log('[flowlog] ' . $e->getMessage());
         }
