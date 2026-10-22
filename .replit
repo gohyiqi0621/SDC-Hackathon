@@ -17,6 +17,7 @@ BREVO_SENDER_EMAIL = "gohyiqi1@gmail.com"
 BREVO_SENDER_NAME = "SMART SME"
 BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 FLOWISE_API_URL = "https://flowise-production-d25d.up.railway.app"
+FLOWISE_CHATFLOW_ID = "32394a6e-fdd5-4e77-b2b7-3125c0265b68"
 
 [workflows]
 runButton = "Project"
