@@ -72,6 +72,18 @@ $isPdf      = $hasFile && $invoice['file_mime'] === 'application/pdf';
                 </div>
                 <p class="field-error" data-error-for="invoice_file"><?= e($errors['invoice_file'] ?? '') ?></p>
 
+                <div class="ai-fill" data-ai-fill data-ai-kind="invoice"
+                     data-ai-url="<?= e(url('financial', ['action' => 'extract'])) ?>"
+                     <?= $hasFile ? 'data-ai-existing="' . e($fileUrl) . '"' : '' ?>>
+                    <i class="fa-solid fa-wand-magic-sparkles ai-fill-icon" data-ai-icon></i>
+                    <span class="ai-fill-text" data-ai-message>
+                        <?= $hasFile ? 'AI can read this file again and refill the details.' : 'Choose a file and AI fills in the details for you.' ?>
+                    </span>
+                    <button class="secondary-btn ai-fill-btn" type="button" data-ai-run<?= $hasFile ? '' : ' hidden' ?>>
+                        <i class="fa-solid fa-rotate"></i> <span data-ai-run-label><?= $hasFile ? 'Read with AI' : 'Read again' ?></span>
+                    </button>
+                </div>
+
                 <div class="file-preview" data-preview-frame<?= $hasFile ? '' : ' hidden' ?>>
                     <?php if ($hasFile && $isPdf): ?>
                         <iframe src="<?= e($fileUrl) ?>" title="Invoice file preview" data-preview-pdf></iframe>

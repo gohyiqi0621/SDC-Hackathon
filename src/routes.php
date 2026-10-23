@@ -152,12 +152,14 @@ $router->post(
     /* ------------------------------------------------------- financial --- */
     // Invoice: list + upload popup (?new=1, ?edit=N). Edit / mark paid / delete are Supervisor only.
     $router->get('financial/invoice', [FinancialController::class, 'invoice'], $auth);
+    $router->get('financial/print', [FinancialController::class, 'print'], $auth);
     $router->post('financial/role', [FinancialController::class, 'role'], $auth);
     $router->post('financial/store', [FinancialController::class, 'store'], $auth);
     $router->post('financial/update', [FinancialController::class, 'update'], $auth);
     $router->post('financial/mark_paid', [FinancialController::class, 'markPaid'], $auth);
     $router->post('financial/delete', [FinancialController::class, 'delete'], $auth);
     $router->get('financial/file', [FinancialController::class, 'file'], $auth);
+    $router->post('financial/extract', [FinancialController::class, 'extract'], $auth); // AI auto-fill (invoice + claim popups)
 
     // Claims: list + new-claim popup (?new=1, ?edit=N). Review / edit / delete are Supervisor only.
     $router->get('financial/claims', [ClaimController::class, 'index'], $auth);
@@ -176,6 +178,8 @@ $router->post(
 
     /* -------------------------------------------- AI chatbot: customer --- */
     $router->get('customer/settings', [ChatbotController::class, 'customerSettings'], $auth);
+    $router->get('customer/connections', [ChatbotController::class, 'customerConnections'], $auth);
+    $router->get('company', [ChatbotController::class, 'companyProfile'], $auth);
     $router->get('customer/chat', [ChatbotController::class, 'customerChat'], $auth);
     $router->get('customer/chat_feed', [ChatbotController::class, 'customerChatFeed'], $auth);
 
@@ -194,9 +198,11 @@ $router->post(
     // Orders from the AI chatbot (buy_product): review payment receipts
     $router->get('orders', [OrderController::class, 'index'], $auth);
     $router->get('orders/receipt', [OrderController::class, 'receipt'], $auth);
+    $router->get('orders/official_receipt', [OrderController::class, 'officialReceipt'], $auth);
     $router->post('orders/approve', [OrderController::class, 'approve'], $auth);
     $router->post('orders/reject', [OrderController::class, 'reject'], $auth);
     $router->post('orders/ship', [OrderController::class, 'ship'], $auth);
+    $router->post('orders/send_receipt', [OrderController::class, 'sendReceipt'], $auth);
     $router->post('orders/cancel', [OrderController::class, 'cancel'], $auth);
 
     $router->get('categories', [CategoryController::class, 'index'], $auth);
@@ -209,6 +215,7 @@ $router->post(
     // always taken from the session; POSTs are CSRF-checked by the Router.
     $router->get('ai_settings/company_profile', [AiSettingsController::class, 'companyProfile'], $auth);
     $router->post('ai_settings/company_profile_save', [AiSettingsController::class, 'companyProfileSave'], $auth);
+    $router->post('ai_settings/payment_method_save', [AiSettingsController::class, 'paymentMethodSave'], $auth);
     $router->get('ai_settings/assistant', [AiSettingsController::class, 'assistant'], $auth);
     $router->post('ai_settings/assistant_save', [AiSettingsController::class, 'assistantSave'], $auth);
     $router->post('ai_settings/generate_sops', [AiSettingsController::class, 'generateSops'], $auth);
@@ -237,17 +244,33 @@ $router->post(
     $router->post('tools/buy_product', [ToolController::class, 'buyProduct'], [], false);
     $router->post('tools/check_availability', [ToolController::class, 'checkAvailability'], [], false);
     $router->post('tools/make_booking', [ToolController::class, 'makeBooking'], [], false);
+    $router->post('tools/send_official_receipt', [ToolController::class, 'sendOfficialReceipt'], [], false);
+    // Staff assistant tools (staff tokens only; send_email_reply needs the staff member's OK).
+    $router->post('tools/check_invoice', [ToolController::class, 'checkInvoice'], [], false);
+    $router->post('tools/check_claims', [ToolController::class, 'checkClaims'], [], false);
+    $router->post('tools/check_orders', [ToolController::class, 'checkOrders'], [], false);
+    $router->post('tools/check_email', [ToolController::class, 'checkEmail'], [], false);
+    $router->post('tools/read_email', [ToolController::class, 'readEmail'], [], false);
+    $router->post('tools/send_email_reply', [ToolController::class, 'sendEmailReply'], [], false);
+    $router->post('tools/send_email', [ToolController::class, 'sendEmail'], [], false);
+    $router->post('tools/review_receipt', [ToolController::class, 'reviewReceipt'], [], false);
 
     // Preview of the system message built from AI Settings.
     $router->get('customer/system_message', [ChatbotController::class, 'customerSystemMessage'], $auth);
 
     /* ----------------------------------------------- AI chatbot: staff --- */
     $router->get('staff/settings', [ChatbotController::class, 'staffSettings'], $auth);
+    $router->get('staff/connections', [ChatbotController::class, 'staffConnections'], $auth);
     $router->get('staff/chat', [ChatbotController::class, 'staffChat'], $auth);
+    $router->post('staff/chat_send', [ChatbotController::class, 'staffChatSend'], $auth);
+    $router->post('staff/order_decide', [ChatbotController::class, 'staffOrderDecide'], $auth);
 
     /* -------------------------------------------------------- profile --- */
     $router->get('profile', [ProfileController::class, 'index'], $auth);
     $router->get('system/settings', [SystemController::class, 'settings'], $auth);
+    // Flow log: signed-in owner, or ?key=<LOG_VIEW_KEY> (checked in SystemController).
+    $router->get('system/logs', [SystemController::class, 'logs']);
+    $router->get('system/logs_feed', [SystemController::class, 'logsFeed']);
     $router->post('profile/update', [ProfileController::class, 'update'], $auth);
     $router->post('profile/password', [ProfileController::class, 'password'], $auth);
 

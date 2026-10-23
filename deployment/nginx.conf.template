@@ -1,0 +1,58 @@
+worker_processes 1;
+error_log __NGINX_ERROR_LOG__ warn;
+pid __NGINX_PID__;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include __NGINX_CONFIG_DIR__/mime.types;
+    default_type application/octet-stream;
+
+    access_log __NGINX_ACCESS_LOG__;
+    sendfile on;
+    client_max_body_size 20m;
+
+    server {
+        listen 0.0.0.0:__PORT__;
+        server_name _;
+        root __APP_ROOT__/public;
+        index index.php;
+
+        location = / {
+            if ($query_string = "") {
+                rewrite ^ /index.php?page=auth&action=login last;
+            }
+            rewrite ^ /index.php last;
+        }
+
+        location ~* ^/uploads/.*\.(php[0-9]?|phtml|phar)(/|$) {
+            return 403;
+        }
+
+        location ~ /\.(?!well-known) {
+            deny all;
+        }
+
+        location / {
+            try_files $uri $uri/ @portal;
+        }
+
+        location @portal {
+            rewrite ^/([a-zA-Z0-9_]+)/([a-zA-Z0-9_]+)/?$ /index.php?page=$1&action=$2 last;
+            rewrite ^/([a-zA-Z0-9_]+)/?$ /index.php?page=$1 last;
+            return 404;
+        }
+
+        location ~ \.php$ {
+            try_files $uri =404;
+            include __NGINX_CONFIG_DIR__/fastcgi_params;
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            fastcgi_param HTTP_HOST $http_host;
+            fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
+            fastcgi_param HTTP_AUTHORIZATION $http_authorization;
+            fastcgi_pass 127.0.0.1:9000;
+        }
+    }
+}

@@ -3,11 +3,12 @@
  * ai_settings/_company_information_form.php - CompanyInformationForm.
  *
  * Table: company_profiles (company_name, company_logo_url, company_background,
- * business_category). company_description is no longer edited here; an existing
+ * business_category, and for the official receipt: registration_no,
+ * company_phone, company_email, company_address). company_description is no longer edited here; an existing
  * value is kept as it is. Field names match the columns so
  * the server can map them directly. The logo is sent as the `company_logo`
- * file; `remove_logo=1` clears the stored one. The payment QR image works the
- * same way (`payment_qr`, `remove_payment_qr=1`).
+ * file; `remove_logo=1` clears the stored one. Payment details (bank, account,
+ * QR) are on Customer Assistant > Setup > Payment Method.
  *
  * Expects: $businessCategories.
  */
@@ -88,40 +89,38 @@ $logoMaxMb = 2;
                         <p class="field-error" id="err-company_background" data-error-for="company_background"></p>
                     </div>
 
-                    <div class="field">
-                        <div class="field-label-row">
-                            <label for="payment_instructions">How customers pay</label>
-                            <span class="char-count" data-counter-for="payment_instructions" aria-hidden="true"></span>
+                    <div class="receipt-details">
+                        <p class="receipt-details__title"><i class="fa-solid fa-address-card" aria-hidden="true"></i> Address &amp; contact</p>
+                        <p class="field-hint">Printed on your official receipts. Recommended so customers know who issued the receipt.</p>
+                        <div class="field">
+                            <label for="company_address">Company address</label>
+                            <textarea id="company_address" name="company_address" rows="3" maxlength="500" autocomplete="street-address"
+                                      placeholder="e.g. 12, Jalan Ampang,&#10;50450 Kuala Lumpur" aria-describedby="err-company_address"></textarea>
+                            <p class="field-error" id="err-company_address" data-error-for="company_address"></p>
                         </div>
-                        <textarea id="payment_instructions" name="payment_instructions" rows="3" maxlength="1000"
-                                  placeholder="e.g. Maybank 5123 4567 8901 (Ah Hock Trading Sdn Bhd) or DuitNow 012-345 6789. Please send the receipt in this chat."
-                                  aria-describedby="hint-payment_instructions err-payment_instructions"></textarea>
-                        <p class="field-hint" id="hint-payment_instructions">When a customer orders through the AI chatbot, it sends them these payment details with the order total.</p>
-                        <p class="field-error" id="err-payment_instructions" data-error-for="payment_instructions"></p>
+
+                        <div class="form-row">
+                            <div class="field">
+                                <label for="registration_no">Registration no. (SSM) <span class="field-optional">(optional)</span></label>
+                                <input id="registration_no" name="registration_no" type="text" maxlength="60" placeholder="e.g. 202301012345 (1501234-A)"
+                                       aria-describedby="err-registration_no">
+                                <p class="field-error" id="err-registration_no" data-error-for="registration_no"></p>
+                            </div>
+                            <div class="field">
+                                <label for="company_phone">Phone <span class="field-optional">(optional)</span></label>
+                                <input id="company_phone" name="company_phone" type="tel" maxlength="40" autocomplete="tel" placeholder="e.g. 03-1234 5678"
+                                       aria-describedby="err-company_phone">
+                                <p class="field-error" id="err-company_phone" data-error-for="company_phone"></p>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="company_email">Email <span class="field-optional">(optional)</span></label>
+                            <input id="company_email" name="company_email" type="email" maxlength="150" autocomplete="email" placeholder="e.g. hello@yourshop.my"
+                                   aria-describedby="err-company_email">
+                            <p class="field-error" id="err-company_email" data-error-for="company_email"></p>
+                        </div>
                     </div>
 
-                    <div class="logo-field qr-field">
-                        <div class="image-preview logo-field__preview qr-field__preview">
-                            <img src="" alt="Payment QR code preview" data-qr-preview hidden>
-                            <span class="image-placeholder" data-qr-placeholder><i class="fa-solid fa-qrcode" aria-hidden="true"></i></span>
-                        </div>
-                        <div class="logo-field__body">
-                            <span class="logo-field__label" id="payment_qr_label">Payment QR code <span class="field-optional">(optional)</span></span>
-                            <input class="sr-only ai-file-input" id="payment_qr" name="payment_qr" type="file"
-                                   accept="image/jpeg,image/png,image/webp" data-qr-input
-                                   data-max-bytes="<?= (int) ($logoMaxMb * 1024 * 1024) ?>"
-                                   aria-labelledby="payment_qr_label" aria-describedby="hint-payment_qr err-payment_qr">
-                            <label class="secondary-btn logo-field__button" for="payment_qr">
-                                <i class="fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i> <span data-qr-choose-label>Choose image</span>
-                            </label>
-                            <p class="field-hint" id="hint-payment_qr">e.g. your DuitNow / bank QR. Sent to the customer on Telegram with the order total. JPG, PNG or WebP · up to <?= (int) $logoMaxMb ?> MB</p>
-                            <span class="field-hint logo-field__file" data-qr-file-name></span>
-                            <label class="checkbox" data-qr-remove-wrap hidden>
-                                <input type="checkbox" name="remove_payment_qr" value="1" data-qr-remove> Remove QR code
-                            </label>
-                        </div>
-                    </div>
-                    <p class="field-error logo-field__error" id="err-payment_qr" data-error-for="payment_qr"></p>
                 </div>
             </section>
 

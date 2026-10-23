@@ -16,7 +16,7 @@ final class Order
 {
     public const STATUSES = [
         'pending_payment'   => 'Awaiting payment',
-        'payment_submitted' => 'Receipt to review',
+        'payment_submitted' => 'Bank ref. to review',
         'paid'              => 'Payment successful',
         'shipped'           => 'Shipped',
         'payment_rejected'  => 'Payment rejected',
@@ -259,7 +259,7 @@ final class Order
 
     /** Sort options for the Orders page. */
     public const SORTS = [
-        'review' => 'Receipts to review first',
+        'review' => 'Bank refs to review first',
         'newest' => 'Newest first',
         'oldest' => 'Oldest first',
         'high'   => 'Total: high to low',
@@ -364,11 +364,21 @@ final class Order
         return array_column($stmt->fetchAll(), 'product_name');
     }
 
+    /** Add orders.official_receipt_sent_at if migration 021 has not run (safe to call again). */
+    public static function ensureReceiptSentColumn(): void
+    {
+        static $done = false;
+        if (!$done) {
+            Database::connection()->exec('ALTER TABLE orders ADD COLUMN IF NOT EXISTS official_receipt_sent_at TIMESTAMPTZ');
+            $done = true;
+        }
+    }
+
     /** Update some columns of one order (updated_at is set too). */
     public function update(int $userId, int $id, array $values): ?array
     {
         $allowed = ['status', 'receipt_path', 'receipt_mime', 'receipt_name', 'receipt_uploaded_at',
-                    'reviewed_at', 'review_note', 'shipped_at'];
+                    'reviewed_at', 'review_note', 'shipped_at', 'official_receipt_sent_at'];
         $values  = array_intersect_key($values, array_flip($allowed));
         if ($values === []) {
             return $this->find($userId, $id);

@@ -5,7 +5,8 @@
  * Expects (from ChatbotController): $title, $audience, $sub, $assistant,
  * $integrations [[icon, name, text, state]] (state: true = connected, 'setup' = available
  * but not configured, false = coming soon), $chatUrl, $productCount (Customer only).
- * Optional: $aiModels + $aiEndpoints - adds the full AI Assistant Settings form
+ * Optional: $aiModels + $aiEndpoints - the page then shows ONLY the AI Assistant
+ * Settings (staff-ai-settings); without them it shows the preview cards. The form
  * (ai_settings/_ai_assistant_settings_form.php) below Assistant and Integrations,
  * loaded and saved by assets/js/ai-settings.js through those endpoints.
  * Saving assistant settings and connecting channels is the next integration
@@ -20,17 +21,21 @@ view('layouts/header', [
 ?>
 <section class="welcome-banner welcome-banner--compact">
     <div class="welcome-text">
-        <h1><?= e($audience) ?> Setting &amp; Integration</h1>
+        <h1><?= e($audience) ?> Assistant Setup</h1>
         <p><?= e($sub) ?></p>
     </div>
     <div class="welcome-actions">
-        <a class="primary-btn" href="<?= e($chatUrl) ?>">
-            <i class="fa-regular fa-comments"></i> Open chat interface
-        </a>
+        <?php if (!empty($connectionsUrl)): ?>
+            <a class="secondary-btn" href="<?= e($connectionsUrl) ?>"><i class="fa-solid fa-plug"></i> Connections</a>
+        <?php else: ?>
+            <a class="primary-btn" href="<?= e($chatUrl) ?>"><i class="fa-regular fa-comments"></i> Open chat interface</a>
+        <?php endif; ?>
     </div>
 </section>
 
 <div class="page-body">
+
+    <?php if ($aiEndpoints === null): ?>
 
     <div class="flash flash--info" role="status">
         <i class="fa-solid fa-circle-info"></i>
@@ -118,8 +123,14 @@ view('layouts/header', [
 
     </div>
 
+    <?php endif; ?>
+
+    <?php if (!empty($steps)): ?>
+        <?php view('partials/setup_checklist', ['steps' => $steps, 'tryUrl' => $chatUrl, 'tryLabel' => 'Open staff chat']); ?>
+    <?php endif; ?>
+
     <?php if ($aiEndpoints !== null): ?>
-        <div class="ai-settings staff-ai-settings"
+        <div class="ai-settings staff-ai-settings" id="assistant"
              data-ai-settings
              data-endpoints="<?= e(json_encode($aiEndpoints, JSON_UNESCAPED_SLASHES)) ?>">
             <div class="staff-ai-heading">

@@ -13,6 +13,7 @@
  *       "systemMessage": "<filled src/Prompts/system_message.md>",
  *       "modelName":     "<ai_assistant_settings.ai_model>",
  *       "temperature":   0.7,
+ *       "anthropicApiKey" (Claude) or "openAIApiKey": "<the business's AI key>",
  *       "vars": { company + tool details, see payload() }
  *     }
  *   }
@@ -23,9 +24,10 @@
  * In the chatflow, "Override Configuration" must allow systemMessage,
  * modelName, temperature and the vars used here.
  *
- * Chatflow choice: FLOWISE_CHATFLOW_ID, or a per-provider one
- * (FLOWISE_CHATFLOW_ID_ANTHROPIC / FLOWISE_CHATFLOW_ID_DEEPSEEK) when the
- * providers need different chat-model nodes.
+ * Chatflow choice: see chatflowFor() - per provider and per audience
+ * (customer / staff), e.g. FLOWISE_CHATFLOW_ID_ANTHROPIC and
+ * FLOWISE_STAFF_CHATFLOW_ID_ANTHROPIC for Claude. The API key goes in
+ * overrideConfig as anthropicApiKey (Claude) or openAIApiKey (others).
  */
 declare(strict_types=1);
 
@@ -50,12 +52,14 @@ final class FlowiseService
      */
     public function ask(array $config, string $systemMessage, string $question, string $sessionId, array $context = []): array
     {
-        if (!$this->isConfigured($config['provider'])) {
-            FlowLog::write('flowise.not_configured', ['flowise_api_url' => FLOWISE_API_URL, 'chatflow_id' => $this->chatflowId($config['provider'])]);
+        // A caller may pick its own chatflow (the staff assistant: FLOWISE_STAFF_CHATFLOW_ID...).
+        $chatflow = trim((string) ($context['_chatflow'] ?? '')) ?: self::chatflowFor($config['provider']);
+        if (FLOWISE_API_URL === '' || $chatflow === '') {
+            FlowLog::write('flowise.not_configured', ['flowise_api_url' => FLOWISE_API_URL, 'chatflow_id' => $chatflow]);
             return ['ok' => false, 'reply' => '', 'error' => 'Flowise is not configured (set FLOWISE_API_URL and FLOWISE_CHATFLOW_ID in .env).'];
         }
 
-        $url     = FLOWISE_API_URL . '/api/v1/prediction/' . rawurlencode($this->chatflowId($config['provider']));
+        $url     = FLOWISE_API_URL . '/api/v1/prediction/' . rawurlencode($chatflow);
         $headers = ['Content-Type' => 'application/json'];
         if (FLOWISE_API_KEY !== '') {
             $headers['Authorization'] = 'Bearer ' . FLOWISE_API_KEY;
@@ -123,7 +127,10 @@ final class FlowiseService
             return ['ok' => false, 'reply' => '', 'error' => 'Flowise returned an empty reply.'];
         }
 
-        return ['ok' => true, 'reply' => $reply, 'error' => null];
+        // usedTools: what the agent really called (the staff assistant checks a
+        // "sent" claim against it).
+        $usedTools = is_array($response['json']) ? (array) ($response['json']['usedTools'] ?? []) : [];
+        return ['ok' => true, 'reply' => $reply, 'error' => null, 'tools' => $usedTools];
     }
 
     /**
@@ -143,7 +150,7 @@ final class FlowiseService
             // Signed for this business and this customer chat (buy_product uses the chat).
             'tool_token'        => ToolToken::issue((int) $config['user_id'], ToolToken::TTL_SECONDS,
                 isset($context['channel'], $context['customer_chat_id']) ? $context['channel'] . ':' . $context['customer_chat_id'] : '') ?? '',
-        ] + array_map('strval', $context);
+        ] + array_map('strval', array_filter($context, static fn ($k): bool => !str_starts_with((string) $k, '_'), ARRAY_FILTER_USE_KEY));
 
         // The business's own AI provider key (Anthropic / DeepSeek), for a
         // chatflow that reads it from $vars. Switch off with
@@ -152,15 +159,29 @@ final class FlowiseService
             $vars['provider_api_key'] = $config['api_key'];
         }
 
+        $override = [
+            'sessionId'     => $sessionId,
+            'systemMessage' => $systemMessage,
+            'modelName'     => $config['ai_model'],
+        ];
+        // Newer Claude models (Haiku 5.5) reject `temperature` ("deprecated for
+        // this model"), so it is not sent for them. Claude Haiku 4.5 and the
+        // other providers still get it.
+        if (!in_array($config['ai_model'], \Src\Controllers\AiSettingsController::NO_TEMPERATURE_MODELS, true)) {
+            $override['temperature'] = round((float) $config['temperature'], 2);
+        }
+        // The chat model node's own key field: ChatAnthropic calls it
+        // anthropicApiKey, ChatOpenAI / OpenAI-compatible nodes openAIApiKey.
+        // Used only if that field is allowed in the chatflow's Override
+        // Configuration; otherwise Flowise ignores it.
+        if (isset($vars['provider_api_key'])) {
+            $override[self::keyField($config['provider'])] = $vars['provider_api_key'];
+        }
+        $override['vars'] = $vars;
+
         return [
             'question'       => $question,
-            'overrideConfig' => [
-                'sessionId'     => $sessionId,
-                'systemMessage' => $systemMessage,
-                'modelName'     => $config['ai_model'],
-                'temperature'   => round((float) $config['temperature'], 2),
-                'vars'          => $vars,
-            ],
+            'overrideConfig' => $override,
         ];
     }
 
@@ -222,16 +243,41 @@ final class FlowiseService
         return is_string($json) ? trim($json) : trim($raw);
     }
 
-    private function chatflowId(?string $provider): string
+    /**
+     * Which chatflow answers. Each provider can have its own chatflow (a Claude
+     * chatflow uses a ChatAnthropic node, the others ChatOpenAI):
+     *
+     *   customer  FLOWISE_CHATFLOW_ID_<PROVIDER>        -> FLOWISE_CHATFLOW_ID
+     *   staff     FLOWISE_STAFF_CHATFLOW_ID_<PROVIDER>  -> FLOWISE_STAFF_CHATFLOW_ID
+     *             (empty: the customer chatflow for that provider)
+     *
+     * <PROVIDER> = ANTHROPIC, AGNES, OPENAI or DEEPSEEK (from the AI model chosen).
+     */
+    public static function chatflowFor(?string $provider, string $audience = 'customer'): string
     {
-        if ($provider !== null) {
-            $specific = trim((string) env('FLOWISE_CHATFLOW_ID_' . strtoupper((string) preg_replace('/[^A-Za-z]/', '', $provider)), ''));
-            if ($specific !== '') {
-                return $specific;
+        $suffix = $provider !== null ? strtoupper((string) preg_replace('/[^A-Za-z]/', '', $provider)) : '';
+        $names  = $audience === 'staff'
+            ? ['FLOWISE_STAFF_CHATFLOW_ID_' . $suffix, 'FLOWISE_STAFF_CHATFLOW_ID']
+            : [];
+        $names[] = 'FLOWISE_CHATFLOW_ID_' . $suffix;
+
+        foreach ($names as $name) {
+            if (!str_ends_with($name, '_') && ($id = trim((string) env($name, ''))) !== '') {
+                return $id;
             }
         }
-
         return FLOWISE_CHATFLOW_ID;
+    }
+
+    /** The override name of the chat model's API key for this provider. */
+    public static function keyField(?string $provider): string
+    {
+        return strcasecmp((string) $provider, 'Anthropic') === 0 ? 'anthropicApiKey' : 'openAIApiKey';
+    }
+
+    private function chatflowId(?string $provider): string
+    {
+        return self::chatflowFor($provider);
     }
 
     private function sendProviderKey(): bool

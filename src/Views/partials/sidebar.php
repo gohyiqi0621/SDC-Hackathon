@@ -2,8 +2,9 @@
 /**
  * partials/sidebar.php - the left navigation, built from nav_items().
  *
- * Expects: $user. Groups (Financial, AI Chatbot) open automatically when one
- * of their pages is active. AI Chatbot is split into Customer and Staff. Logout is a POST form so a link cannot sign out.
+ * Expects: $user. Groups (Financial, Customer Assistant, Staff Assistant) open
+ * automatically when one of their pages is active. Orders shows how many
+ * receipts wait for review; an orange dot marks an unfinished assistant setup. Logout is a POST form so a link cannot sign out.
  */
 $current = page_key();
 $prevSection = null;
@@ -37,10 +38,14 @@ $prevSection = null;
             <?php endif; ?>
 
             <?php if ($item['kind'] === 'link'): ?>
-                <a class="nav-link<?= $current === $item['key'] ? ' active' : '' ?>"
-                   href="<?= e($item['url']) ?>"<?= $current === $item['key'] ? ' aria-current="page"' : '' ?>>
+                <?php $active = nav_is_active($item, $current); ?>
+                <a class="nav-link<?= $active ? ' active' : '' ?>"
+                   href="<?= e($item['url']) ?>"<?= $active ? ' aria-current="page"' : '' ?>>
                     <i class="<?= e($item['icon']) ?>"></i>
                     <span><?= e($item['label']) ?></span>
+                    <?php if (!empty($item['badge'])): ?>
+                        <b class="nav-badge" title="<?= e($item['badge_title'] ?? '') ?>"><?= e($item['badge']) ?></b>
+                    <?php endif; ?>
                 </a>
 
             <?php elseif ($item['kind'] === 'group'): ?>
@@ -49,6 +54,7 @@ $prevSection = null;
                     <button class="nav-link" type="button" data-nav-group aria-expanded="<?= $open ? 'true' : 'false' ?>">
                         <i class="<?= e($item['icon']) ?>"></i>
                         <span><?= e($item['label']) ?></span>
+                        <?php if (!empty($item['dot'])): ?><b class="nav-dot" title="<?= e($item['dot']) ?>"></b><?php endif; ?>
                         <i class="fa-solid fa-chevron-down nav-caret"></i>
                     </button>
                     <div class="nav-sub">
@@ -62,6 +68,7 @@ $prevSection = null;
                                href="<?= e($child['url']) ?>"<?= $active ? ' aria-current="page"' : '' ?>>
                                 <i class="<?= e($child['icon']) ?>"></i>
                                 <span><?= e($child['label']) ?></span>
+                                <?php if (!empty($child['dot'])): ?><b class="nav-dot" title="<?= e($child['dot']) ?>"></b><?php endif; ?>
                             </a>
                         <?php endforeach; ?>
                     </div>

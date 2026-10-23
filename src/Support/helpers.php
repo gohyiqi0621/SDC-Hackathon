@@ -359,13 +359,16 @@ function fmt_datetime(?string $value, string $format = 'j M Y, H:i'): string
  * The sidebar navigation. Also drives the page-title lookup, so the two can
  * never drift apart. Icons are Font Awesome classes, matching the dashboard.
  *
- * Financial and AI Chatbot are collapsible groups; Profile and Logout live in
+ * Financial and the two AI assistants are collapsible groups; Company Profile,
+ * My Profile and Logout live in
  * the account section. There is no admin portal anywhere in this app.
  *
  * @return array<int, array<string, mixed>>
  */
 function nav_items(): array
 {
+    $status = nav_status();
+
     return [
         [
             'kind'  => 'link',
@@ -374,6 +377,18 @@ function nav_items(): array
             'icon'  => 'fa-solid fa-house',
             'url'   => url('dashboard'),
             'group' => 'Workspace',
+        ],
+        [
+            'kind'  => 'link',
+            'key'   => 'orders',
+            'label' => 'Orders',
+            'icon'  => 'fa-solid fa-bag-shopping',
+            'url'   => url('orders'),
+            'group' => 'Workspace',
+            'match' => ['orders', 'orders/receipt'],
+            // Receipts waiting for review.
+            'badge' => $status['to_review'] > 0 ? (string) $status['to_review'] : null,
+            'badge_title' => $status['to_review'] . ' bank reference' . ($status['to_review'] === 1 ? '' : 's') . ' to review',
         ],
         [
             'kind'     => 'group',
@@ -388,27 +403,47 @@ function nav_items(): array
         ],
         [
             'kind'     => 'group',
-            'key'      => 'chatbot',
-            'label'    => 'AI Chatbot',
+            'key'      => 'customer',
+            'label'    => 'Customer Assistant',
             'icon'     => 'fa-solid fa-robot',
-            'group'    => 'Workspace',
-            // Pages that keep this group open and highlighted.
-            'match'    => ['customer', 'staff', 'products', 'categories', 'orders'],
+            'group'    => 'AI Assistant',
+            'match'    => ['customer', 'products', 'categories'],
+            'dot'      => $status['customer_todo'] ? 'Setup not finished' : null,
             'children' => [
-                ['heading' => 'Customer'],
-                ['key' => 'customer/settings', 'label' => 'Setting & Integration', 'icon' => 'fa-solid fa-sliders',       'url' => url('customer', ['action' => 'settings'])],
-                ['key' => 'products',          'label' => 'Product & Service',     'icon' => 'fa-solid fa-box-open',      'url' => url('products'), 'match' => ['products', 'categories']],
-                ['key' => 'orders',            'label' => 'Orders',                'icon' => 'fa-solid fa-bag-shopping',  'url' => url('orders'), 'match' => ['orders', 'orders/receipt']],
-                ['key' => 'customer/chat',     'label' => 'Chat Interface',        'icon' => 'fa-regular fa-comments',    'url' => url('customer', ['action' => 'chat'])],
-                ['heading' => 'Staff'],
-                ['key' => 'staff/settings',    'label' => 'Setting & Integration', 'icon' => 'fa-solid fa-sliders',       'url' => url('staff', ['action' => 'settings'])],
-                ['key' => 'staff/chat',        'label' => 'Chat Interface',        'icon' => 'fa-regular fa-comments',    'url' => url('staff', ['action' => 'chat'])],
+                ['key' => 'customer/chat',        'label' => 'Chats',                'icon' => 'fa-regular fa-comments',   'url' => url('customer', ['action' => 'chat'])],
+                ['key' => 'products',             'label' => 'Products & Services',  'icon' => 'fa-solid fa-box-open',     'url' => url('products'), 'match' => ['products', 'categories']],
+                ['key' => 'customer/settings',    'label' => 'Setup',                'icon' => 'fa-solid fa-list-check',   'url' => url('customer', ['action' => 'settings']),
+                 'dot' => $status['customer_todo'] ? 'Setup not finished' : null],
+                ['key' => 'customer/connections', 'label' => 'Connections',          'icon' => 'fa-solid fa-plug',         'url' => url('customer', ['action' => 'connections'])],
+            ],
+        ],
+        [
+            'kind'     => 'group',
+            'key'      => 'staff',
+            'label'    => 'Staff Assistant',
+            'icon'     => 'fa-solid fa-user-tie',
+            'group'    => 'AI Assistant',
+            'match'    => ['staff'],
+            'dot'      => $status['staff_todo'] ? 'Setup not finished' : null,
+            'children' => [
+                ['key' => 'staff/chat',        'label' => 'Chat',        'icon' => 'fa-regular fa-comments',  'url' => url('staff', ['action' => 'chat'])],
+                ['key' => 'staff/settings',    'label' => 'Setup',       'icon' => 'fa-solid fa-list-check',  'url' => url('staff', ['action' => 'settings']),
+                 'dot' => $status['staff_todo'] ? 'Setup not finished' : null],
+                ['key' => 'staff/connections', 'label' => 'Connections', 'icon' => 'fa-solid fa-plug',        'url' => url('staff', ['action' => 'connections'])],
             ],
         ],
         [
             'kind'  => 'link',
+            'key'   => 'company',
+            'label' => 'Company Profile',
+            'icon'  => 'fa-solid fa-building',
+            'url'   => url('company'),
+            'group' => 'Settings',
+        ],
+        [
+            'kind'  => 'link',
             'key'   => 'profile',
-            'label' => 'Profile',
+            'label' => 'My Profile',
             'icon'  => 'fa-solid fa-circle-user',
             'url'   => url('profile'),
             'group' => 'Account',
@@ -421,6 +456,39 @@ function nav_items(): array
             'group' => 'Account',
         ],
     ];
+}
+
+/**
+ * Numbers for the sidebar: receipts to review, and whether the customer /
+ * staff assistant setup is unfinished. Once per request; never breaks the page.
+ *
+ * @return array{to_review: int, customer_todo: bool, staff_todo: bool}
+ */
+function nav_status(): array
+{
+    static $status = null;
+    if ($status !== null) {
+        return $status;
+    }
+    $status = ['to_review' => 0, 'customer_todo' => false, 'staff_todo' => false];
+    $userId = (int) ($_SESSION['user_id'] ?? 0);
+    if ($userId <= 0) {
+        return $status;
+    }
+    try {
+        $stmt = \Src\Support\Database::connection()->prepare("SELECT COUNT(*) FROM orders WHERE user_id = ? AND status = 'payment_submitted'");
+        $stmt->execute([$userId]);
+        $status['to_review'] = (int) $stmt->fetchColumn();
+    } catch (\Throwable $e) {
+        // orders table not created yet
+    }
+    try {
+        $status['customer_todo'] = !\Src\Services\SetupStatus::complete(\Src\Services\SetupStatus::customer($userId));
+        $status['staff_todo']    = !\Src\Services\SetupStatus::complete(\Src\Services\SetupStatus::staff($userId));
+    } catch (\Throwable $e) {
+        // settings tables not created yet
+    }
+    return $status;
 }
 
 /** The sanitized route key that marks the current nav item as active. */
@@ -459,14 +527,18 @@ function page_title_for(string $key): string
 {
     $titles = [
         'dashboard'           => 'Dashboard',
-        'profile'             => 'Profile',
+        'profile'             => 'My Profile',
+        'company'             => 'Company Profile',
+        'orders'              => 'Orders',
         'financial/invoice'   => 'Invoice',
         'financial/claims'    => 'Claims',
-        'customer/settings'   => 'AI Settings & Integration',
-        'customer/chat'       => 'Customer Chat Interface',
-        'staff/settings'      => 'Staff Setting & Integration',
-        'staff/chat'          => 'Staff Chat Interface',
-        'products'            => 'Product & Service',
+        'customer/settings'   => 'Customer Assistant Setup',
+        'customer/connections'=> 'Customer Assistant Connections',
+        'customer/chat'       => 'Customer Chats',
+        'staff/settings'      => 'Staff Assistant Setup',
+        'staff/connections'   => 'Staff Assistant Connections',
+        'staff/chat'          => 'Staff Chat',
+        'products'            => 'Products & Services',
         'products/create'     => 'Add Product / Service',
         'products/edit'       => 'Edit Product / Service',
         'categories'          => 'Categories',

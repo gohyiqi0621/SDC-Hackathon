@@ -18,6 +18,8 @@
  *
  * Expects: $aiModels (AiSettingsController::AI_MODELS: id => [label, provider]).
  * Optional: $audience ('customer' default, or 'staff' on Staff Setting & Integration).
+ * Staff: the System instructions (SOP) panel is replaced by "Functions"
+ * checkboxes (check email / invoice / claims / orders), saved as `functions`.
  */
 $audience = ($audience ?? 'customer') === 'staff' ? 'staff' : 'customer';
 $byProvider = [];
@@ -31,6 +33,9 @@ $personalities = [
     'persuasive'   => ['Persuasive',   'fa-solid fa-bullhorn',      'Confident, highlights benefits and next steps.'],
     'custom'       => ['Custom',       'fa-solid fa-wand-magic-sparkles', 'Describe the exact tone yourself.'],
 ];
+
+// Staff assistant: functions it may use (staff_ai_assistant_settings.functions).
+$staffFunctions = \Src\Controllers\AiSettingsController::STAFF_FUNCTIONS;
 
 $sections = [
     'service'  => ['Customer Service SOP',  'fa-solid fa-headset',        'Steps for complaints, order checks, refunds and returns.'],
@@ -150,6 +155,37 @@ $sections = [
                     </div>
                 </section>
 
+<?php if ($audience === 'staff'): ?>
+                <section class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Functions</h2>
+                            <p>What the staff assistant is allowed to look up for your team.</p>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <fieldset class="field">
+                            <legend class="sr-only">Functions</legend>
+                            <div class="function-grid">
+                                <?php foreach ($staffFunctions as $key => [$label, $icon, $hint]): ?>
+                                    <label class="function-option">
+                                        <input type="checkbox" name="fn_<?= e($key) ?>" data-function="<?= e($key) ?>">
+                                        <span class="function-card">
+                                            <span class="function-icon"><i class="<?= e($icon) ?>" aria-hidden="true"></i></span>
+                                            <span class="function-text">
+                                                <strong><?= e($label) ?></strong>
+                                                <small><?= e($hint) ?></small>
+                                            </span>
+                                            <span class="function-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
+                                        </span>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                            <p class="field-error" data-error-for="functions"></p>
+                        </fieldset>
+                    </div>
+                </section>
+<?php else: ?>
                 <section class="panel">
                     <div class="panel-header">
                         <div>
@@ -201,15 +237,12 @@ $sections = [
 
                             <div class="sop-footer">
                                 <span class="char-count" data-sop-count></span>
-                                <details class="sop-combined">
-                                    <summary>Show the combined text that will be saved</summary>
-                                    <pre data-sop-combined></pre>
-                                </details>
                             </div>
                             <p class="field-error" data-error-for="system_instructions"></p>
                         </div>
                     </div>
                 </section>
+<?php endif; ?>
         </div>
 
         <?php view('ai_settings/_save_button'); ?>

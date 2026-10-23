@@ -35,6 +35,41 @@ final class ChatMessage
            ->execute([$userId, $channel, $chatId, $role, $content, $status]);
     }
 
+    /** Allow the 'staff' channel (migration 017; safe to rerun). */
+    public function allowStaffChannel(): void
+    {
+        $db = Database::connection();
+        $db->exec('ALTER TABLE chat_messages DROP CONSTRAINT IF EXISTS chat_messages_channel_check');
+        $db->exec("ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_channel_check CHECK (channel IN ('telegram', 'web', 'staff'))");
+    }
+
+    /** Keep why the AI did not answer on this chat's latest fallback/skipped reply (migration 018). */
+    public function setError(int $userId, string $channel, string $chatId, string $reason): void
+    {
+        try {
+            Database::connection()->prepare(
+                "UPDATE chat_messages SET error_reason = ?
+                  WHERE id = (SELECT id FROM chat_messages WHERE user_id = ? AND channel = ? AND chat_id = ?
+                                AND role = 'assistant' AND status <> 'ok' ORDER BY id DESC LIMIT 1)"
+            )->execute([mb_substr($reason, 0, 2000), $userId, $channel, $chatId]);
+        } catch (\PDOException $e) {
+            // migration 018 not run yet
+        }
+    }
+
+    /** ", error_reason" when migration 018 has run (checked once per request). */
+    private static function errorColumn(): string
+    {
+        static $sql = null;
+        if ($sql === null) {
+            $has = (bool) Database::connection()->query(
+                "SELECT 1 FROM information_schema.columns WHERE table_name = 'chat_messages' AND column_name = 'error_reason'"
+            )->fetchColumn();
+            $sql = $has ? ', error_reason' : ', NULL AS error_reason';
+        }
+        return $sql;
+    }
+
     /**
      * One row per customer conversation, newest activity first: channel,
      * chat_id, last message, its time, message count, and the customer's
@@ -65,7 +100,7 @@ final class ChatMessage
                     $nameSql AS customer_name,
                     $userSql AS customer_username
                FROM (SELECT user_id, channel, chat_id, COUNT(*) AS messages, MAX(created_at) AS last_at
-                       FROM chat_messages WHERE user_id = ?
+                       FROM chat_messages WHERE user_id = ? AND channel <> 'staff'
                       GROUP BY user_id, channel, chat_id) c
               ORDER BY c.last_at DESC
               LIMIT " . max(1, min(500, $limit))
@@ -97,7 +132,7 @@ final class ChatMessage
     public function after(int $userId, string $channel, string $chatId, int $afterId, int $limit = 200): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT id, role, content, status, created_at FROM chat_messages
+            'SELECT id, role, content, status, created_at' . self::errorColumn() . ' FROM chat_messages
               WHERE user_id = ? AND channel = ? AND chat_id = ? AND id > ?
               ORDER BY id LIMIT ' . max(1, min(500, $limit))
         );
@@ -106,12 +141,44 @@ final class ChatMessage
         return $stmt->fetchAll();
     }
 
+    /**
+     * Staff > Chat Interface: this staff member's chat sessions, newest first.
+     * chat_id is "staff-<id>" or "staff-<id>-<session>"; title = the first
+     * thing they asked.
+     *
+     * @return list<array{chat_id: string, title: string, started_at: string, last_at: string, messages: int}>
+     */
+    public function staffSessions(int $userId, int $limit = 30): array
+    {
+        $stmt = Database::connection()->prepare(
+            "SELECT s.chat_id, s.started_at, s.last_at, s.messages,
+                    (SELECT m.content FROM chat_messages m
+                      WHERE m.user_id = s.user_id AND m.channel = 'staff' AND m.chat_id = s.chat_id AND m.role = 'customer'
+                      ORDER BY m.id LIMIT 1) AS title
+               FROM (SELECT user_id, chat_id, MIN(created_at) AS started_at, MAX(created_at) AS last_at, COUNT(*) AS messages
+                       FROM chat_messages
+                      WHERE user_id = ? AND channel = 'staff' AND (chat_id = ? OR chat_id LIKE ?)
+                      GROUP BY user_id, chat_id) s
+              ORDER BY s.last_at DESC
+              LIMIT " . max(1, min(100, $limit))
+        );
+        $stmt->execute([$userId, 'staff-' . $userId, 'staff-' . $userId . '-%']);
+
+        return array_map(static fn (array $r): array => [
+            'chat_id'    => (string) $r['chat_id'],
+            'title'      => (string) ($r['title'] ?? ''),
+            'started_at' => (string) $r['started_at'],
+            'last_at'    => (string) $r['last_at'],
+            'messages'   => (int) $r['messages'],
+        ], $stmt->fetchAll());
+    }
+
     /** The latest messages of one conversation, oldest first. */
     public function recent(int $userId, string $channel, string $chatId, int $limit = 30): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT id, role, content, status, created_at
-               FROM (SELECT id, role, content, status, created_at
+            'SELECT id, role, content, status, created_at, error_reason
+               FROM (SELECT id, role, content, status, created_at' . self::errorColumn() . '
                        FROM chat_messages
                       WHERE user_id = ? AND channel = ? AND chat_id = ?
                       ORDER BY created_at DESC, id DESC

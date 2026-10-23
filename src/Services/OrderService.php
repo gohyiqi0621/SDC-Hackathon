@@ -10,7 +10,12 @@
  *                    "payment_submitted", the customer is thanked and the
  *                    staff chat gets the receipt with the order details.
  *   approve()        staff approved on the Orders page: "paid", and the
- *                    customer gets "Payment verified" on Telegram.
+ *                    customer gets "Payment verified" and the official
+ *                    receipt (PDF, OfficialReceiptPdf) on Telegram.
+ *   officialReceipt() the official receipt PDF of a paid / shipped order.
+ *
+ * Wording: what the customer sends is the "bank reference" (transfer slip /
+ * payment proof); the "official receipt" is the PDF the business issues.
  *   reject()         staff rejected: the customer is asked for a new receipt.
  *   cancel()         staff cancelled the order; the customer is told.
  */
@@ -20,6 +25,7 @@ namespace Src\Services;
 
 use RuntimeException;
 use Src\Models\ChatMessage;
+use Src\Models\CompanyProfile;
 use Src\Models\Order;
 use Src\Models\TelegramIntegration;
 use Src\Support\Crypto;
@@ -30,7 +36,7 @@ final class OrderService
     /**
      * @param array  $integration telegram_integrations row of the business
      * @param array  $message     the Telegram message (has a photo or document)
-     * @return bool  true when the file was taken as a payment receipt
+     * @return bool  true when the file was taken as a bank reference
      */
     public function attachReceipt(array $integration, string $token, array $message): bool
     {
@@ -62,7 +68,7 @@ final class OrderService
 
         if ($stored === null) {
             FlowLog::write('order.receipt_failed', ['order_no' => $order['order_no'], 'file' => $file]);
-            $telegram->sendText($token, $chatId, 'Sorry, I could not read that file. Please send the payment receipt as a photo, or as a PDF / JPG / PNG file (10 MB max).');
+            $telegram->sendText($token, $chatId, 'Sorry, I could not read that file. Please send your bank reference (transfer slip) as a photo, or as a PDF / JPG / PNG file (10 MB max).');
             return true;
         }
 
@@ -84,10 +90,10 @@ final class OrderService
         FlowLog::write('order.receipt_received', ['order_no' => $order['order_no'], 'mime' => $stored['file_mime'], 'size' => $stored['file_size']]);
 
         $total = format_money($order['total'], $order['currency']);
-        $thanks = "🧾 Thank you! We received your payment receipt for order {$order['order_no']} ({$total}).\n"
+        $thanks = "🧾 Thank you! We received your bank reference for order {$order['order_no']} ({$total}).\n"
             . 'Our team will verify it and let you know here shortly.';
         $telegram->sendText($token, $chatId, $thanks);
-        $this->remember($userId, $order, 'customer', '📎 [Payment receipt sent for ' . $order['order_no'] . ']');
+        $this->remember($userId, $order, 'customer', '📎 [Bank reference sent for ' . $order['order_no'] . ']');
         $this->remember($userId, $order, 'assistant', $thanks);
 
         // Staff alert with the approve link: never into the customer's own chat
@@ -97,7 +103,7 @@ final class OrderService
             FlowLog::write('staff.alert_skipped', ['order_no' => $order['order_no'],
                 'reason' => $staff === '' ? 'no staff chat linked' : 'staff chat is the same Telegram account as the customer']);
         } else {
-            $caption = "🧾 Payment receipt to review\n"
+            $caption = "🧾 Bank reference to review\n"
                 . "Order: {$order['order_no']}\n"
                 . 'Customer: ' . $this->customerLabel($order) . "\n"
                 . "Total: {$total}\n"
@@ -139,7 +145,7 @@ final class OrderService
             . 'Total: ' . format_money($order['total'], $order['currency']) . "\n"
             . $this->itemSummary((int) $order['id'])
             . (!empty($order['delivery_note']) ? "\nNote: {$order['delivery_note']}" : '') . "\n"
-            . "Waiting for the customer's payment receipt. You will get another message when it arrives.\n"
+            . "Waiting for the customer's bank reference. You will get another message when it arrives.\n"
             . 'Orders: ' . PUBLIC_APP_URL . '/?page=orders';
         $sent = (new TelegramService())->sendText($token, $staff, $text);
         FlowLog::write('staff.new_order_alert', ['order_no' => $order['order_no'], 'sent' => $sent]);
@@ -171,7 +177,7 @@ final class OrderService
         }
 
         $total   = format_money($order['total'], $order['currency']);
-        $caption = "Scan to pay {$total} for order {$order['order_no']}.\nThen send the payment receipt (photo or PDF) in this chat.";
+        $caption = "Scan to pay {$total} for order {$order['order_no']}.\nThen send your bank reference (transfer slip, photo or PDF) in this chat.";
         $sent    = (new TelegramService())->sendPhoto($token, (string) $order['customer_chat_id'], $path, $caption);
         if ($sent) {
             $this->remember($userId, $order, 'assistant', '🖼 [Payment QR code] ' . $caption);
@@ -179,12 +185,12 @@ final class OrderService
         return $sent;
     }
 
-    /** Staff approved the receipt. */
+    /** Staff approved the bank reference. */
     public function approve(int $userId, array $order): array
     {
         // Only after the customer sent a receipt.
         if ($order['status'] !== 'payment_submitted' || empty($order['receipt_path'])) {
-            throw new RuntimeException('The customer has not sent a payment receipt for this order yet.');
+            throw new RuntimeException('The customer has not sent a bank reference for this order yet.');
         }
 
         $order = (new Order())->update($userId, (int) $order['id'], [
@@ -192,20 +198,113 @@ final class OrderService
         ]) ?? $order;
 
         $total = format_money($order['total'], $order['currency']);
-        $text  = "✅ Payment verified!\nWe have received {$total} for order {$order['order_no']}. Thank you for your order.";
+        $text  = "✅ Payment verified!\nWe have received {$total} for order {$order['order_no']}. Thank you for your order.\n"
+            . 'Your official receipt (' . OfficialReceiptPdf::receiptNo($order) . ') is attached below.';
         $sent  = $this->notifyCustomer($userId, $order, $text);
         $this->remember($userId, $order, 'assistant', $text);
+        $receiptSent = $sent && $this->sendOfficialReceipt($userId, $order);
+        if ($receiptSent) {
+            $order = $this->markReceiptSent($userId, $order);
+        }
 
-        FlowLog::write('order.approved', ['order_no' => $order['order_no'], 'customer_notified' => $sent]);
+        FlowLog::write('order.approved', ['order_no' => $order['order_no'], 'customer_notified' => $sent, 'official_receipt_sent' => $receiptSent]);
 
-        return ['order' => $order, 'notified' => $sent];
+        return ['order' => $order, 'notified' => $sent, 'receipt_sent' => $receiptSent];
     }
 
-    /** Staff rejected the receipt: the customer can send a new one. */
+    /**
+     * The official receipt PDF (bytes) of a paid / shipped order, with the
+     * business details from Company Profile.
+     */
+    public function officialReceipt(int $userId, array $order): string
+    {
+        try {
+            $company = (new CompanyProfile())->find($userId) ?? [];
+        } catch (\Throwable $e) {
+            $company = [];
+        }
+        return (new OfficialReceiptPdf())->render($order, (new Order())->items((int) $order['id']), $company);
+    }
+
+    /**
+     * Send the official receipt PDF to the customer on Telegram again (paid /
+     * shipped orders only): "Send receipt" on the Orders page, or the customer
+     * asks for it in the chat (tools/send_official_receipt).
+     */
+    public function resendOfficialReceipt(int $userId, array $order): bool
+    {
+        if (!in_array((string) $order['status'], OfficialReceiptPdf::STATUSES, true)) {
+            throw new RuntimeException('The official receipt is issued after the payment is approved.');
+        }
+        if ($order['channel'] !== 'telegram') {
+            throw new RuntimeException('This customer did not order on Telegram. Download the receipt and send it yourself.');
+        }
+        if (!$this->sendOfficialReceipt($userId, $order)) {
+            return false;
+        }
+        $this->markReceiptSent($userId, $order);
+        FlowLog::write('order.official_receipt_resent', ['order_no' => $order['order_no']]);
+        return true;
+    }
+
+    private function markReceiptSent(int $userId, array $order): array
+    {
+        try {
+            Order::ensureReceiptSentColumn();
+            return (new Order())->update($userId, (int) $order['id'], ['official_receipt_sent_at' => date('c')]) ?? $order;
+        } catch (\Throwable $e) {
+            return $order;
+        }
+    }
+
+    /** Send the official receipt PDF to the customer on Telegram. */
+    private function sendOfficialReceipt(int $userId, array $order): bool
+    {
+        if ($order['channel'] !== 'telegram') {
+            return false;
+        }
+        $token = $this->botToken($userId);
+        if ($token === null) {
+            return false;
+        }
+        try {
+            $pdf = $this->officialReceipt($userId, $order);
+        } catch (\Throwable $e) {
+            FlowLog::write('order.official_receipt_failed', ['order_no' => $order['order_no'], 'error' => $e->getMessage()]);
+            return false;
+        }
+        $tmp = tempnam(sys_get_temp_dir(), 'or');
+        if ($tmp === false || file_put_contents($tmp, $pdf) === false) {
+            return false;
+        }
+        $ok = (new TelegramService())->sendDocument($token, (string) $order['customer_chat_id'], $tmp,
+            OfficialReceiptPdf::fileName($order), '🧾 Official receipt ' . OfficialReceiptPdf::receiptNo($order) . ' · ' . $order['order_no']);
+        @unlink($tmp);
+        if ($ok) {
+            $this->remember($userId, $order, 'assistant', '📄 [Official receipt ' . OfficialReceiptPdf::receiptNo($order) . ' sent as PDF]');
+        }
+        return $ok;
+    }
+
+    /** The saved Telegram bot token of this business, or null. */
+    private function botToken(int $userId): ?string
+    {
+        $integration = (new TelegramIntegration())->find($userId);
+        if ($integration === null || empty($integration['bot_token_encrypted'])) {
+            return null;
+        }
+        try {
+            return Crypto::decrypt((string) $integration['bot_token_encrypted']);
+        } catch (RuntimeException $e) {
+            return null;
+        }
+    }
+
+    /** Staff rejected the bank reference: the customer can send a new one. */
     public function reject(int $userId, array $order, string $reason): array
     {
         if ($order['status'] !== 'payment_submitted') {
-            throw new RuntimeException('Only orders with a receipt to review can be rejected.');
+            throw new RuntimeException('Only orders with a bank reference to review can be rejected.');
         }
 
         $reason = trim($reason);
@@ -216,7 +315,7 @@ final class OrderService
 
         $text = "⚠️ We could not verify the payment for order {$order['order_no']}."
             . ($reason !== '' ? "\nReason: {$reason}" : '')
-            . "\nPlease send a clear photo or PDF of the payment receipt here, or reply if you need help.";
+            . "\nPlease send a clear photo or PDF of your bank reference (transfer slip) here, or reply if you need help.";
         $sent = $this->notifyCustomer($userId, $order, $text);
         $this->remember($userId, $order, 'assistant', $text);
 

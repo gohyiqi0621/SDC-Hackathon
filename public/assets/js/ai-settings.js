@@ -615,14 +615,16 @@
         }
 
         var logo = imageField('logo', 'company_logo', 'remove_logo');
-        var qr = imageField('qr', 'payment_qr', 'remove_payment_qr');
 
         function schema() {
             return {
                 company_name: [Rules.required('Company name'), Rules.minLength(2, 'Company name'), Rules.maxLength(150, 'Company name')],
                 business_category: [Rules.required('Business category'), Rules.oneOf(selectOptions(category), 'Choose a category from the list.')],
                 company_background: [Rules.maxLength(3000, 'Company background')],
-                payment_instructions: [Rules.maxLength(1000, 'Payment instructions')]
+                registration_no: [Rules.maxLength(60, 'Registration no.')],
+                company_phone: [Rules.maxLength(40, 'Phone')],
+                company_email: [Rules.maxLength(150, 'Email')],
+                company_address: [Rules.maxLength(500, 'Address')]
             };
         }
 
@@ -632,12 +634,13 @@
                 company_name: p.company_name || '',
                 business_category: p.business_category || '',
                 company_background: p.company_background || '',
-                payment_instructions: p.payment_instructions || '',
+                registration_no: p.registration_no || '',
+                company_phone: p.company_phone || '',
+                company_email: p.company_email || '',
+                company_address: p.company_address || '',
                 remove_logo: false,
-                remove_payment_qr: false
             });
             logo.setSaved(p.company_logo_url);
-            qr.setSaved(p.payment_qr_url);
             emptyNote.hidden = !!profile;
             ctrl.setSavedMeta(savedMetaText(p.updated_at, demo));
         }
@@ -663,7 +666,8 @@
             }
 
             var body = new FormData();
-            ['company_name', 'business_category', 'company_background', 'payment_instructions'].forEach(function (key) {
+            ['company_name', 'business_category', 'company_background',
+             'registration_no', 'company_phone', 'company_email', 'company_address'].forEach(function (key) {
                 body.append(key, trimmed(values[key]));
             });
             images.forEach(function (img) { img.appendTo(body); });
@@ -692,6 +696,7 @@
 
     var Assistant = (function () {
         var section = $('[data-section="assistant"]', root);
+        if (!section) { return null; }   // this page does not have this section (Company Profile, Connections)
         var form = $('[data-form="assistant"]', section);
         var output = $('[data-sop-output]', form);
         var combined = $('[data-sop-combined]', form);
@@ -720,6 +725,16 @@
             { key: 'booking', label: 'Booking SOP' },
             { key: 'sales',   label: 'Salesman SOP' }
         ];
+
+        // Staff page: "Functions" checkboxes instead of the SOP editor.
+        var hasSop = !!output;
+        var functionBoxes = $all('[data-function]', form);
+        if (!hasSop) { SOP = []; }
+
+        function selectedFunctions(values) {
+            return functionBoxes.filter(function (box) { return !!values[box.name]; })
+                .map(function (box) { return box.getAttribute('data-function'); });
+        }
 
         var editors = {};
         SOP.forEach(function (s) { editors[s.key] = $('[data-sop="' + s.key + '"]', form); });
@@ -754,9 +769,10 @@
         }
 
         function syncInstructions() {
+            if (!hasSop) { return; }
             var text = compose();
             output.value = text;
-            combined.textContent = text || '(nothing yet)';
+            if (combined) { combined.textContent = text || '(nothing yet)'; }
             count.textContent = text.length.toLocaleString() + ' / ' + MAX_INSTRUCTIONS.toLocaleString() + ' characters';
             count.classList.toggle('is-near', text.length > MAX_INSTRUCTIONS * 0.9);
             SOP.forEach(function (s) {
@@ -766,6 +782,7 @@
         }
 
         function fillEditors(text) {
+            if (!hasSop) { return; }
             var parts = parse(text);
             SOP.forEach(function (s) { editors[s.key].value = parts[s.key]; });
             syncInstructions();
@@ -842,7 +859,7 @@
             });
         }
 
-        makeTabs($all('[data-sop-tab]', form), function (tab) {
+        if (hasSop) makeTabs($all('[data-sop-tab]', form), function (tab) {
             return document.getElementById(tab.getAttribute('aria-controls'));
         });
 
@@ -919,7 +936,7 @@
                     },
                     Rules.maxLength(500, 'Tone description')
                 ],
-                system_instructions: [Rules.maxLength(MAX_INSTRUCTIONS, 'System instructions')],
+                system_instructions: hasSop ? [Rules.maxLength(MAX_INSTRUCTIONS, 'System instructions')] : [],
                 ai_model: [Rules.required('AI model'), Rules.oneOf(selectOptions(modelSelect), 'Choose an AI model from the list.')],
                 temperature: [function (value) {
                     var n = Number(value);
@@ -948,17 +965,22 @@
             keyState = { saved: !!s.has_api_key, provider: s.has_api_key ? providerOf(model) : null };
             clearKey();
             fillEditors(s.system_instructions || '');
-            ctrl.load({
+            var fnValues = {};
+            var enabledFns = Array.isArray(s.functions) ? s.functions : null;   // null: never saved -> all on
+            functionBoxes.forEach(function (box) {
+                fnValues[box.name] = enabledFns === null || enabledFns.indexOf(box.getAttribute('data-function')) !== -1;
+            });
+            ctrl.load(Object.assign(fnValues, {
                 assistant_name: s.assistant_name || '',
                 personality: PERSONALITIES.indexOf(s.personality) === -1 ? 'friendly' : s.personality,
                 tone_description: s.tone_description || '',
                 is_enabled: s.is_enabled === undefined || s.is_enabled === null ? true : s.is_enabled,
-                system_instructions: output.value,
+                system_instructions: hasSop ? output.value : '',
                 ai_model: model,
                 temperature: String(Math.round(temp * 10) / 10),
                 reply_language: ['auto', 'en', 'ms', 'zh', 'ta'].indexOf(s.reply_language) === -1 ? 'auto' : s.reply_language,
                 api_key: ''
-            });
+            }));
             ctrl.setSavedMeta(savedMetaText(s.updated_at, demo));
             updateToneRequirement();
             updateSwitchLabel();
@@ -997,6 +1019,10 @@
                 temperature: values.temperature,
                 reply_language: values.reply_language || 'auto'
             };
+            if (!hasSop) {
+                delete payload.system_instructions;
+                payload.functions = selectedFunctions(values).join(',');
+            }
             // Only sent when typed; otherwise the server keeps the saved key.
             if (trimmed(values.api_key) !== '') { payload.api_key = trimmed(values.api_key); }
 
@@ -1489,10 +1515,22 @@
         }
 
         function fill(g) {
+            var v = values(g || {});
             render(g);
+            // Show the saved booking rules straight away; the calendar list
+            // (a call to Google) fills in afterwards.
+            ctrl.load(v);
+            ctrl.setSavedMeta(savedMetaText((g || {}).updated_at));
+            updateRules();
+            var before = JSON.stringify(Object.assign({}, ctrl.values(), { calendar_id: null }));
             return loadCalendars().then(function () {
-                ctrl.load(values(g || {}));
-                ctrl.setSavedMeta(savedMetaText((g || {}).updated_at));
+                var now = JSON.stringify(Object.assign({}, ctrl.values(), { calendar_id: null }));
+                if (now === before) {
+                    ctrl.load(v);              // nothing edited while loading: saved state incl. calendar
+                } else {
+                    calendarSelect.value = v.calendar_id;   // keep the user's edits, just pick the calendar
+                    ctrl.refresh();
+                }
                 updateRules();
             });
         }

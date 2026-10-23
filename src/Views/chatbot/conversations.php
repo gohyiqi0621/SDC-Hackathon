@@ -24,7 +24,7 @@ view('layouts/header', ['title' => $title, 'styles' => ['assets/css/conversation
                     <h1>Chats</h1>
                     <p><span class="msgr-live" data-live><i></i> Live</span> <span data-count></span></p>
                 </div>
-                <a class="icon-btn" href="<?= e($settingsUrl) ?>" title="Setting &amp; Integration" aria-label="Setting &amp; Integration">
+                <a class="icon-btn" href="<?= e($settingsUrl) ?>" title="Setup" aria-label="Setup">
                     <i class="fa-solid fa-sliders"></i>
                 </a>
             </div>

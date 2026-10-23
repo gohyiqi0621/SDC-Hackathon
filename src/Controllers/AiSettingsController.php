@@ -56,12 +56,10 @@ final class AiSettingsController
      * the provider's API expects. Add a row here to offer another model.
      */
     public const AI_MODELS = [
-        'claude-haiku-5-5'    => ['Claude Haiku 5.5',    'Anthropic'],
+        'claude-haiku-4-5'    => ['Claude Haiku 4.5',    'Anthropic'],
         'agnes-2.5-flash'     => ['Agnes 2.5 Flash',     'Agnes'],
-        'gpt-6-luna'          => ['GPT-6 Luna',          'OpenAI'],
-        'deepseek-v4.1-flash' => ['DeepSeek V4.1 Flash', 'DeepSeek'],
     ];
-    public const DEFAULT_AI_MODEL    = 'claude-haiku-5-5';
+    public const DEFAULT_AI_MODEL    = 'claude-haiku-4-5';
 
     /** Reply language choices (ai_assistant_settings.reply_language, migration 010). */
     public const REPLY_LANGUAGES = [
@@ -73,15 +71,17 @@ final class AiSettingsController
     ];
     public const DEFAULT_TEMPERATURE = 0.7;
 
+    /** Models that reject a temperature (newer Claude): it is not sent to Flowise for these. */
+    public const NO_TEMPERATURE_MODELS = ['claude-haiku-5-5'];
+
     /**
      * Models offered before, mapped to the nearest model still on the list, so
      * a row saved earlier keeps working with the same provider and key.
      */
     private const LEGACY_MODELS = [
-        'claude-sonnet-5-5' => 'claude-haiku-5-5',
-        'claude-opus-5-5'   => 'claude-haiku-5-5',
-        'deepseek-v4-flash' => 'deepseek-v4.1-flash',
-        'deepseek-v4-pro'   => 'deepseek-v4.1-flash',
+        'claude-haiku-5-5'  => 'claude-haiku-4-5',
+        'claude-sonnet-5-5' => 'claude-haiku-4-5',
+        'claude-opus-5-5'   => 'claude-haiku-4-5',
     ];
 
     /** What each provider's secret keys start with (a quick sanity check, not a real test). Agnes keys have no fixed prefix. */
@@ -118,8 +118,20 @@ final class AiSettingsController
     public function companyProfileSave(): void
     {
         $this->run(function (int $userId): void {
-            $input  = $this->strings($_POST, ['company_name', 'business_category', 'company_background', 'payment_instructions']);
+            $input  = $this->strings($_POST, ['company_name', 'business_category', 'company_background',
+                                              'registration_no', 'company_address', 'company_phone', 'company_email']);
             $errors = [];
+
+            // Printed on the official receipt (all optional).
+            foreach (['registration_no' => [60, 'Registration no.'], 'company_address' => [500, 'Address'],
+                      'company_phone' => [40, 'Phone'], 'company_email' => [150, 'Email']] as $key => [$max, $what]) {
+                if (mb_strlen($input[$key]) > $max) {
+                    $errors[$key] = $what . ' must be ' . $max . ' characters or fewer.';
+                }
+            }
+            if ($input['company_email'] !== '' && !filter_var($input['company_email'], FILTER_VALIDATE_EMAIL)) {
+                $errors['company_email'] = 'Enter a valid email address, e.g. hello@yourshop.my.';
+            }
 
             if ($input['company_name'] === '' ) {
                 $errors['company_name'] = 'Company name is required.';
@@ -135,9 +147,6 @@ final class AiSettingsController
                 $errors['company_background'] = 'Company background must be 3000 characters or fewer.';
             }
 
-            if (mb_strlen($input['payment_instructions']) > 1000) {
-                $errors['payment_instructions'] = 'Payment instructions must be 1000 characters or fewer.';
-            }
 
             $file = $_FILES['company_logo'] ?? null;
             $logoError = $this->logoError($file);
@@ -175,11 +184,15 @@ final class AiSettingsController
             }
 
             try {
+                CompanyProfile::ensureColumns();
                 $row = $model->save($userId, [
+                    'registration_no'     => $input['registration_no'] !== '' ? $input['registration_no'] : null,
+                    'company_address'     => $input['company_address'] !== '' ? $input['company_address'] : null,
+                    'company_phone'       => $input['company_phone'] !== '' ? $input['company_phone'] : null,
+                    'company_email'       => $input['company_email'] !== '' ? $input['company_email'] : null,
                     'company_name'        => $input['company_name'],
                     'business_category'   => $input['business_category'],
                     'company_background'  => $input['company_background'] !== '' ? $input['company_background'] : null,
-                    'payment_instructions' => $input['payment_instructions'] !== '' ? $input['payment_instructions'] : null,
                     'payment_qr_url'      => $qr,
                     'company_logo_url'    => $logo,
                 ]);
@@ -233,6 +246,14 @@ final class AiSettingsController
     {
         $this->assistantSaveFor(new StaffAiAssistantSetting());
     }
+
+    /** Staff assistant functions (checkboxes on Staff Assistant Setup): key => [label, icon, hint]. */
+    public const STAFF_FUNCTIONS = [
+        'check_email'   => ['Check email',    'fa-regular fa-envelope',       'List, summarise and reply to emails in the Gmail connected on the Dashboard.'],
+        'check_invoice' => ['Check invoice',  'fa-solid fa-file-invoice',     'Look up invoices, amounts and payment status.'],
+        'check_claims'  => ['Check claims',   'fa-solid fa-receipt',          'Look up expense claims and their approval status.'],
+        'check_orders'  => ['Check orders',   'fa-solid fa-bag-shopping',     'Look up customer orders, receipts and shipping.'],
+    ];
 
     private function assistantSaveFor(UserSettingsRow $model): void
     {
@@ -294,6 +315,25 @@ final class AiSettingsController
                 $errors['system_instructions'] = 'System instructions must be ' . number_format(self::MAX_INSTRUCTIONS) . ' characters or fewer.';
             }
 
+            // Staff assistant: functions instead of free-text instructions.
+            $isStaff   = $model instanceof StaffAiAssistantSetting;
+            $functions = [];
+            if ($isStaff) {
+                $raw = $_POST['functions'] ?? '';
+                $raw = is_array($raw) ? $raw : explode(',', (string) $raw);
+                foreach ($raw as $fn) {
+                    $fn = trim((string) $fn);
+                    if ($fn === '') {
+                        continue;
+                    }
+                    if (!isset(self::STAFF_FUNCTIONS[$fn])) {
+                        $errors['functions'] = 'Unknown function: ' . $fn . '.';
+                        break;
+                    }
+                    $functions[$fn] = true;
+                }
+            }
+
             if ($errors !== []) {
                 $this->invalid($errors);
             }
@@ -310,6 +350,12 @@ final class AiSettingsController
             ];
             if ($apiKey !== '') {
                 $values['api_key_encrypted'] = Crypto::encrypt($apiKey);   // otherwise the saved key is kept
+            }
+            if ($isStaff) {
+                // Keep the checkbox order; the free-text instructions are not used for staff.
+                $values['functions'] = implode(',', array_values(array_filter(array_keys(self::STAFF_FUNCTIONS),
+                    static fn (string $k): bool => isset($functions[$k]))));
+                unset($values['system_instructions']);
             }
 
             $row = $model->save($userId, $values);
@@ -579,6 +625,96 @@ final class AiSettingsController
         });
     }
 
+    /* ==================================================== payment method === */
+
+    /**
+     * POST ai_settings/payment_method_save (multipart) - Customer Assistant >
+     * Setup > Payment Method: payment_bank, payment_account_no,
+     * payment_account_name, payment_notes, payment_qr (file), remove_payment_qr.
+     * Saved on company_profiles (the Company Profile must exist first).
+     */
+    public function paymentMethodSave(): void
+    {
+        $this->run(function (int $userId): void {
+            $input  = $this->strings($_POST, ['payment_bank', 'payment_account_no', 'payment_account_name', 'payment_notes']);
+            $errors = [];
+
+            if (!in_array($input['payment_bank'], CompanyProfile::bankNames(), true)) {
+                $errors['payment_bank'] = $input['payment_bank'] === '' ? 'Choose the bank or e-wallet customers pay to.' : 'Choose a bank from the list.';
+            }
+            $account = (string) preg_replace('/\s+/', ' ', $input['payment_account_no']);
+            if ($account === '') {
+                $errors['payment_account_no'] = 'Enter the account number customers transfer to.';
+            } elseif (!preg_match('/^[0-9A-Za-z][0-9A-Za-z \-]{3,38}[0-9A-Za-z]$/', $account)) {
+                $errors['payment_account_no'] = 'Use only digits, letters, spaces or dashes (5 to 40 characters).';
+            }
+            if ($input['payment_account_name'] === '') {
+                $errors['payment_account_name'] = 'Enter the account holder name as it appears at the bank.';
+            } elseif (mb_strlen($input['payment_account_name']) > 150) {
+                $errors['payment_account_name'] = 'Account holder name must be 150 characters or fewer.';
+            }
+            if (mb_strlen($input['payment_notes']) > 500) {
+                $errors['payment_notes'] = 'Payment notes must be 500 characters or fewer.';
+            }
+
+            $qrFile  = $_FILES['payment_qr'] ?? null;
+            $qrError = $this->logoError($qrFile);
+            if ($qrError !== null) {
+                $errors['payment_qr'] = str_replace('The logo', 'The QR image', $qrError);
+            }
+
+            $model    = new CompanyProfile();
+            $existing = $model->find($userId);
+            if ($existing === null) {
+                $errors['payment_bank'] = 'Save your Company Profile first (Settings > Company Profile).';
+            }
+            if ($errors !== []) {
+                $this->invalid($errors);
+            }
+
+            $oldQr = $existing['payment_qr_url'] ?? null;
+            $newQr = $this->hasUpload($qrFile) ? $this->storeLogo($userId, $qrFile) : null;
+            $qr    = !empty($_POST['remove_payment_qr']) ? null : $oldQr;
+            if ($newQr !== null) {
+                $qr = $newQr;
+            }
+
+            try {
+                CompanyProfile::ensureColumns();
+                $row = $model->save($userId, [
+                    'payment_bank'         => $input['payment_bank'],
+                    'payment_account_no'   => $account,
+                    'payment_account_name' => $input['payment_account_name'],
+                    'payment_instructions' => $input['payment_notes'] !== '' ? $input['payment_notes'] : null,
+                    'payment_qr_url'       => $qr,
+                ]);
+            } catch (Throwable $e) {
+                $this->deleteLogo($userId, $newQr);
+                throw $e;
+            }
+            if ($oldQr !== null && $oldQr !== $qr) {
+                $this->deleteLogo($userId, $oldQr);
+            }
+
+            json_response(true, ['payment' => self::presentPayment($row)], 'Payment method saved.');
+        });
+    }
+
+    /** The Payment Method form values (for the page and the save answer). */
+    public static function presentPayment(?array $row): array
+    {
+        $row = $row ?? [];
+        return [
+            'bank'         => (string) ($row['payment_bank'] ?? ''),
+            'account_no'   => (string) ($row['payment_account_no'] ?? ''),
+            'account_name' => (string) ($row['payment_account_name'] ?? ''),
+            'notes'        => (string) ($row['payment_instructions'] ?? ''),
+            'qr_url'       => !empty($row['payment_qr_url']) ? asset((string) $row['payment_qr_url']) : null,
+            'summary'      => CompanyProfile::paymentText($row),
+            'has_company'  => $row !== [],
+        ];
+    }
+
     /* =================================================== google calendar === */
 
     /** GET ai_settings/google_calendar */
@@ -625,7 +761,7 @@ final class AiSettingsController
         unset($_SESSION[self::OAUTH_SESSION_KEY]); // single use
 
         $back = static function (string $outcome, string $message = ''): never {
-            $params = ['action' => 'settings', 'gcal' => $outcome];
+            $params = ['action' => 'connections', 'gcal' => $outcome];
             if ($message !== '') {
                 $params['gcal_message'] = $message;
             }
@@ -846,6 +982,10 @@ final class AiSettingsController
             'company_description' => (string) ($row['company_description'] ?? ''),
             'business_category'   => (string) ($row['business_category'] ?? ''),
             'payment_instructions' => (string) ($row['payment_instructions'] ?? ''),
+            'registration_no'     => (string) ($row['registration_no'] ?? ''),
+            'company_address'     => (string) ($row['company_address'] ?? ''),
+            'company_phone'       => (string) ($row['company_phone'] ?? ''),
+            'company_email'       => (string) ($row['company_email'] ?? ''),
             'payment_qr_url'      => !empty($row['payment_qr_url']) ? asset((string) $row['payment_qr_url']) : null,
             'created_at'          => $this->iso($row['created_at'] ?? null),
             'updated_at'          => $this->iso($row['updated_at'] ?? null),
@@ -868,6 +1008,10 @@ final class AiSettingsController
             'temperature'         => isset($row['temperature']) ? (float) $row['temperature'] : self::DEFAULT_TEMPERATURE,
             'reply_language'      => (string) ($row['reply_language'] ?? 'auto'),
             'has_api_key'         => !empty($row['api_key_encrypted']),   // the key itself never leaves the server
+            // Staff assistant only (null for the customer assistant).
+            'functions'           => array_key_exists('functions', $row)
+                ? array_values(array_filter(explode(',', (string) $row['functions'])))
+                : null,
             'updated_at'          => $this->iso($row['updated_at'] ?? null),
         ];
     }
