@@ -320,6 +320,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ======================================================== */
 
     let meetingOnly = false;
+    let selectedCategory = "all";
     const meetingKeywords = /\b(?:meeting invitation|meeting request|schedule a meeting)\b/i;
     const isImportant = email => Boolean(email.starred);
     const receivedToday = email => email.timestamp > 0 &&
@@ -544,6 +545,9 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             if (meetingOnly && !email.meeting) return false;
+            if (selectedCategory !== "all" && !(selectedCategory === "Meeting"
+                ? email.meeting || email.category === "Meeting"
+                : email.category === selectedCategory)) return false;
 
             if (activeFilter === "unread") {
                 return email.unread;
@@ -1406,7 +1410,10 @@ function clearSelectedEmail() {
 
     function activateFilter(filter, meetings = false) {
         activeFilter = filter;
+        if (meetingOnly && !meetings) selectedCategory = "all";
+        if (meetings) selectedCategory = "Meeting";
         meetingOnly = meetings;
+        if ($("filterBtn")) $("filterBtn").value = selectedCategory;
 
         document.querySelectorAll(".tab").forEach(tab => {
             tab.classList.toggle(
@@ -1437,35 +1444,23 @@ function clearSelectedEmail() {
             searchQuery = "";
             if ($("searchInput")) $("searchInput").value = "";
             newestFirst = true;
+            selectedCategory = "all";
+            if ($("sortBtn")) $("sortBtn").value = "newest";
             activateFilter(filter === "meeting" ? "all" : filter, filter === "meeting");
             $("inbox")?.scrollIntoView({ behavior: "smooth", block: "start" });
             $("inbox")?.focus({ preventScroll: true });
         });
     });
 
-    $("sortBtn")?.addEventListener("click", () => {
-        newestFirst = !newestFirst;
+    $("sortBtn")?.addEventListener("change", event => {
+        newestFirst = event.target.value === "newest";
         renderEmails();
     });
 
-    $("filterBtn")?.addEventListener("click", () => {
-        const options = [
-            "all",
-            "unread",
-            "important",
-            "sent",
-            "spam",
-            "trash"
-        ];
-
-        const index = options.indexOf(
-            activeFilter
-        );
-
-        const next =
-            options[(index + 1) % options.length];
-
-        activateFilter(next);
+    $("filterBtn")?.addEventListener("change", event => {
+        selectedCategory = event.target.value;
+        meetingOnly = false;
+        renderEmails();
     });
 
     $("gmailSyncBtn")?.addEventListener(

@@ -528,15 +528,25 @@ function render() {
 
                 <div class="inbox-actions">
 
-                    <button id="sortBtn">
-                        <i class="fa-solid fa-arrow-down-wide-short"></i>
-                        Sort
-                    </button>
+                    <label class="inbox-select">
+                        <span><i class="fa-solid fa-arrow-down-wide-short" aria-hidden="true"></i> Sort</span>
+                        <select id="sortBtn" aria-label="Sort emails by received date">
+                            <option value="newest">Newest to oldest</option>
+                            <option value="oldest">Oldest to newest</option>
+                        </select>
+                    </label>
 
-                    <button id="filterBtn">
-                        <i class="fa-solid fa-filter"></i>
-                        Filter
-                    </button>
+                    <label class="inbox-select">
+                        <span><i class="fa-solid fa-filter" aria-hidden="true"></i> Filter</span>
+                        <select id="filterBtn" aria-label="Filter emails by category">
+                            <option value="all">All categories</option>
+                            <option value="Finance">Finance</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Orders">Orders</option>
+                            <option value="Partnership">Partnership</option>
+                            <option value="General">General</option>
+                        </select>
+                    </label>
 
                 </div>
 

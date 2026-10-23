@@ -154,13 +154,7 @@ $router->post(
     // Record payment / delete / SST setting are Supervisor only.
     $router->get('financial/invoice', [FinancialController::class, 'invoice'], $auth);
     $router->get('financial/print', [FinancialController::class, 'print'], $auth);
-    $router->get('financial/receipt', [FinancialController::class, 'receipt'], $auth);
     $router->post('financial/role', [FinancialController::class, 'role'], $auth);
-    $router->post('financial/store', [FinancialController::class, 'store'], $auth);
-    $router->post('financial/update', [FinancialController::class, 'update'], $auth);
-    $router->post('financial/pay', [FinancialController::class, 'pay'], $auth);
-    $router->post('financial/settings', [FinancialController::class, 'settings'], $auth);
-    $router->post('financial/delete', [FinancialController::class, 'delete'], $auth);
     $router->get('financial/file', [FinancialController::class, 'file'], $auth);
     $router->post('financial/extract', [FinancialController::class, 'extract'], $auth); // AI auto-fill (claim popup)
 
@@ -173,8 +167,6 @@ $router->post(
     $router->get('financial/claim_file', [ClaimController::class, 'file'], $auth);
 
     // Old addresses: the Upload Invoice and claim-form pages became popups; Settlement was removed.
-    $router->get('financial/upload', [FinancialController::class, 'upload'], $auth);
-    $router->get('financial/edit', [FinancialController::class, 'edit'], $auth);
     $router->get('financial/claim_new', [ClaimController::class, 'create'], $auth);
     $router->get('financial/claim_edit', [ClaimController::class, 'edit'], $auth);
     $router->get('financial/settlement', static fn () => redirect(url('financial', ['action' => 'invoice'])), $auth);

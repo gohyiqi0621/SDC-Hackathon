@@ -1,23 +1,8 @@
 <?php
-/**
- * financial/invoice.php - the business's invoices to its customers.
- *
- * Anyone creates invoices (from Products & Services), continues drafts, and
- * prints invoices and receipts. A Supervisor also records payments, edits an
- * unpaid invoice with no payments, deletes drafts / unpaid ones, and sets SST.
- *
- * Expects: $invoices, $total (matching filters), $allCount, $stats,
- * $filters [q, status, sort], $page, $pages, $perPage, $modal, $modalOpen,
- * $pay (payments popup or null), $products, $customers, $finance.
- */
+/** Invoice list with read-only details and PDF printing. */
 use Src\Models\Invoice;
 
 view('layouts/header', ['title' => 'Invoice']);
-
-$supervisor = is_supervisor();
-// While the popup is editing an invoice, "Create invoice" reloads into a blank one.
-$newUrl     = url('financial', ['action' => 'invoice', 'new' => 1]);
-$openNew    = $modal['invoice'] === null && empty($modal['values']['order_id']) ? ' data-modal-open="#invoiceModal"' : '';
 
 $filtered  = $filters['q'] !== '' || $filters['status'] !== '';
 $listQuery = array_filter([
@@ -26,26 +11,14 @@ $listQuery = array_filter([
     'status' => $filters['status'],
     'sort'   => $filters['sort'] !== 'newest' ? $filters['sort'] : null,
 ], static fn ($v) => $v !== null && $v !== '');
-$listUrl   = url('financial', $listQuery + ($page > 1 ? ['p' => $page] : []));
 $from      = $total === 0 ? 0 : ($page - 1) * $perPage + 1;
 $to        = min($total, $page * $perPage);
 $today     = date('Y-m-d');
-$sstLabel  = $finance['sst_registered'] ? 'SST ' . rtrim(rtrim($finance['sst_rate'], '0'), '.') . '%' : 'No SST';
 ?>
 <section class="welcome-banner welcome-banner--compact">
     <div class="welcome-text">
         <h1>Invoice</h1>
-        <p>Bill your customers from your Products &amp; Services, then record their payments and issue receipts.</p>
-    </div>
-    <div class="welcome-actions">
-        <?php if ($supervisor): ?>
-            <button class="secondary-btn" type="button" data-modal-open="#sstModal" title="SST charged on new invoices">
-                <i class="fa-solid fa-percent"></i> <?= e($sstLabel) ?>
-            </button>
-        <?php endif; ?>
-        <a class="primary-btn" href="<?= e($newUrl) ?>"<?= $openNew ?>>
-            <i class="fa-solid fa-plus"></i> Create invoice
-        </a>
+        <p>View your invoices, payment status and balances, and print invoice PDFs.</p>
     </div>
 </section>
 
@@ -128,10 +101,7 @@ $sstLabel  = $finance['sst_registered'] ? 'SST ' . rtrim(rtrim($finance['sst_rat
             <div class="empty-state">
                 <div class="empty-icon"><i class="fa-solid fa-file-invoice"></i></div>
                 <h3>No invoices yet</h3>
-                <p>Create an invoice for a customer by ticking the products or services they bought.</p>
-                <a class="primary-btn" href="<?= e($newUrl) ?>"<?= $openNew ?>>
-                    <i class="fa-solid fa-plus"></i> Create invoice
-                </a>
+                <p>Your invoices will appear here when available.</p>
             </div>
 
         <?php elseif ($total === 0): ?>
@@ -164,9 +134,6 @@ $sstLabel  = $finance['sst_registered'] ? 'SST ' . rtrim(rtrim($finance['sst_rat
                             $isDraft   = $row['status'] === 'draft';
                             $balance   = $row['status'] === 'voided' ? 0.0 : (float) $row['amount'] - (float) $row['amount_paid'];
                             $overdue   = in_array($row['status'], ['unpaid', 'partial'], true) && $row['due_date'] !== null && $row['due_date'] < $today;
-                            $noPayment = (float) $row['amount_paid'] === 0.0;
-                            $canEdit   = $isDraft || ($supervisor && $row['status'] === 'unpaid' && $noPayment
-                                         && $row['type'] === 'sales' && empty($row['file_path']) && (int) $row['loose_items'] === 0);
                             $name      = $row['invoice_number'] ?: 'Draft';
                             ?>
                             <tr>
@@ -203,41 +170,11 @@ $sstLabel  = $finance['sst_registered'] ? 'SST ' . rtrim(rtrim($finance['sst_rat
                                 </td>
                                 <td data-label="Status"><span class="badge <?= e($statusClass) ?>"><?= e($statusLabel) ?></span></td>
                                 <td class="actions">
-                                    <?php if ($isDraft): ?>
-                                        <a class="icon-btn" href="<?= e(url('financial', ['action' => 'invoice', 'edit' => $row['id']])) ?>"
-                                           title="Continue draft" aria-label="Continue draft for <?= e($row['party_name']) ?>">
-                                            <i class="fa-regular fa-pen-to-square"></i>
-                                        </a>
-                                    <?php else: ?>
+                                    <?php if (!$isDraft): ?>
                                         <a class="icon-btn" href="<?= e(url('financial', ['action' => 'print', 'id' => $row['id']])) ?>" target="_blank" rel="noopener"
                                            title="Print invoice" aria-label="Print invoice <?= e($name) ?>">
                                             <i class="fa-solid fa-print"></i>
                                         </a>
-                                        <a class="icon-btn<?= $supervisor && $balance > 0.001 ? ' icon-btn--ok' : '' ?>"
-                                           href="<?= e(url('financial', ['action' => 'invoice', 'payments' => $row['id']])) ?>"
-                                           title="<?= $supervisor && $balance > 0.001 ? 'Record payment / receipts' : 'Payments and receipts' ?>"
-                                           aria-label="Payments for <?= e($name) ?>">
-                                            <i class="fa-solid fa-<?= $supervisor && $balance > 0.001 ? 'money-bill-wave' : 'receipt' ?>"></i>
-                                        </a>
-                                        <?php if ($canEdit): ?>
-                                            <a class="icon-btn" href="<?= e(url('financial', ['action' => 'invoice', 'edit' => $row['id']])) ?>"
-                                               title="Edit" aria-label="Edit <?= e($name) ?>">
-                                                <i class="fa-regular fa-pen-to-square"></i>
-                                            </a>
-                                        <?php endif; ?>
-                                    <?php endif; ?>
-
-                                    <?php if ($supervisor && in_array($row['status'], ['draft', 'unpaid'], true) && $noPayment): ?>
-                                        <form method="post" action="<?= e(url('financial', ['action' => 'delete'])) ?>"
-                                              data-confirm="Remove <?= $isDraft ? 'this draft' : 'invoice ' . e($name) ?>? This cannot be undone."
-                                              data-confirm-title="Remove invoice?" data-confirm-ok="Remove">
-                                            <?= csrf_field() ?>
-                                            <input type="hidden" name="id" value="<?= (int) $row['id'] ?>">
-                                            <input type="hidden" name="return" value="<?= e($listUrl) ?>">
-                                            <button class="icon-btn icon-btn--danger" type="submit" title="Remove" aria-label="Remove <?= e($name) ?>">
-                                                <i class="fa-regular fa-trash-can"></i>
-                                            </button>
-                                        </form>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -268,35 +205,4 @@ $sstLabel  = $finance['sst_registered'] ? 'SST ' . rtrim(rtrim($finance['sst_rat
 
 </div>
 
-<?php require __DIR__ . '/_invoice_modal.php'; ?>
-<?php if ($pay !== null): ?>
-    <?php require __DIR__ . '/_payments_modal.php'; ?>
-<?php endif; ?>
-
-<?php if ($supervisor): ?>
-    <!-- SST setting (Supervisor): applied to every new invoice. -->
-    <dialog class="confirm-dialog sst-dialog" id="sstModal" aria-labelledby="sstTitle">
-        <form method="post" action="<?= e(url('financial', ['action' => 'settings'])) ?>">
-            <?= csrf_field() ?>
-            <div class="confirm-icon confirm-icon--primary"><i class="fa-solid fa-percent"></i></div>
-            <h3 id="sstTitle">SST on invoices</h3>
-            <p>Businesses registered for SST charge it on every invoice. Not registered? Leave it off.</p>
-            <label class="checkbox sst-check">
-                <input type="checkbox" name="sst_registered" value="1"<?= $finance['sst_registered'] ? ' checked' : '' ?>>
-                My business is SST-registered
-            </label>
-            <div class="field sst-rate">
-                <label for="sst_rate">SST rate (%)</label>
-                <input id="sst_rate" name="sst_rate" type="text" inputmode="decimal" list="sstRates"
-                       value="<?= e(rtrim(rtrim($finance['sst_rate'], '0'), '.')) ?>">
-                <datalist id="sstRates"><option value="8"></option><option value="6"></option><option value="10"></option><option value="5"></option></datalist>
-                <p class="field-hint">Service tax is usually 8% (some services 6%); sales tax 5% or 10%. Existing invoices keep their rate.</p>
-            </div>
-            <div class="confirm-actions">
-                <button class="secondary-btn" type="button" data-modal-close>Cancel</button>
-                <button class="primary-btn" type="submit">Save</button>
-            </div>
-        </form>
-    </dialog>
-<?php endif; ?>
 <?php view('layouts/footer'); ?>
