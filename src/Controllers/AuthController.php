@@ -171,9 +171,7 @@ final class AuthController
     /**
      * POST /?page=auth&action=forgot
      *
-     * The response is identical whether or not the address exists: the same
-     * message, the same redirect and the same timing envelope. An unknown
-     * address simply never receives a mail.
+     * Keep the response identical whether or not the address exists.
      */
     public function forgot(): void
     {
@@ -212,18 +210,22 @@ final class AuthController
             redirect(url('auth', ['action' => 'forgot']));
         }
 
-        // Always succeeds from the caller's point of view; a send failure is
-        // logged by the mailer and never reveals whether the account exists.
-        (new PasswordResetService())->request($email, client_ip());
+        try {
+            (new PasswordResetService())->request($email, client_ip());
+        } catch (\Throwable $e) {
+            // Keep infrastructure failures from creating an account-enumeration response.
+            error_log('[password_reset] request failed: ' . $e->getMessage());
+        }
 
-        $message = 'If that address is registered, a password reset link is on its way. '
+        $message = 'If that email is registered, a password reset link is on its way. '
             . 'The link works once and expires in ' . PasswordResetService::TTL_MINUTES . ' minutes.';
+
+        flash('success', $message, 'Check your email');
 
         if (wants_json()) {
             json_response(true, ['redirect' => url('auth', ['action' => 'login'])], $message);
         }
 
-        flash('success', $message, 'Check your email');
         redirect(url('auth', ['action' => 'login']));
     }
 

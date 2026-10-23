@@ -162,6 +162,9 @@ final class OrderService
     {
         $relative = (string) ($company['payment_qr_url'] ?? '');
         $path     = $relative !== '' && !str_contains($relative, '..') ? PUBLIC_ROOT . '/' . $relative : '';
+        if ($path !== '') {
+            \Src\Support\FileBackup::restore('public', $relative);   // missing after a redeploy
+        }
         if ($order['channel'] !== 'telegram' || $path === '' || !is_file($path)) {
             return false;
         }
@@ -197,6 +200,9 @@ final class OrderService
             'status' => 'paid', 'reviewed_at' => date('c'), 'review_note' => null,
         ]) ?? $order;
 
+        // The order's invoice (Financial > Invoice) becomes Paid.
+        $invoice = (new OrderInvoiceService())->markPaid($userId, $order);
+
         $total = format_money($order['total'], $order['currency']);
         $text  = "✅ Payment verified!\nWe have received {$total} for order {$order['order_no']}. Thank you for your order.\n"
             . 'Your official receipt (' . OfficialReceiptPdf::receiptNo($order) . ') is attached below.';
@@ -209,7 +215,8 @@ final class OrderService
 
         FlowLog::write('order.approved', ['order_no' => $order['order_no'], 'customer_notified' => $sent, 'official_receipt_sent' => $receiptSent]);
 
-        return ['order' => $order, 'notified' => $sent, 'receipt_sent' => $receiptSent];
+        return ['order' => $order, 'notified' => $sent, 'receipt_sent' => $receiptSent,
+                'invoice_paid' => $invoice !== null && ($invoice['status'] ?? '') === 'paid'];
     }
 
     /**
@@ -286,6 +293,45 @@ final class OrderService
         return $ok;
     }
 
+    /**
+     * Send the order's invoice (PDF) to the customer on Telegram. The invoice
+     * is created first if the order has none yet. Returns the invoice number.
+     *
+     * @throws RuntimeException with a message for staff
+     */
+    public function sendInvoice(int $userId, array $order): string
+    {
+        if ($order['channel'] !== 'telegram') {
+            throw new RuntimeException('This order did not come from Telegram, so the invoice cannot be sent there.');
+        }
+        $invoice = (new OrderInvoiceService())->createFor($userId, $order);
+        if ($invoice === null || empty($invoice['invoice_number'])) {
+            throw new RuntimeException('The invoice for this order could not be created. Check Financial > Invoice.');
+        }
+        $token = $this->botToken($userId);
+        if ($token === null) {
+            throw new RuntimeException('Telegram is not connected (Customer Assistant > Connections).');
+        }
+
+        $items = (new \Src\Models\InvoiceItem())->forInvoice((int) $invoice['id']);
+        $pdf   = (new InvoicePdfService())->render($invoice, $items);
+        $tmp   = tempnam(sys_get_temp_dir(), 'inv');
+        if ($tmp === false || file_put_contents($tmp, $pdf) === false) {
+            throw new RuntimeException('The invoice PDF could not be prepared. Please try again.');
+        }
+        $number = (string) $invoice['invoice_number'];
+        $ok = (new TelegramService())->sendDocument($token, (string) $order['customer_chat_id'], $tmp,
+            'Invoice-' . $number . '.pdf', '🧾 Invoice ' . $number . ' · ' . $order['order_no']);
+        @unlink($tmp);
+        if (!$ok) {
+            throw new RuntimeException('Telegram did not accept the invoice. Check the Telegram connection and try again.');
+        }
+        $this->remember($userId, $order, 'assistant', '📄 [Invoice ' . $number . ' sent as PDF]');
+        FlowLog::write('order.invoice_sent', ['order_no' => $order['order_no'], 'invoice' => $number]);
+
+        return $number;
+    }
+
     /** The saved Telegram bot token of this business, or null. */
     private function botToken(int $userId): ?string
     {
@@ -349,6 +395,7 @@ final class OrderService
         }
 
         $order = (new Order())->update($userId, (int) $order['id'], ['status' => 'cancelled', 'reviewed_at' => date('c')]) ?? $order;
+        (new OrderInvoiceService())->cancelForOrders($userId, [(string) $order['order_no']]);
         $text  = "Order {$order['order_no']} has been cancelled. Reply here if you have any questions.";
         $sent  = $this->notifyCustomer($userId, $order, $text);
         $this->remember($userId, $order, 'assistant', $text);

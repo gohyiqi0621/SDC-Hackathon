@@ -24,7 +24,10 @@ if ($path !== '/' && is_file(__DIR__ . $path)) {
     return false;
 }
 
-if (preg_match('#^/([A-Za-z0-9_]+)/([A-Za-z0-9_]+)/?$#', $path, $m)) {
+if (str_starts_with($path, '/uploads/')) {
+    // An uploaded image that is not on disk (fresh deployment): restored from the database.
+    $_GET = ['page' => 'files', 'action' => 'public', 'path' => substr($path, 1)];
+} elseif (preg_match('#^/([A-Za-z0-9_]+)/([A-Za-z0-9_]+)/?$#', $path, $m)) {
     $_GET['page']   = $m[1];
     $_GET['action'] = $m[2];
 } elseif (preg_match('#^/([A-Za-z0-9_]+)/?$#', $path, $m) && $m[1] !== 'index') {

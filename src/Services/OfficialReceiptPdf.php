@@ -305,6 +305,7 @@ final class OfficialReceiptPdf
             return null;
         }
         $path = PUBLIC_ROOT . '/' . ltrim($rel, '/');
+        \Src\Support\FileBackup::restore('public', $rel);   // missing after a redeploy
         if (!is_file($path) || filesize($path) > 5 * 1024 * 1024) {
             return null;
         }

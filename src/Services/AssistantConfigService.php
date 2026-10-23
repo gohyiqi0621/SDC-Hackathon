@@ -65,9 +65,8 @@ final class AssistantConfigService
     {
         $config = $this->build($userId, new StaffAiAssistantSetting());
         $row    = (new StaffAiAssistantSetting())->find($userId) ?? [];
-        $config['functions'] = array_key_exists('functions', $row)
-            ? array_values(array_filter(explode(',', (string) $row['functions'])))
-            : array_keys(AiSettingsController::STAFF_FUNCTIONS);   // migration 016 not run: all on
+        // Every staff function is always on (no checkboxes any more), whatever an older save stored.
+        $config['functions'] = array_keys(AiSettingsController::STAFF_FUNCTIONS);
         $config['problems'] = str_replace('AI assistant settings are not saved yet.',
             'Staff AI assistant settings are not saved yet (Staff Assistant > Setup).', $config['problems']);
         return $config;
@@ -118,7 +117,7 @@ final class AssistantConfigService
 
         return [
             'user_id'            => $userId,
-            'enabled'            => !empty($assistant) && $this->isTrue($assistant['is_enabled'] ?? true),
+            'enabled'            => !empty($assistant),   // always on once saved (no on/off switch)
             'problems'           => $problems,
             'assistant_name'     => trim((string) ($assistant['assistant_name'] ?? '')) ?: 'Assistant',
             'personality'        => $personality,

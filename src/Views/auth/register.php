@@ -52,6 +52,11 @@ view('layouts/header', ['title' => 'Create account', 'bare' => true]);
         <button class="primary-btn btn-lg btn-block" type="submit">
             <i class="fa-solid fa-user-plus"></i> Create account
         </button>
+
+        <p class="auth-consent">
+            By creating an account you agree to the <a href="<?= e(url('terms')) ?>">Terms of Service</a>
+            and the <a href="<?= e(url('privacy')) ?>">Privacy Policy</a>.
+        </p>
     </form>
 
     <p class="auth-switch">

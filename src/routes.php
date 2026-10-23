@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 use Src\Controllers\AiSettingsController;
 use Src\Controllers\AuthController;
+use Src\Controllers\LegalController;
 use Src\Controllers\CategoryController;
 use Src\Controllers\ChatbotController;
 use Src\Controllers\ClaimController;
@@ -44,6 +45,11 @@ return static function (Router $router): void {
     $router->get('auth/reset', [AuthController::class, 'showReset'], [GuestMiddleware::class]);
     $router->post('auth/reset', [AuthController::class, 'reset'], [GuestMiddleware::class]);
     $router->post('auth/logout', [AuthController::class, 'logout'], $auth);
+
+    /* ----------------------------------------------- legal (public) --- */
+    // No sign-in: Google's OAuth consent screen links here, and visitors read them before registering.
+    $router->get('privacy', [LegalController::class, 'privacy']);
+    $router->get('terms', [LegalController::class, 'terms']);
 
     /* ------------------------------------------------------- dashboard --- */
     $router->get('dashboard', [DashboardController::class, 'index'], $auth);
@@ -150,16 +156,13 @@ $router->post(
 
 
     /* ------------------------------------------------------- financial --- */
-    // Invoice: list + upload popup (?new=1, ?edit=N). Edit / mark paid / delete are Supervisor only.
+    // Invoice: list + create popup (?new=1, ?edit=N, ?from_order=N) + payments popup (?payments=N).
+    // Record payment / delete / SST setting are Supervisor only.
     $router->get('financial/invoice', [FinancialController::class, 'invoice'], $auth);
     $router->get('financial/print', [FinancialController::class, 'print'], $auth);
     $router->post('financial/role', [FinancialController::class, 'role'], $auth);
-    $router->post('financial/store', [FinancialController::class, 'store'], $auth);
-    $router->post('financial/update', [FinancialController::class, 'update'], $auth);
-    $router->post('financial/mark_paid', [FinancialController::class, 'markPaid'], $auth);
-    $router->post('financial/delete', [FinancialController::class, 'delete'], $auth);
     $router->get('financial/file', [FinancialController::class, 'file'], $auth);
-    $router->post('financial/extract', [FinancialController::class, 'extract'], $auth); // AI auto-fill (invoice + claim popups)
+    $router->post('financial/extract', [FinancialController::class, 'extract'], $auth); // AI auto-fill (claim popup)
 
     // Claims: list + new-claim popup (?new=1, ?edit=N). Review / edit / delete are Supervisor only.
     $router->get('financial/claims', [ClaimController::class, 'index'], $auth);
@@ -170,8 +173,6 @@ $router->post(
     $router->get('financial/claim_file', [ClaimController::class, 'file'], $auth);
 
     // Old addresses: the Upload Invoice and claim-form pages became popups; Settlement was removed.
-    $router->get('financial/upload', [FinancialController::class, 'upload'], $auth);
-    $router->get('financial/edit', [FinancialController::class, 'edit'], $auth);
     $router->get('financial/claim_new', [ClaimController::class, 'create'], $auth);
     $router->get('financial/claim_edit', [ClaimController::class, 'edit'], $auth);
     $router->get('financial/settlement', static fn () => redirect(url('financial', ['action' => 'invoice'])), $auth);
@@ -203,6 +204,8 @@ $router->post(
     $router->post('orders/reject', [OrderController::class, 'reject'], $auth);
     $router->post('orders/ship', [OrderController::class, 'ship'], $auth);
     $router->post('orders/send_receipt', [OrderController::class, 'sendReceipt'], $auth);
+    $router->post('orders/send_invoice', [OrderController::class, 'sendInvoice'], $auth);
+    $router->post('orders/delete', [OrderController::class, 'delete'], $auth);
     $router->post('orders/cancel', [OrderController::class, 'cancel'], $auth);
 
     $router->get('categories', [CategoryController::class, 'index'], $auth);
@@ -270,6 +273,9 @@ $router->post(
     $router->get('system/settings', [SystemController::class, 'settings'], $auth);
     // Flow log: signed-in owner, or ?key=<LOG_VIEW_KEY> (checked in SystemController).
     $router->get('system/logs', [SystemController::class, 'logs']);
+
+    // An uploaded image missing on disk (fresh deployment): written back from the database copy.
+    $router->get('files/public', static fn () => \Src\Support\FileBackup::servePublic((string) ($_GET['path'] ?? '')));
     $router->get('system/logs_feed', [SystemController::class, 'logsFeed']);
     $router->post('profile/update', [ProfileController::class, 'update'], $auth);
     $router->post('profile/password', [ProfileController::class, 'password'], $auth);

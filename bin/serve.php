@@ -26,6 +26,15 @@ if ($path !== '/' && $file !== false && str_starts_with($file, $public . '/')
     return false;
 }
 
+// An uploaded image that is not on disk (fresh deployment): restored from the database.
+if (str_starts_with($path, '/uploads/')) {
+    $_GET = ['page' => 'files', 'action' => 'public', 'path' => substr($path, 1)];
+    $_SERVER['SCRIPT_NAME'] = '/index.php';
+    $_SERVER['PHP_SELF'] = '/index.php';
+    require $public . '/index.php';
+    exit;
+}
+
 if ($path !== '/' && $path !== '/index.php') {
     if (!preg_match('#^/([a-zA-Z0-9_]+)(?:/([a-zA-Z0-9_]+))?/?$#', $path, $parts)) {
         http_response_code(404);

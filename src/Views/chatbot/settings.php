@@ -143,4 +143,4 @@ view('layouts/header', [
         </div>
     <?php endif; ?>
 </div>
-<?php view('layouts/footer', ['scripts' => $aiEndpoints !== null ? ['assets/js/ai-settings-api.js', 'assets/js/ai-settings.js'] : []]); ?>
+<?php view('layouts/footer', ['scripts' => $aiEndpoints !== null ? ['assets/js/ai-settings-api.js', 'assets/js/ai-settings.js', 'assets/js/setup-checklist.js'] : []]); ?>

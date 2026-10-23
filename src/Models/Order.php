@@ -327,6 +327,27 @@ final class Order
         return $counts;
     }
 
+    /**
+     * Delete this business's orders (their items go with them).
+     *
+     * @param list<int> $ids
+     * @return list<array{order_no: string, receipt_path: ?string}> the deleted orders
+     */
+    public function deleteMany(int $userId, array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn (int $id): bool => $id > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        $marks = implode(',', array_fill(0, count($ids), '?'));
+        $stmt  = Database::connection()->prepare(
+            "DELETE FROM orders WHERE user_id = ? AND id IN ($marks) RETURNING order_no, receipt_path"
+        );
+        $stmt->execute(array_merge([$userId], $ids));
+
+        return $stmt->fetchAll();
+    }
+
     /** Numbers for the cards at the top: to review, awaiting payment, to ship, paid today. */
     public function overview(int $userId): array
     {
@@ -334,7 +355,7 @@ final class Order
             "SELECT COUNT(*) FILTER (WHERE status = 'payment_submitted')                         AS review,
                     COUNT(*) FILTER (WHERE status IN ('pending_payment', 'payment_rejected'))   AS waiting,
                     COUNT(*) FILTER (WHERE status = 'paid')                                      AS to_ship,
-                    COALESCE(SUM(total) FILTER (WHERE status IN ('paid', 'shipped') AND created_at >= ?::timestamptz), 0) AS sales_today,
+                    COALESCE(SUM(total) FILTER (WHERE status IN ('paid', 'shipped') AND COALESCE(reviewed_at, created_at) >= ?::timestamptz), 0) AS sales_today,
                     COUNT(*) FILTER (WHERE created_at >= ?::timestamptz)                         AS today,
                     COALESCE(MAX(currency), 'MYR')                                               AS currency
                FROM orders WHERE user_id = ?"
@@ -443,7 +464,10 @@ final class Order
         $params = [$userId];
 
         $status = (string) ($f['status'] ?? '');
-        if (isset(self::STATUSES[$status])) {
+        if ($status === 'awaiting') {
+            // Waiting for the customer's bank reference (a rejected one must be sent again).
+            $where .= " AND o.status IN ('pending_payment', 'payment_rejected')";
+        } elseif (isset(self::STATUSES[$status])) {
             $where   .= ' AND o.status = ?';
             $params[] = $status;
         }

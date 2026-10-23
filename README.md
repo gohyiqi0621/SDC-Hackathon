@@ -63,25 +63,81 @@ By combining AI automation with human verification, SME Smart reduces repetitive
 
 ```
 .
-├── docs/                    # Screenshots, diagrams
+├── bin/                         # CLI tools: migrate, create-user, generate-key, telegram-webhook,
+│                                #   flow-log, check, plus the local / production server launchers
+├── database/
+│   ├── schema.sql               # base PostgreSQL schema (users + password resets)
+│   ├── all_migrations.sql       # every migration in one file (paste into a fresh database)
+│   └── migrations/              # numbered migrations 001_ ... 024_, run by bin/migrate.php
+├── deployment/                  # Nginx + PHP-FPM configuration for the Replit deployment
+├── docs/
+│   ├── AUTH.md                  # sign-in, sessions and profile
+│   ├── FINANCIAL.md             # invoices, receipts, payments, claims, SST
+│   └── FLOWISE.md               # AI chatflows for the Customer / Staff assistants
+├── public/                      # web root - the only folder the web server serves
+│   ├── index.php                # front controller (loads src/bootstrap.php + src/routes.php)
+│   ├── router.php               # clean URLs for PHP's built-in server (Replit)
+│   ├── .htaccess                # clean URLs under Apache / XAMPP
+│   ├── uploads/                 # logos, QR codes, product images (scripts blocked)
+│   └── assets/
+│       ├── brand/               # SME Smart logo set and favicons
+│       ├── css/                 # app.css (shared design), dashboard, orders, ai-settings ...
+│       └── js/                  # app.js (sidebar, AJAX forms, toasts), dashboard, orders,
+│                                #   ai-settings, payment-method, product-import ...
 ├── runpod/
-│   └── handler.py           # RunPod serverless handler (GPU workload)
-├── src/
-│   ├── main.py              # Application entry point
-│   └── utils.py             # Helper functions
-├── submission/              # Required submission documents
-│   ├── REPLIT PROOF OF USE.pdf
-│   ├── RUNPOD PROOF OF USE.pdf
-│   └── Submission Template SDC Hackathon.pdf
+│   ├── handler.py               # RunPod serverless handler template
+│   └── requirements.txt         # dependencies for the RunPod endpoint
+├── src/                         # all application source code
+│   ├── bootstrap.php            # env, constants, autoloader, database sessions, security headers
+│   ├── routes.php               # every URL -> controller + middleware
+│   ├── company.php              # default company details (overridden by Company Profile)
+│   ├── Controllers/             # Auth, Dashboard, Gmail, AiSettings, Chatbot, Order, Financial,
+│   │                            #   Claim, Product, Category, Booking, Profile, Legal, Tool,
+│   │                            #   TelegramWebhook, System
+│   ├── Middleware/              # Auth, Guest, Csrf
+│   ├── Models/                  # User, CompanyProfile, Product, Category, Order, Invoice,
+│   │                            #   InvoiceItem, Receipt, Claim, Booking, ChatMessage,
+│   │                            #   assistant settings, Gmail / Calendar / Telegram connections
+│   ├── Services/                # business logic: Auth, Order, OrderInvoice, Invoice + PDFs,
+│   │                            #   Claim, Product, Booking, Gmail, GoogleCalendar, Telegram,
+│   │                            #   Flowise, AI (text + document extraction), SetupStatus, Brevo mail
+│   ├── Support/                 # Database, Router, View, HttpClient, Crypto, DbSessionHandler,
+│   │                            #   FileBackup, FlowLog, helpers
+│   ├── Prompts/                 # system prompts for the Customer and Staff assistants
+│   ├── Lib/tfpdf/               # PDF library for invoices and receipts
+│   ├── Views/
+│   │   ├── layouts/             # head, header / footer, app + auth shells
+│   │   ├── partials/            # sidebar, topbar, flashes, setup checklist
+│   │   ├── auth/                # register, login, forgot, reset
+│   │   ├── legal/               # public Privacy Policy + Terms of Service
+│   │   ├── dashboard/           # Gmail inbox, AI summary, team task planner
+│   │   ├── ai_settings/         # company profile, assistant setup, connections
+│   │   ├── chatbot/             # Customer + Staff assistant: setup, connections, chats
+│   │   ├── products/            # products & services, categories, import
+│   │   ├── orders/              # customer orders from chat, payment review
+│   │   ├── financial/           # invoices (create, payments, receipts) and claims
+│   │   ├── bookings/            # appointments booked through the assistant
+│   │   ├── profile/             # my profile, password
+│   │   ├── email/ emails/       # email pages + password-reset email bodies
+│   │   ├── system/              # flow log, system settings
+│   │   └── errors/
+│   ├── main.py                  # Python entry point (hackathon template)
+│   └── utils.py                 # Python helpers (hackathon template)
+├── storage/                     # logs, cache, private uploads (git-ignored content)
+├── submission/                  # required submission documents (PDF)
 ├── tests/
-│   └── test_utils.py        # Unit tests
-├── .env.example             # Example environment variables
-├── .gitignore
-├── .replit                  # Replit run configuration
+│   └── test_utils.py            # unit tests
+├── .env.example                 # every setting the app reads, with safe defaults
+├── .htaccess                    # blocks src/, .env etc. from the web
+├── .replit                      # Replit run + deployment configuration
 ├── LICENSE
 ├── requirements.txt         # Python dependencies
 └── README.md
 ```
+
+> Older files from the first prototype are still in the repository (`app/`, root `config.php`,
+> `db.php`, `helpers.php`, `setup.php`, `database.sql`, `migrations/`, `ai-service/`). The running
+> app does not use them; everything current is in `src/` and `public/`.
 
 ### Architecture
              

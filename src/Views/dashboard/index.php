@@ -5,7 +5,6 @@
  * The inbox shows the user's real Gmail when connected (loaded as JSON from
  * /gmail/inbox by assets/js/dashboard.js), otherwise demo emails. The AI
  * summary, reply draft and suggested follow-up are generated in the browser.
- * The Brevo strip sends a test message through the password-reset mailer.
  */
 $firstName = trim(explode(' ', trim((string) $user['name']))[0] ?? '') ?: (string) $user['name'];
 $hour      = (int) date('G');
@@ -36,49 +35,49 @@ view('layouts/header', [
         <!-- EMAIL STATISTICS -->
         <section class="stats-grid" aria-label="Email statistics">
 
-            <div class="stat-card purlpe">
+            <a class="stat-card purlpe" href="#inbox" data-inbox-shortcut="all">
                 <div class="stat-icon">
                     <i class="fa-solid fa-envelope"></i>
                 </div>
                 <div class="stat-details">
-                    <h2 id="newEmailCount">24</h2>
+                    <h2 id="newEmailCount">—</h2>
                     <p>New emails</p>
                 </div>
                 <span class="stat-trend positive">↑ 28%</span>
-            </div>
+            </a>
 
-            <div class="stat-card blue">
+            <a class="stat-card blue" href="#inbox" data-inbox-shortcut="unread">
                 <div class="stat-icon">
                     <i class="fa-solid fa-star"></i>
                 </div>
                 <div class="stat-details">
-                    <h2 id="replyCount">5</h2>
+                    <h2 id="replyCount">—</h2>
                     <p>Need your reply</p>
                 </div>
                 <span class="stat-trend negative">↑ 2</span>
-            </div>
+            </a>
 
-            <div class="stat-card teal">
+            <a class="stat-card teal" href="#inbox" data-inbox-shortcut="meeting">
                 <div class="stat-icon">
                     <i class="fa-solid fa-calendar-days"></i>
                 </div>
                 <div class="stat-details">
-                    <h2 id="meetingCount">3</h2>
+                    <h2 id="meetingCount">—</h2>
                     <p>Meeting requests</p>
                 </div>
                 <span class="stat-trend positive">↑ 1</span>
-            </div>
+            </a>
 
-            <div class="stat-card yellow">
+            <a class="stat-card yellow" href="#inbox" data-inbox-shortcut="important">
                 <div class="stat-icon">
                     <i class="fa-solid fa-flag"></i>
                 </div>
                 <div class="stat-details">
-                    <h2 id="importantCount">7</h2>
+                    <h2 id="importantCount">—</h2>
                     <p>Important updates</p>
                 </div>
                 <span class="stat-trend warning">↑ 3</span>
-            </div>
+            </a>
 
         </section>
     </div>
@@ -121,17 +120,9 @@ view('layouts/header', [
 <div
     class="ai-bot-3d"
     id="aiBot3D"
-    data-chatbot-url="<?= e(url('chatbot')) ?>"
 >
     <div id="aiBotCanvas"></div>
 
-    <a
-        class="ai-bot-open"
-        id="aiBotOpen"
-        href="<?= e(url('chatbot')) ?>"
-        aria-label="Go to AI Assistant"
-        title="Chat with AI Assistant">
-    </a>
 </div>
 
 <div class="page-body" id="dashboardRoot"
@@ -372,9 +363,10 @@ view('layouts/header', [
                 <label for="wpTitle">Title</label><input id="wpTitle" name="title" maxlength="150" required placeholder="e.g. Follow up invoice" />
                 <div id="wpTaskFields">
                     <label for="wpAssignee">Assign to (worker name)</label><input id="wpAssignee" name="assignee" maxlength="100" placeholder="e.g. Sarah" />
-                    <label for="wpPriority">Priority</label><select id="wpPriority" name="priority"><option>Medium</option><option>High</option><option>Low</option></select>
+                    <label for="wpPriority">Priority</label><select id="wpPriority" name="priority"><option>High</option><option selected>Medium</option><option>Low</option></select>
                 </div>
                 <label for="wpDate">Date / deadline</label><input id="wpDate" name="date" type="date" required />
+                <p class="wp-date-warning" id="wpDateWarning" hidden><i class="fa-solid fa-triangle-exclamation"></i> This date has already passed. The task will be marked <strong>Expired</strong>.</p>
                 <div class="wp-modal-actions"><button type="button" id="wpCancel" class="wp-cancel">Cancel</button><button type="submit" class="wp-primary">Save</button></div>
             </form>
         </div>
@@ -386,9 +378,9 @@ view('layouts/header', [
       .wp-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:17px 0}.wp-summary>div,.wp-card{background:#fff;border:1px solid #eae8f5;border-radius:13px;padding:17px}.wp-summary span{font-size:12px;color:#8589a0;display:block}.wp-summary strong{font-size:25px;display:block;margin-top:4px;color:#25264c}
       .wp-columns{display:grid;grid-template-columns:1fr 1fr;gap:14px}.wp-card-heading h3{margin:0;font-size:15px}.wp-primary{border:0;border-radius:9px;background:#6d59ef;color:#fff;padding:9px 12px;font-size:12px;font-weight:700;cursor:pointer}.wp-primary:hover{background:#5c49d5}
       .wp-filters{display:flex;gap:5px;margin:16px 0 9px}.wp-filter{background:transparent;border:0;padding:7px 11px;border-radius:8px;font-size:12px;color:#8589a0;cursor:pointer}.wp-filter.is-active{background:#eeebff;color:#6b55e8;font-weight:700}
-      .wp-task-list{max-height:350px;overflow-y:auto}.wp-task{display:flex;align-items:flex-start;gap:10px;padding:13px 2px;border-bottom:1px solid #f0eef8}.wp-task input{margin-top:4px;accent-color:#6d59ef}.wp-task-content{flex:1;min-width:0}.wp-task-title{font-size:13px;font-weight:700;overflow-wrap:anywhere}.wp-task.is-done .wp-task-title{text-decoration:line-through;color:#9698a9}.wp-task-meta{font-size:11px;color:#8b8ea5;margin-top:5px;display:flex;flex-wrap:wrap;gap:7px}.wp-priority{border-radius:20px;padding:2px 7px;background:#f0edff;color:#6955dc}.wp-priority.high{background:#ffe9e9;color:#c54949}.wp-priority.low{background:#e6f7ed;color:#25845c}.wp-delete{border:0;background:transparent;color:#9a9ab0;cursor:pointer}.wp-empty{padding:22px 4px;color:#9295ab;font-size:12px;text-align:center}
+      .wp-task-list{max-height:350px;overflow-y:auto}.wp-task{display:flex;align-items:flex-start;gap:10px;padding:13px 2px;border-bottom:1px solid #f0eef8}.wp-task input{margin-top:4px;accent-color:#6d59ef}.wp-task-content{flex:1;min-width:0}.wp-task-title{font-size:13px;font-weight:700;overflow-wrap:anywhere}.wp-task.is-done .wp-task-title{text-decoration:line-through;color:#9698a9}.wp-task-meta{font-size:11px;color:#8b8ea5;margin-top:5px;display:flex;flex-wrap:wrap;gap:7px}.wp-priority{border-radius:20px;padding:2px 7px;background:#f0edff;color:#6955dc}.wp-priority.high{background:#ffe9e9;color:#c54949}.wp-priority.low{background:#e6f7ed;color:#25845c}.wp-delete{border:0;background:transparent;color:#9a9ab0;cursor:pointer}.wp-task-actions{display:flex;align-items:center;gap:2px;flex:0 0 auto}.wp-edit{border:0;background:transparent;color:#9a9ab0;cursor:pointer}.wp-edit:hover{color:#6d59ef}.wp-expired{border-radius:20px;padding:2px 7px;background:#ffe9e9;color:#c54949;font-weight:700}.wp-task.is-expired .wp-task-title{color:#b54848}.wp-task.is-expired .wp-due{color:#c54949}.wp-date-warning{margin:8px 0 0;padding:8px 10px;border-radius:8px;background:#fff4e5;color:#9a5b00;font-size:12px;line-height:1.45}.wp-date-warning[hidden]{display:none}.wp-empty{padding:22px 4px;color:#9295ab;font-size:12px;text-align:center}
       .wp-monthbar{margin:18px 0 12px}.wp-monthbar strong{font-size:14px}.wp-monthbar button{background:#f5f2ff;border:0;border-radius:7px;padding:7px 10px;cursor:pointer;color:#6d59ef}.wp-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.wp-weekday{text-align:center;font-size:11px;color:#9a9cb0;padding:6px 0}.wp-day{border:0;background:#f9f8ff;min-height:36px;border-radius:7px;cursor:pointer;color:#414366;font-size:12px;position:relative}.wp-day:hover{background:#efebff}.wp-day.selected{background:#6d59ef;color:#fff}.wp-day.has-item:after{content:'';width:5px;height:5px;border-radius:50%;background:#f0a843;position:absolute;bottom:4px;left:calc(50% - 2.5px)}.wp-day.selected:after{background:#fff}.wp-calendar .wp-blank{min-height:36px}.wp-agenda{border-top:1px solid #eeeaf9;margin-top:16px;padding-top:12px}.wp-agenda h4{font-size:12px;margin:0 0 10px}.wp-agenda-item{padding:8px 10px;margin:6px 0;background:#f8f6ff;border-radius:8px;font-size:12px}.wp-agenda-item span{color:#878ba6;font-size:11px}.wp-disclaimer{font-size:11px;color:#9395ac;margin:13px 0 0}
-      .wp-modal-backdrop[hidden]{display:none!important}.wp-modal-backdrop{position:fixed;inset:0;background:#1d1d3a99;z-index:10000;display:flex;justify-content:center;align-items:center;padding:15px}.wp-modal{background:white;border-radius:15px;padding:22px;width:min(420px,100%);box-shadow:0 12px 40px #15153530}.wp-modal-heading h3{font-size:18px;margin:0}.wp-modal-heading button{background:none;border:0;font-size:24px;cursor:pointer}.wp-modal label{display:block;font-size:12px;color:#656981;font-weight:650;margin:13px 0 5px}.wp-modal input,.wp-modal select{display:block;width:100%;border:1px solid #e2e0ee;border-radius:8px;padding:10px;font-size:13px;color:#28294b;background:#fff}.wp-modal-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:19px}.wp-cancel{border:1px solid #e6e3f4;background:#fff;padding:9px 12px;border-radius:9px;cursor:pointer}
+      .wp-modal-backdrop[hidden]{display:none!important}.wp-modal-backdrop{position:fixed;inset:0;background:#1d1d3a99;z-index:10000;display:flex;justify-content:center;align-items:center;padding:15px}.wp-modal{background:white;border-radius:15px;padding:22px;width:min(420px,100%);box-shadow:0 12px 40px #15153530}.wp-modal-heading h3{font-size:18px;margin:0}.wp-modal-heading button{background:none;border:0;font-size:24px;cursor:pointer}.wp-modal label{display:block;font-size:12px;color:#656981;font-weight:650;margin:13px 0 5px}.wp-modal input,.wp-modal select{display:block;width:100%;height:42px;box-sizing:border-box;border:1px solid #e2e0ee;border-radius:8px;padding:0 12px;font:inherit;font-size:13px;color:#28294b;background:#fff}.wp-modal select{appearance:none;-webkit-appearance:none;padding-right:36px;cursor:pointer;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23656981' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center}.wp-modal input:focus,.wp-modal select:focus{outline:none;border-color:#9587f0;box-shadow:0 0 0 3px rgba(109,92,231,.1)}.wp-modal-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:19px}.wp-cancel{border:1px solid #e6e3f4;background:#fff;padding:9px 12px;border-radius:9px;cursor:pointer}
       @media(max-width:850px){.wp-columns{grid-template-columns:1fr}}@media(max-width:550px){.workspace-planner{padding:13px}.wp-summary>div,.wp-card{padding:11px}.wp-heading h2{font-size:16px}.wp-summary strong{font-size:21px}}
     </style>
     <script>
@@ -407,12 +399,16 @@ view('layouts/header', [
         try { const parsed = JSON.parse(localStorage.getItem(storageKey) || '{}'); data = {tasks:Array.isArray(parsed.tasks)?parsed.tasks:[],events:Array.isArray(parsed.events)?parsed.events:[]}; } catch (_) { data={tasks:[],events:[]}; }
         let filter='all', month=new Date(today.getFullYear(),today.getMonth(),1), selected=localISO(today), modalType='task';
         const save=()=>{try{localStorage.setItem(storageKey,JSON.stringify(data));}catch(e){console.warn('Planner local storage unavailable',e);}};
+        // A task is Expired when it is not done and its date / deadline is before today.
+        const isExpired=t=>!t.done&&!!t.date&&t.date<localISO(new Date());
+        let editingId=null;
         function renderTasks(){
           el('wpTotal').textContent=data.tasks.length;el('wpPending').textContent=data.tasks.filter(t=>!t.done).length;el('wpCompleted').textContent=data.tasks.filter(t=>t.done).length;
           const shown=data.tasks.filter(t=>filter==='all'||(filter==='done'?t.done:!t.done));
-          el('wpTaskList').innerHTML=shown.length?shown.map(t=>'<div class="wp-task '+(t.done?'is-done':'')+'"><input type="checkbox" data-task-toggle="'+escapeHTML(t.id)+'" aria-label="Mark task complete" '+(t.done?'checked':'')+'><div class="wp-task-content"><div class="wp-task-title">'+escapeHTML(t.title)+'</div><div class="wp-task-meta"><span><i class="fa-regular fa-user"></i> '+escapeHTML(t.assignee||'Unassigned')+'</span><span><i class="fa-regular fa-calendar"></i> '+escapeHTML(t.date)+'</span><span class="wp-priority '+escapeHTML(t.priority.toLowerCase())+'">'+escapeHTML(t.priority)+'</span></div></div><button class="wp-delete" type="button" data-task-delete="'+escapeHTML(t.id)+'" aria-label="Delete task"><i class="fa-solid fa-trash"></i></button></div>').join(''):'<div class="wp-empty">No tasks here yet. Click Add Task to get started.</div>';
+          el('wpTaskList').innerHTML=shown.length?shown.map(t=>'<div class="wp-task '+(t.done?'is-done ':'')+(isExpired(t)?'is-expired':'')+'"><input type="checkbox" data-task-toggle="'+escapeHTML(t.id)+'" aria-label="Mark task complete" '+(t.done?'checked':'')+'><div class="wp-task-content"><div class="wp-task-title">'+escapeHTML(t.title)+'</div><div class="wp-task-meta"><span><i class="fa-regular fa-user"></i> '+escapeHTML(t.assignee||'Unassigned')+'</span><span class="wp-due"><i class="fa-regular fa-calendar"></i> '+escapeHTML(t.date)+'</span><span class="wp-priority '+escapeHTML(String(t.priority||'Medium').toLowerCase())+'">'+escapeHTML(t.priority||'Medium')+'</span>'+(isExpired(t)?'<span class="wp-expired"><i class="fa-regular fa-clock"></i> Expired</span>':'')+'</div></div><div class="wp-task-actions"><button class="wp-edit" type="button" data-task-edit="'+escapeHTML(t.id)+'" aria-label="Edit task" title="Edit task"><i class="fa-regular fa-pen-to-square"></i></button><button class="wp-delete" type="button" data-task-delete="'+escapeHTML(t.id)+'" aria-label="Delete task" title="Delete task"><i class="fa-solid fa-trash"></i></button></div></div>').join(''):'<div class="wp-empty">No tasks here yet. Click Add Task to get started.</div>';
           el('wpTaskList').querySelectorAll('[data-task-toggle]').forEach(box=>box.addEventListener('change',()=>{const t=data.tasks.find(t=>t.id===box.dataset.taskToggle);if(t){t.done=box.checked;save();render();}}));
-          el('wpTaskList').querySelectorAll('[data-task-delete]').forEach(btn=>btn.addEventListener('click',()=>{data.tasks=data.tasks.filter(t=>t.id!==btn.dataset.taskDelete);save();render();}));
+          el('wpTaskList').querySelectorAll('[data-task-edit]').forEach(btn=>btn.addEventListener('click',()=>{const t=data.tasks.find(t=>t.id===btn.dataset.taskEdit);if(t)openModal('task','',t);}));
+          el('wpTaskList').querySelectorAll('[data-task-delete]').forEach(btn=>btn.addEventListener('click',()=>{const t=data.tasks.find(t=>t.id===btn.dataset.taskDelete);if(!t)return;confirmDelete(t).then(ok=>{if(!ok)return;data.tasks=data.tasks.filter(x=>x.id!==t.id);save();render();});}));
         }
         function renderCalendar(){
           el('wpMonthTitle').textContent=month.toLocaleDateString('en-US',{month:'long',year:'numeric'});
@@ -423,7 +419,7 @@ view('layouts/header', [
           el('wpCalendar').innerHTML=html;
           el('wpCalendar').querySelectorAll('[data-date]').forEach(b=>b.addEventListener('click',()=>{selected=b.dataset.date;renderCalendar();}));
           el('wpAgendaTitle').textContent=new Date(selected+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
-          const items=[...data.tasks.filter(t=>t.date===selected).map(t=>({title:t.title,kind:t.done?'Completed task':'Task',assignee:t.assignee})),...data.events.filter(e=>e.date===selected).map(e=>({title:e.title,kind:'Event',assignee:''}))];
+          const items=[...data.tasks.filter(t=>t.date===selected).map(t=>({title:t.title,kind:t.done?'Completed task':(isExpired(t)?'Expired task':'Task'),assignee:t.assignee})),...data.events.filter(e=>e.date===selected).map(e=>({title:e.title,kind:'Event',assignee:''}))];
           el('wpAgendaItems').innerHTML=items.length?items.map(i=>'<div class="wp-agenda-item"><strong>'+escapeHTML(i.title)+'</strong><br><span>'+escapeHTML(i.kind)+(i.assignee?' · '+escapeHTML(i.assignee):'')+'</span></div>').join(''):'<div class="wp-empty">Nothing scheduled for this date.</div>';
         }
         
@@ -494,14 +490,29 @@ function render() {
     renderUpcomingEvents();
 }
 
-        function openModal(type,prefill='') {modalType=type;el('wpModalTitle').textContent=type==='task'?'Create Team Task':'Add Calendar Event';el('wpTaskFields').hidden=type==='event';el('wpTitle').value=prefill;el('wpAssignee').value='';el('wpPriority').value='Medium';el('wpDate').value=selected;el('wpModal').hidden=false;el('wpTitle').focus();}
-        function closeModal(){el('wpModal').hidden=true;}
+        function updateDateWarning(){const w=el('wpDateWarning');if(!w)return;const v=el('wpDate').value;w.hidden=!(modalType==='task'&&v&&v<localISO(new Date()));}
+        function openModal(type,prefill='',task=null) {modalType=type;editingId=task?task.id:null;el('wpModalTitle').textContent=task?'Edit Team Task':(type==='task'?'Create Team Task':'Add Calendar Event');el('wpTaskFields').hidden=type==='event';el('wpTitle').value=task?task.title:prefill;el('wpAssignee').value=task?(task.assignee||''):'';el('wpPriority').value=task?(task.priority||'Medium'):'Medium';el('wpDate').value=task?task.date:selected;updateDateWarning();el('wpModal').hidden=false;el('wpTitle').focus();}
+        function closeModal(){el('wpModal').hidden=true;editingId=null;}
+        el('wpDate').addEventListener('input',updateDateWarning);el('wpDate').addEventListener('change',updateDateWarning);
+
+        /* Delete needs a second confirmation in a popup (the app's confirm dialog). */
+        function confirmDelete(task){
+          const message='Delete "'+task.title+'"? This task will be removed permanently and cannot be undone.';
+          const dialog=document.getElementById('confirmDialog');
+          if(!dialog||typeof dialog.showModal!=='function')return Promise.resolve(window.confirm(message));
+          dialog.querySelector('[data-confirm-title]').textContent='Delete this task?';
+          dialog.querySelector('[data-confirm-message]').textContent=message;
+          dialog.querySelector('[data-confirm-button]').textContent='Delete';
+          dialog.returnValue='';
+          dialog.showModal();
+          return new Promise(resolve=>{dialog.addEventListener('close',function onClose(){dialog.removeEventListener('close',onClose);resolve(dialog.returnValue==='confirm');});});
+        }
         el('wpAddTask').addEventListener('click',()=>openModal('task'));
         el('wpAddEvent').addEventListener('click',()=>openModal('event'));
         el('wpCloseModal').addEventListener('click',closeModal);el('wpCancel').addEventListener('click',closeModal);
         el('wpModal').addEventListener('click',e=>{if(e.target===el('wpModal'))closeModal();});
         document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!el('wpModal').hidden)closeModal();});
-        el('wpForm').addEventListener('submit',e=>{e.preventDefault();const title=el('wpTitle').value.trim(),date=el('wpDate').value;if(!title||!date)return;const id='wp-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);if(modalType==='task')data.tasks.push({id,title,date,assignee:el('wpAssignee').value.trim(),priority:el('wpPriority').value,done:false});else data.events.push({id,title,date});selected=date;const parts=date.split('-');month=new Date(Number(parts[0]),Number(parts[1])-1,1);save();closeModal();render();});
+        el('wpForm').addEventListener('submit',e=>{e.preventDefault();const title=el('wpTitle').value.trim(),date=el('wpDate').value;if(!title||!date)return;const id='wp-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);const editing=modalType==='task'&&editingId?data.tasks.find(t=>t.id===editingId):null;if(editing){editing.title=title;editing.date=date;editing.assignee=el('wpAssignee').value.trim();editing.priority=el('wpPriority').value;}else if(modalType==='task')data.tasks.push({id,title,date,assignee:el('wpAssignee').value.trim(),priority:el('wpPriority').value,done:false});else data.events.push({id,title,date});selected=date;const parts=date.split('-');month=new Date(Number(parts[0]),Number(parts[1])-1,1);save();closeModal();render();});
         root.querySelectorAll('[data-wp-filter]').forEach(b=>b.addEventListener('click',()=>{filter=b.dataset.wpFilter;root.querySelectorAll('[data-wp-filter]').forEach(x=>x.classList.toggle('is-active',x===b));renderTasks();}));
         el('wpPrevMonth').addEventListener('click',()=>{month=new Date(month.getFullYear(),month.getMonth()-1,1);renderCalendar();});
         el('wpNextMonth').addEventListener('click',()=>{month=new Date(month.getFullYear(),month.getMonth()+1,1);renderCalendar();});
@@ -511,15 +522,6 @@ function render() {
     })();
     </script>
 
-    <?php if ($brevoReady): ?>
-    <form method="post" action="<?= e(url('dashboard', ['action' => 'test_email'])) ?>">
-        <?= csrf_field() ?>
-        <button class="primary-btn" type="submit">
-            <i class="fa-regular fa-envelope"></i>
-            Send test email
-        </button>
-    </form>
-<?php endif; ?>
 
 
 
@@ -528,7 +530,7 @@ function render() {
 
 
         <!-- ========== LEFT: INBOX ========== -->
-        <section class="inbox-panel">
+        <section class="inbox-panel" id="inbox" tabindex="-1">
 
             <div class="panel-header">
 
@@ -536,15 +538,25 @@ function render() {
 
                 <div class="inbox-actions">
 
-                    <button id="sortBtn">
-                        <i class="fa-solid fa-arrow-down-wide-short"></i>
-                        Sort
-                    </button>
+                    <label class="inbox-select">
+                        <span><i class="fa-solid fa-arrow-down-wide-short" aria-hidden="true"></i> Sort</span>
+                        <select id="sortBtn" aria-label="Sort emails by received date">
+                            <option value="newest">Newest to oldest</option>
+                            <option value="oldest">Oldest to newest</option>
+                        </select>
+                    </label>
 
-                    <button id="filterBtn">
-                        <i class="fa-solid fa-filter"></i>
-                        Filter
-                    </button>
+                    <label class="inbox-select">
+                        <span><i class="fa-solid fa-filter" aria-hidden="true"></i> Filter</span>
+                        <select id="filterBtn" aria-label="Filter emails by category">
+                            <option value="all">All categories</option>
+                            <option value="Finance">Finance</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Orders">Orders</option>
+                            <option value="Partnership">Partnership</option>
+                            <option value="General">General</option>
+                        </select>
+                    </label>
 
                 </div>
 
@@ -876,13 +888,6 @@ function render() {
             <i class="fa-solid fa-rotate"></i>
             Regenerate
         </button>
-
-        <button type="button"
-                class="secondary-btn"
-                id="adjustReplyBtn">
-            <i class="fa-solid fa-sliders"></i>
-            Adjust
-        </button>
     </div>
 
 </div>
@@ -893,30 +898,6 @@ function render() {
                 <button type="button" class="secondary-btn" id="wpCreateFromEmail"><i class="fa-solid fa-list-check"></i> Add Email to Team To-Do</button>
             </div>
 
-            <!-- ========== SUGGESTED FOLLOW-UP (HUMAN APPROVAL) ========== -->
-            <section class="compact-followup">
-                <div class="followup-heading">
-                    <h3><i class="fa-solid fa-list-check"></i> Suggested Follow-up</h3>
-                    <button id="historyBtn" type="button">
-                        <i class="fa-solid fa-clock-rotate-left"></i> History
-                    </button>
-                </div>
-
-                <p id="suggestedAction">Select an email to view the suggested action.</p>
-
-                <div class="followup-footer">
-                    <span class="badge" id="approvalStatus">Pending Approval</span>
-
-                    <div class="workflow-buttons">
-                        <button class="primary-btn" id="approveTaskBtn" type="button">
-                            <i class="fa-solid fa-check"></i> Approve
-                        </button>
-                        <button class="secondary-btn" id="rejectTaskBtn" type="button">
-                            Dismiss
-                        </button>
-                    </div>
-                </div>
-            </section>
 
         </section>
 
@@ -1018,8 +999,8 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
   
-const ROBOT_MODEL_URL =
-  "/SDC-Hackathon/public/assets/roboter_cute.glb";
+// asset(): the right address on XAMPP (/SDC-Hackathon/public/...) and on Replit (/assets/...).
+const ROBOT_MODEL_URL = <?= json_encode(asset('assets/roboter_cute.glb'), JSON_UNESCAPED_SLASHES) ?>;
 
 
 
@@ -1187,10 +1168,6 @@ space.addEventListener("pointerleave", () => {
     hover = false;
   });
 
-  bot.addEventListener("click", () => {
-    const url = bot.dataset.chatbotUrl;
-    if (url) window.location.href = url;
-  });
 
   function resize() {
     const width = Math.max(host.clientWidth, 1);

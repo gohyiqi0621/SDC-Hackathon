@@ -46,7 +46,7 @@ try {
     }
 
     $missing = false;
-    foreach (['users', 'password_resets', 'product_categories', 'products', 'company_profiles', 'ai_assistant_settings', 'staff_ai_assistant_settings', 'telegram_integrations', 'google_calendar_integrations', 'gmail_connections', 'invoices', 'invoice_items', 'claims', 'telegram_updates', 'chat_messages'] as $table) {
+    foreach (['users', 'password_resets', 'product_categories', 'products', 'company_profiles', 'ai_assistant_settings', 'staff_ai_assistant_settings', 'telegram_integrations', 'google_calendar_integrations', 'gmail_connections', 'invoices', 'invoice_items', 'receipts', 'document_counters', 'finance_settings', 'file_backups', 'app_sessions', 'claims', 'telegram_updates', 'chat_messages'] as $table) {
         $stmt = $pdo->prepare('SELECT to_regclass(?)');
         $stmt->execute(['public.' . $table]);
         $exists = $stmt->fetchColumn() !== null;

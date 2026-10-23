@@ -523,6 +523,80 @@ BEGIN
         EXECUTE 'UPDATE invoice_items SET quantity = NULLIF(BTRIM(qty::text), '''')::numeric WHERE quantity IS NULL AND BTRIM(qty::text) ~ ''^[0-9]+([.][0-9]+)?$''';
     END IF;
 END $$;
+
+-- 022: invoices are created from Products & Services (drafts, auto numbers),
+-- payments are receipts (partial allowed), per-company SST setting.
+ALTER TABLE invoices ALTER COLUMN invoice_number DROP NOT NULL;
+ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_status_check;
+ALTER TABLE invoices ADD CONSTRAINT invoices_status_check CHECK (status IN ('draft', 'unpaid', 'partial', 'paid'));
+ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_number_unless_draft_check;
+ALTER TABLE invoices ADD CONSTRAINT invoices_number_unless_draft_check CHECK (status = 'draft' OR invoice_number IS NOT NULL);
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS amount_paid NUMERIC(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS issued_at   TIMESTAMPTZ   NULL;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS order_id    BIGINT        NULL REFERENCES orders (id) ON DELETE SET NULL;
+ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_amount_paid_check;
+ALTER TABLE invoices ADD CONSTRAINT invoices_amount_paid_check CHECK (amount_paid >= 0 AND amount_paid <= amount);
+CREATE UNIQUE INDEX IF NOT EXISTS invoices_order_uniq ON invoices (order_id) WHERE order_id IS NOT NULL;
+ALTER TABLE invoices ALTER COLUMN type SET DEFAULT 'sales';
+UPDATE invoices SET amount_paid = amount WHERE status = 'paid' AND amount_paid = 0;
+ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS product_id BIGINT NULL REFERENCES products (id) ON DELETE SET NULL;
+
+CREATE TABLE IF NOT EXISTS receipts (
+    id              BIGINT        GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id         BIGINT        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    invoice_id      BIGINT        NOT NULL REFERENCES invoices (id) ON DELETE RESTRICT,
+    receipt_number  VARCHAR(30)   NOT NULL,
+    amount          NUMERIC(12,2) NOT NULL,
+    currency        CHAR(3)       NOT NULL DEFAULT 'MYR',
+    payment_date    DATE          NOT NULL,
+    method          VARCHAR(20)   NOT NULL,
+    reference       VARCHAR(100)  NULL,
+    notes           TEXT          NULL,
+    created_at      TIMESTAMPTZ   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT receipts_amount_check CHECK (amount > 0),
+    CONSTRAINT receipts_method_check CHECK (method IN ('cash', 'bank_transfer', 'duitnow', 'card', 'cheque', 'other'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS receipts_user_number_uniq ON receipts (user_id, receipt_number);
+CREATE INDEX        IF NOT EXISTS receipts_invoice_idx      ON receipts (invoice_id, payment_date);
+
+CREATE TABLE IF NOT EXISTS document_counters (
+    user_id  BIGINT      NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    kind     VARCHAR(20) NOT NULL,
+    year     SMALLINT    NOT NULL,
+    last_no  INTEGER     NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, kind, year)
+);
+
+CREATE TABLE IF NOT EXISTS finance_settings (
+    user_id         BIGINT       PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+    sst_registered  BOOLEAN      NOT NULL DEFAULT FALSE,
+    sst_rate        NUMERIC(5,2) NOT NULL DEFAULT 8,
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT finance_settings_sst_rate_check CHECK (sst_rate >= 0 AND sst_rate <= 100)
+);
+
+-- 023: preserve uploaded files across deployments.
+CREATE TABLE IF NOT EXISTS file_backups (
+    area        VARCHAR(10)  NOT NULL,
+    path        VARCHAR(255) NOT NULL,
+    mime        VARCHAR(100) NULL,
+    data        BYTEA        NOT NULL,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (area, path)
+);
+
+-- 024: retain issued invoices as voided records when an order is cancelled.
+ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_status_check;
+ALTER TABLE invoices ADD CONSTRAINT invoices_status_check
+    CHECK (status IN ('draft', 'unpaid', 'partial', 'paid', 'voided'));
+
+-- 024: login sessions in the database (src/Support/DbSessionHandler.php), so a restart / redeploy does not sign users out.
+CREATE TABLE IF NOT EXISTS app_sessions (
+    id          VARCHAR(128) PRIMARY KEY,
+    data        TEXT         NOT NULL DEFAULT '',
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS app_sessions_updated_idx ON app_sessions (updated_at);
 COMMIT;
 
 -- ----------------------------------------------------------------------------
@@ -531,8 +605,9 @@ COMMIT;
 --   SELECT table_name FROM information_schema.tables
 --    WHERE table_schema = 'public' ORDER BY table_name;
 --
--- Expected (18): ai_assistant_settings, bookings, chat_messages, claims,
--- company_profiles, gmail_connections, google_calendar_integrations, invoice_items,
+-- Expected (23): ai_assistant_settings, app_sessions, bookings, chat_messages, claims,
+-- company_profiles, document_counters, finance_settings, gmail_connections,
+-- file_backups, google_calendar_integrations, invoice_items, receipts,
 -- invoices, order_items, orders, password_resets, product_categories, products,
 -- staff_ai_assistant_settings, telegram_integrations, telegram_updates, users
 -- ----------------------------------------------------------------------------

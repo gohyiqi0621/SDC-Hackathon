@@ -1,6 +1,6 @@
 <?php
 /**
- * SopGeneratorService.php - Agnes AI writes three SOPs for one business.
+ * SopGeneratorService.php - AI writes three SOPs for one business.
  *
  * Input: the saved company profile (name, category, background, description)
  * and up to 20 active products. Output: three SOPs, five short steps each,
@@ -11,21 +11,14 @@
  *            no appointments gets e.g. "Order & Delivery SOP" instead)
  *   sales    how to recommend, upsell and close
  *
- * Agnes AI uses the OpenAI-style API:
- *   POST {AGNES_API_URL}/chat/completions   Authorization: Bearer <key>
- *
- * Key: AGNES_API_KEY in .env, or the business's own saved key when its
- * assistant runs on an Agnes model. The key is never logged or returned.
+ * Which AI writes them: TextAiService (RunPod, then Claude, then Agnes).
  */
 declare(strict_types=1);
 
 namespace Src\Services;
 
 use RuntimeException;
-use Src\Controllers\AiSettingsController;
-use Src\Support\Crypto;
 use Src\Support\Database;
-use Src\Support\Http;
 use Throwable;
 
 final class SopGeneratorService
@@ -47,58 +40,18 @@ final class SopGeneratorService
      */
     public function generate(array $company, array $products, ?array $assistant): array
     {
-        $apiKey = $this->apiKey($assistant);
-        $model  = (string) (env('AGNES_SOP_MODEL', '') ?: 'agnes-2.5-flash');
-        $url    = rtrim((string) (env('AGNES_API_URL', '') ?: 'https://apihub.agnes-ai.com/v1'), '/') . '/chat/completions';
-
-        $payload = [
-            'model'       => $model,
-            'temperature' => 0.4,
-            'max_tokens'  => 4000,   // room for models that think before answering
-            'messages'    => [
-                ['role' => 'system', 'content' => $this->instructions()],
-                ['role' => 'user',   'content' => $this->companyBrief($company, $products)],
-            ],
-        ];
+        // RunPod first, then Claude, then Agnes (see TextAiService).
+        $answer = (new TextAiService())->complete($this->instructions(), $this->companyBrief($company, $products), 1500, 0.4, $assistant);
 
         try {
-            $response = Http::request('POST', $url, [
-                'Authorization' => 'Bearer ' . $apiKey,
-                'Content-Type'  => 'application/json',
-            ], json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), self::TIMEOUT);
+            $sops = $this->parse($answer['text']);
         } catch (RuntimeException $e) {
-            error_log('[sop] ' . $e->getMessage());
-            throw new RuntimeException('Could not reach Agnes AI. Check the internet connection and try again.');
-        }
-
-        if ($response['status'] === 401 || $response['status'] === 403) {
-            throw new RuntimeException('Agnes AI rejected the API key. Check AGNES_API_KEY in .env (or the saved Agnes key).');
-        }
-        if ($response['status'] === 429) {
-            throw new RuntimeException('Agnes AI is busy or the usage limit was reached. Try again in a minute.');
-        }
-        if ($response['status'] < 200 || $response['status'] >= 300) {
-            $detail = is_array($response['json']) ? (string) ($response['json']['error']['message'] ?? '') : '';
-            error_log('[sop] Agnes HTTP ' . $response['status'] . ($detail !== '' ? ': ' . $detail : ''));
-            throw new RuntimeException('Agnes AI could not generate the SOPs (HTTP ' . $response['status'] . ').' . (APP_DEBUG && $detail !== '' ? ' ' . $detail : ''));
-        }
-
-        $choice = is_array($response['json']) ? ($response['json']['choices'][0] ?? []) : [];
-        $text   = $this->contentText($choice['message']['content'] ?? ($choice['text'] ?? ''));
-
-        try {
-            $sops = $this->parse($text);
-        } catch (RuntimeException $e) {
-            // The AI's own answer (no secrets in it), so the format can be checked in Apache's error.log.
-            error_log('[sop] could not read Agnes answer (finish_reason=' . (string) ($choice['finish_reason'] ?? '?') . '): '
-                . ($text !== '' ? mb_substr($text, 0, 3000) : '(empty) raw=' . mb_substr($response['raw'], 0, 1500)));
-            if (($choice['finish_reason'] ?? '') === 'length') {
-                throw new RuntimeException('Agnes AI stopped before finishing the SOPs. Please try again.');
-            }
+            // The AI's own answer (no secrets in it), so the format can be checked in the error log.
+            error_log('[sop] could not read the ' . $answer['provider'] . ' answer: ' . mb_substr($answer['text'], 0, 3000));
             throw $e;
         }
 
-        return ['model' => $model, 'sops' => $sops];
+        return ['model' => $answer['provider'], 'sops' => $sops];
     }
 
     /** Up to 20 active products: name, category, price, so the steps can mention real items. */
@@ -121,25 +74,6 @@ final class SopGeneratorService
     }
 
     /* ---------------------------------------------------------- private ---- */
-
-    private function apiKey(?array $assistant): string
-    {
-        $key = trim((string) env('AGNES_API_KEY', ''));
-        if ($key !== '') {
-            return $key;
-        }
-
-        $model = AiSettingsController::resolveModel($assistant['ai_model'] ?? null);
-        if (!empty($assistant['api_key_encrypted']) && (AiSettingsController::AI_MODELS[$model][1] ?? '') === 'Agnes') {
-            try {
-                return Crypto::decrypt((string) $assistant['api_key_encrypted']);
-            } catch (RuntimeException $e) {
-                // fall through to the message below
-            }
-        }
-
-        throw new RuntimeException('No Agnes AI key. Add AGNES_API_KEY=... to .env, or choose Agnes 2.5 Flash as the AI model and save your Agnes key.');
-    }
 
     private function instructions(): string
     {
@@ -221,7 +155,7 @@ TXT;
         $items = $this->jsonItems($text) ?? $this->textItems($text);
 
         if (!is_array($items) || $items === []) {
-            throw new RuntimeException('Agnes AI sent an answer in an unexpected format. Please try again.');
+            throw new RuntimeException('The AI sent an answer in an unexpected format. Please try again.');
         }
 
         $bySlot = [];
@@ -254,7 +188,7 @@ TXT;
                 }
             }
             if (count($steps) < self::STEPS) {
-                throw new RuntimeException('Agnes AI returned an incomplete SOP. Please try again.');
+                throw new RuntimeException('The AI returned an incomplete instruction. Please try again.');
             }
 
             $title = trim((string) preg_replace('/\s+/u', ' ', (string) ($item['title'] ?? $item['name'] ?? '')));
@@ -268,7 +202,7 @@ TXT;
         }
 
         if (count($bySlot) !== count(self::SLOTS)) {
-            throw new RuntimeException('Agnes AI did not return all three SOPs. Please try again.');
+            throw new RuntimeException('The AI did not return all three instructions. Please try again.');
         }
 
         return array_values(array_map(static fn (string $slot): array => $bySlot[$slot], array_keys(self::SLOTS)));

@@ -70,6 +70,7 @@ final class GmailService
                 $token['status'] . ' ' .
                 ($body['error'] ?? '')
             );
+            self::logProblem('connect: token exchange', $token);
 
             return null;
         }
@@ -91,6 +92,7 @@ final class GmailService
                 '[gmail] profile lookup failed: HTTP ' .
                 $profile['status']
             );
+            self::logProblem('connect: profile lookup', $profile);
 
             return null;
         }
@@ -114,11 +116,13 @@ final class GmailService
     /**
      * Get latest inbox and spam emails.
      *
-     * Only metadata and snippets are loaded here.
+     * Full MIME payloads are inspected for keyword and calendar classification.
+     * Only summaries and classification flags are returned to the browser.
      */
     public function inbox(
         int $userId,
-        int $max = GMAIL_MAX_RESULTS
+        int $max = GMAIL_MAX_RESULTS,
+        string $pageToken = ''
     ): array {
         $token = $this->accessToken($userId);
 
@@ -136,6 +140,7 @@ final class GmailService
                 'maxResults' => $max,
                 'labelIds' => 'INBOX',
                 'includeSpamTrash' => 'false',
+                'pageToken' => $pageToken,
             ]),
             $this->auth($token)
         );
@@ -154,6 +159,7 @@ final class GmailService
                 '[gmail] list failed: HTTP ' .
                 $list['status']
             );
+            self::logProblem('inbox list', $list);
 
             return [
                 'ok' => false,
@@ -174,10 +180,7 @@ final class GmailService
             ) {
                 $urls[$id] =
                     self::API_URL . '/messages/' . $id .
-                    '?format=metadata' .
-                    '&metadataHeaders=From' .
-                    '&metadataHeaders=Subject' .
-                    '&metadataHeaders=Date';
+                    '?format=full';
             }
         }
 
@@ -204,7 +207,8 @@ final class GmailService
 
         return [
             'ok' => true,
-            'emails' => $emails
+            'emails' => $emails,
+            'nextPageToken' => $list['body']['nextPageToken'] ?? null
         ];
     }
 
@@ -264,6 +268,7 @@ final class GmailService
                 '[gmail] message failed: HTTP ' .
                 $response['status']
             );
+            self::logProblem('open message', $response);
 
             return [
                 'ok' => false,
@@ -497,6 +502,7 @@ if ($response['status'] !== 200) {
         '[gmail] Send failed HTTP ' .
         $response['status'] . ': ' . $googleMessage
     );
+    self::logProblem('send reply', $response);
 
     return [
         'ok' => false,
@@ -536,6 +542,7 @@ public function sent(int $userId): array
     );
 
     if ($response['status'] === 401) {
+        self::logProblem('sent list', $response);
         return [
             'ok' => false,
             'reconnect' => true,
@@ -544,6 +551,7 @@ public function sent(int $userId): array
     }
 
     if ($response['status'] !== 200) {
+        self::logProblem('sent list', $response);
         return [
             'ok' => false,
             'error' => 'Unable to load sent emails.'
@@ -966,6 +974,7 @@ public function thread(int $userId, string $threadId): array
                 ': ' .
                 $googleMessage
             );
+            self::logProblem('email action', $response);
 
             return [
                 'ok' => false,
@@ -1166,6 +1175,7 @@ public function thread(int $userId, string $threadId): array
                 $refresh['status'] . ' ' .
                 ($refresh['body']['error'] ?? '')
             );
+            self::logProblem('refresh access (uses GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET)', $refresh);
 
             if (
                 ($refresh['body']['error'] ?? '') ===
@@ -1234,6 +1244,7 @@ public function thread(int $userId, string $threadId): array
         }
         if ($list['status'] !== 200 || !is_array($list['body'])) {
             error_log('[gmail] search failed: HTTP ' . $list['status']);
+            self::logProblem('search', $list);
             return ['ok' => false, 'error' => 'Could not load Gmail right now (HTTP ' . $list['status'] . ').'];
         }
 
@@ -1340,6 +1351,7 @@ public function thread(int $userId, string $threadId): array
             $err = $response['body']['error'] ?? [];
             $msg = is_array($err) ? (string) ($err['message'] ?? 'Unknown Gmail API error') : (string) $err;
             error_log('[gmail] send new failed HTTP ' . $response['status'] . ': ' . $msg);
+            self::logProblem('send new email', $response);
             return ['ok' => false, 'error' => 'Gmail API Error (' . $response['status'] . '): ' . $msg];
         }
 
@@ -1391,8 +1403,20 @@ public function thread(int $userId, string $threadId): array
     }
 
     /**
-     * Convert Gmail metadata into dashboard email format.
+     * Detect calendar invitations, including nested MIME attachments.
      */
+    private function hasCalendarPart(array $payload): bool
+    {
+        if (strtolower((string) ($payload['mimeType'] ?? '')) === 'text/calendar'
+            || preg_match('/\.ics$/i', (string) ($payload['filename'] ?? ''))) {
+            return true;
+        }
+        foreach ($payload['parts'] ?? [] as $part) {
+            if (is_array($part) && $this->hasCalendarPart($part)) return true;
+        }
+        return false;
+    }
+
     private function toEmail(
         string $id,
         array $message
@@ -1414,12 +1438,18 @@ public function thread(int $userId, string $threadId): array
 
         $labels = $message['labelIds'] ?? [];
 
+        $payload = $message['payload'] ?? [];
+        $classificationText = ($headers['subject'] ?? '') . ' '
+            . $this->extractBody($payload) . ' ' . ($message['snippet'] ?? '');
+
         $millis = (int) (
             $message['internalDate'] ?? 0
         );
 
         return [
             'id'        => $id,
+            'meeting' => $this->hasCalendarPart($payload)
+                || (bool) preg_match('/\b(?:meeting invitation|meeting request|schedule a meeting)\b/i', $classificationText),
             'sender'    => $headers['from'] ?? '',
             'subject'   => $headers['subject'] ?? '',
             'preview'   => html_entity_decode(
@@ -1471,5 +1501,30 @@ public function thread(int $userId, string $threadId): array
             ),
 
         ];
+    }
+
+    /** Google's own error text from an API response (never contains tokens). */
+    private static function googleError(array $response): string
+    {
+        $body  = is_array($response['body'] ?? null) ? $response['body'] : [];
+        $error = $body['error'] ?? null;
+        if (is_array($error)) {
+            $text = trim((string) ($error['message'] ?? '') . ' ' . (string) ($error['status'] ?? ''));
+        } else {
+            $text = trim((string) $error . ' ' . (string) ($body['error_description'] ?? ''));
+        }
+        return mb_substr($text, 0, 400);
+    }
+
+    /** A Gmail problem, also shown in System > Flow Log so it can be traced on the live site. */
+    private static function logProblem(string $step, array $response): void
+    {
+        \Src\Support\FlowLog::write('gmail.error', [
+            'step'          => $step,
+            'status'        => (int) ($response['status'] ?? 0),
+            'google'        => self::googleError($response),
+            'client_id_set' => GMAIL_CLIENT_ID !== '',
+            'redirect_uri'  => GMAIL_REDIRECT_URI,
+        ]);
     }
 }

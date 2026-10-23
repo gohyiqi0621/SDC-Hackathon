@@ -46,6 +46,30 @@
 .inbox-actions {
     display: flex;
     gap: 12px;
+    flex-wrap: wrap;
+}
+
+.inbox-panel .panel-header {
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.inbox-select {
+    display: grid;
+    gap: 4px;
+    color: #505a84;
+    font-size: 12px;
+}
+
+.inbox-select select {
+    max-width: 100%;
+    padding: 7px 9px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
 }
 
 .inbox-actions button {
@@ -1475,265 +1499,6 @@
 }
 
 
-/* ========================================
-   HEADER AI CHATBOT
-   Beside Profile in Topbar
-======================================== */
-
-.header-chatbot {
-    position: relative;
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-    z-index: 110;
-}
-
-/* Chatbot button */
-.header-chatbot-trigger {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 7px 12px;
-    border: 1px solid #e6e2ff;
-    border-radius: 12px;
-    background: #f7f5ff;
-    color: #5547c8;
-    cursor: pointer;
-    font-family: inherit;
-    transition: background 0.2s ease,
-                border-color 0.2s ease,
-                transform 0.2s ease;
-}
-
-.header-chatbot-trigger:hover {
-    background: #eeebff;
-    border-color: #cfc7ff;
-    transform: translateY(-1px);
-}
-
-/* Robot icon */
-.header-chatbot-icon {
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    border-radius: 10px;
-    background: linear-gradient(135deg, #7565f4, #a08aff);
-    color: #ffffff;
-    font-size: 17px;
-    box-shadow: 0 4px 12px rgba(100, 80, 220, 0.18);
-}
-
-/* Text beside icon */
-.header-chatbot-text {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 3px;
-    text-align: left;
-}
-
-.header-chatbot-text strong {
-    color: #4536b8;
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 1.2;
-}
-
-.header-chatbot-text small {
-    color: #8a85a8;
-    font-size: 10px;
-    font-weight: 400;
-    line-height: 1.3;
-}
-
-/* Hide popup when closed */
-.header-chatbot-panel[hidden] {
-    display: none !important;
-}
-
-/* Chatbot popup */
-.header-chatbot-panel {
-    position: absolute;
-    top: calc(100% + 14px);
-    right: 0;
-    width: 360px;
-    max-width: calc(100vw - 24px);
-    max-height: min(600px, calc(100vh - 100px));
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border: 1px solid #e6e2ff;
-    border-radius: 18px;
-    background: #ffffff;
-    box-shadow: 0 18px 55px rgba(45, 38, 100, 0.18);
-    z-index: 9999;
-    animation: headerChatbotAppear 0.2s ease-out;
-}
-
-/* Popup header */
-.header-chatbot-panel-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 15px 18px;
-    border-bottom: 1px solid #eeebff;
-    background: linear-gradient(135deg, #f7f5ff, #ffffff);
-}
-
-.header-chatbot-title {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    color: #4e40c4;
-    font-size: 14px;
-    font-weight: 700;
-}
-
-.header-chatbot-panel-top button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border: none;
-    border-radius: 8px;
-    background: transparent;
-    color: #77718f;
-    cursor: pointer;
-}
-
-.header-chatbot-panel-top button:hover {
-    background: #eeebff;
-}
-
-/* Reserved space for future animation */
-.header-chatbot-animation {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 115px;
-    padding: 18px;
-    background: linear-gradient(180deg, #faf9ff, #ffffff);
-    border-bottom: 1px solid #f0edff;
-    color: #958bbd;
-    font-size: 12px;
-    text-align: center;
-}
-
-/* Chat messages */
-.header-chatbot-messages {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    min-height: 120px;
-    max-height: 220px;
-    overflow-y: auto;
-    padding: 16px;
-    background: #ffffff;
-}
-
-.header-chatbot-bubble {
-    align-self: flex-start;
-    max-width: 88%;
-    padding: 11px 13px;
-    border-radius: 12px 12px 12px 3px;
-    background: #f1efff;
-    color: #4e477a;
-    font-size: 12px;
-    line-height: 1.6;
-    overflow-wrap: anywhere;
-}
-
-.header-chatbot-bubble.is-user {
-    align-self: flex-end;
-    border-radius: 12px 12px 3px 12px;
-    background: #6d5ce7;
-    color: #ffffff;
-}
-
-/* Input area */
-.header-chatbot-form {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 13px;
-    border-top: 1px solid #eeebff;
-    background: #ffffff;
-}
-
-.header-chatbot-form input {
-    flex: 1;
-    min-width: 0;
-    padding: 11px 12px;
-    border: 1px solid #e5e1f6;
-    border-radius: 9px;
-    outline: none;
-    background: #fafaff;
-    color: #38344f;
-    font-family: inherit;
-    font-size: 12px;
-}
-
-.header-chatbot-form input:focus {
-    border-color: #9587f0;
-    box-shadow: 0 0 0 3px rgba(109, 92, 231, 0.1);
-}
-
-.header-chatbot-form button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 39px;
-    height: 39px;
-    flex-shrink: 0;
-    border: none;
-    border-radius: 9px;
-    background: #6d5ce7;
-    color: #ffffff;
-    cursor: pointer;
-}
-
-.header-chatbot-form button:hover {
-    background: #5847d1;
-}
-
-/* Open animation */
-@keyframes headerChatbotAppear {
-    from {
-        opacity: 0;
-        transform: translateY(-6px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Responsive */
-@media (max-width: 900px) {
-    .header-chatbot-text small {
-        display: none;
-    }
-}
-
-@media (max-width: 600px) {
-    .header-chatbot-trigger {
-        padding: 6px;
-    }
-
-    .header-chatbot-text {
-        display: none;
-    }
-
-    .header-chatbot-panel {
-        width: min(340px, calc(100vw - 24px));
-    }
-}
-
 
 /* ==========================================
    SMART SME — PREMIUM AI COMPANION
@@ -1813,24 +1578,6 @@
     height: 100% !important;
     background: transparent;
     pointer-events: none;
-}
-
-/* Click robot to open separate Chatbot Page */
-.ai-bot-open {
-    position: absolute;
-    inset: 8% 10%;
-    display: block;
-    z-index: 4;
-    border: 0;
-    border-radius: 24px;
-    background: transparent;
-    cursor: pointer;
-    text-decoration: none;
-}
-
-.ai-bot-open:focus-visible {
-    outline: 3px solid #8c75ff;
-    outline-offset: 3px;
 }
 
 /* ==========================================
@@ -2616,6 +2363,18 @@
     transform: translateY(-5px);
     box-shadow: 0 14px 30px rgba(91,72,160,.16);
 }
+
+#welcomeBanner a.stat-card {
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+#welcomeBanner a.stat-card:focus-visible {
+    outline: 3px solid #6255f5;
+    outline-offset: 3px;
+}
+
 
 @keyframes wbCardEnter {
     from {
@@ -4033,10 +3792,10 @@
 
 #welcomeBanner.welcome-banner {
   box-sizing: border-box !important;
-  width: 100% !important;
+  width: calc(100% - 64px) !important;
   height: 340px !important;
   min-height: 340px !important;
-  margin: 0 0 18px !important;
+  margin: 0 32px 18px !important;
   padding: 38px !important;
   border: 1px solid #dcd7ff !important;
   border-radius: 28px !important;
@@ -4568,4 +4327,214 @@
 /* Keep Workspace stationary */
 #workspacePlanner {
   filter: none !important;
+}
+
+/* The welcome robot is decorative. */
+/* Match the page-body gutters used by the Gmail inbox on small screens. */
+@media (max-width: 650px) {
+    #welcomeBanner.welcome-banner {
+        width: calc(100% - 32px) !important;
+        margin-inline: 16px !important;
+    }
+}
+
+#welcomeBanner #aiBot3D {
+    cursor: default;
+}
+
+
+/* ==========================================================
+   DASHBOARD CARDS — FREE 2D DRAGGING
+   The handle lifts the card; it follows the pointer in any
+   direction inside the grid while a placeholder keeps its slot.
+   ========================================================== */
+
+#customDashboardGrid {
+    position: relative;
+}
+
+#customDashboardGrid .dashboard-drag-handle {
+    touch-action: none;            /* touch drags move the card, not the page */
+    -webkit-touch-callout: none;
+}
+
+#customDashboardGrid .dashboard-drag-handle:focus-visible {
+    outline: 2px solid #7966dc;
+    outline-offset: 2px;
+    border-radius: 8px;
+}
+
+/* The lifted card: out of the grid flow, above everything else. */
+#customDashboardGrid .dashboard-draggable-card.is-lifted {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 60;
+    margin: 0;
+    opacity: 1;
+    box-shadow: 0 22px 50px rgba(54, 44, 140, 0.22), 0 4px 12px rgba(54, 44, 140, 0.12);
+    will-change: transform;
+    transition: box-shadow 0.15s ease;
+}
+
+#customDashboardGrid .dashboard-draggable-card.is-lifted .dashboard-drag-handle {
+    cursor: grabbing !important;
+}
+
+/* Gliding into its new slot on release. */
+#customDashboardGrid .dashboard-draggable-card.is-settling {
+    transition: transform 0.2s cubic-bezier(.2, .8, .2, 1), box-shadow 0.2s ease;
+    box-shadow: 0 8px 25px rgba(49, 60, 123, 0.08);
+}
+
+/* The slot the card will drop into. */
+#customDashboardGrid .dashboard-drag-placeholder {
+    min-width: 0;
+    border: 2px dashed #b8acf6;
+    border-radius: 16px;
+    background: rgba(121, 102, 220, 0.06);
+    box-sizing: border-box;
+}
+
+#customDashboardGrid .dashboard-drag-placeholder.full-width {
+    grid-column: 1 / -1;
+}
+
+body.dashboard-is-dragging {
+    overflow-anchor: none;
+}
+
+body.dashboard-is-dragging,
+body.dashboard-is-dragging * {
+    cursor: grabbing !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #customDashboardGrid .dashboard-draggable-card.is-settling {
+        transition: none;
+    }
+}
+
+
+/* ==========================================================
+   INBOX MATCHES EMAIL DETAILS & AI ASSISTANT
+   Email Details & AI Assistant keeps its natural height. On
+   desktop, dashboard.js copies that height onto the Inbox card
+   (--inbox-match-height), so both line up top and bottom; the
+   email list scrolls inside the Inbox when it has more emails.
+   ========================================================== */
+
+@media (min-width: 901px) {
+    #customDashboardGrid > .dashboard-draggable-card.is-height-matched {
+        height: var(--inbox-match-height) !important;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #customDashboardGrid > .dashboard-draggable-card.is-height-matched > .dashboard-drag-header {
+        flex: 0 0 auto;
+    }
+
+    /* Header, search and tabs stay put; only the list scrolls. */
+    #customDashboardGrid .dashboard-draggable-card.is-height-matched > .inbox-panel {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    #customDashboardGrid .dashboard-draggable-card.is-height-matched > .inbox-panel > * {
+        flex: 0 0 auto;
+    }
+
+    #customDashboardGrid .dashboard-draggable-card.is-height-matched > .inbox-panel > .email-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: none;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+}
+
+/* Tablets and phones: one column, natural heights; the inbox list is capped
+   so it never pushes the email details far down. */
+@media (max-width: 900px) {
+    #customDashboardGrid .dashboard-draggable-card > .inbox-panel > .email-list {
+        max-height: min(60vh, 520px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+}
+
+
+/* ==========================================================
+   TEAM TO-DO: EDIT BUTTON + EXPIRED TASKS
+   ========================================================== */
+
+#workspacePlanner .wp-task-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 0 0 auto;
+}
+
+#workspacePlanner .wp-edit,
+#workspacePlanner .wp-delete {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #a0a0b9;
+    cursor: pointer;
+    transition: background-color .15s, color .15s;
+}
+
+#workspacePlanner .wp-edit:hover {
+    background: #f0eaff;
+    color: #7552ec;
+}
+
+#workspacePlanner .wp-delete:hover {
+    background: #ffe8ec;
+    color: #e4496b;
+}
+
+#workspacePlanner .wp-edit:focus-visible,
+#workspacePlanner .wp-delete:focus-visible {
+    outline: 2px solid #7555f6;
+    outline-offset: 1px;
+}
+
+/* Not done and the deadline is before today. */
+#workspacePlanner .wp-task.is-expired {
+    border-color: #ffd3dc !important;
+    background: #fffafb;
+    box-shadow: inset 3px 0 0 #e34562, 0 3px 10px rgba(85,81,160,.04) !important;
+}
+
+#workspacePlanner .wp-task.is-expired .wp-task-title {
+    color: #b8364f;
+}
+
+#workspacePlanner .wp-task.is-expired .wp-due {
+    color: #e34562;
+    font-weight: 700;
+}
+
+#workspacePlanner .wp-expired {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    background: #ffe8ec;
+    color: #e34562;
+    font-weight: 750;
 }

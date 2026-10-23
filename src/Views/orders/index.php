@@ -1,56 +1,57 @@
 <?php
 /**
- * orders/index.php - orders from the AI chatbot and their payment receipts.
+ * orders/index.php - Orders: orders from the AI chatbot, their bank references,
+ * invoices and official receipts.
  *
- * Expects: $orders, $items (order id => items), $counts (status => n, with the
- * other filters applied), $overview (top cards), $summary (filtered count/sum),
- * $products (names for the product filter), $f (filters: status, q, range,
- * from, to, product, sort), $total, $page, $pages, $perPage, $missingTable.
+ * Layout: 4 summary cards (click = filter) -> filter bar (status dropdown +
+ * search) -> table  Order | Customer | Total | Status | Action  -> pager.
  *
- * Layout: header -> four summary cards (click = filter) -> one panel with the
- * status tabs, the filter bar (search, date, product, sort), the result line
- * with active filter chips, the order table (cards on phones) and the pager.
- * Columns: Order | Customer | Items | Total | Payment (status + receipt) | Action.
+ * Action column:
+ *   Verify payment (bank reference sent)  Approve · Reject (popup: reason) · Details
+ *   Payment successful                    Mark shipped · Details
+ *   anything else                         Details
+ * Details popup: order, customer, items, payment + bank reference, invoice and
+ * official receipt (Send invoice / Send receipt), timeline, Cancel order.
+ *
+ * Delete: tick orders (checkbox column, or "select all") -> the bar shows
+ * "N selected  Delete" -> confirm -> POST orders/delete. Also in Details.
+ *
+ * Expects: $orders, $items (order id => items), $invoices (order id => invoice),
+ * $overview (cards), $f (status, q), $total, $page, $pages, $perPage, $missingTable.
  */
 use Src\Controllers\OrderController;
-use Src\Models\Order;
 
 view('layouts/header', ['title' => 'Orders', 'styles' => ['assets/css/orders.css']]);
 
 $status    = $f['status'];
 $q         = $f['q'];
-// Everything that describes the current list, so links keep the other filters.
-$listQuery = array_filter([
-    'status'  => $f['status'],
-    'q'       => $f['q'],
-    'range'   => $f['range'],
-    'from'    => $f['range'] === 'custom' ? $f['from'] : null,
-    'to'      => $f['range'] === 'custom' ? $f['to'] : null,
-    'product' => $f['product'],
-    'sort'    => $f['sort'] !== 'review' ? $f['sort'] : null,
-], static fn ($v) => $v !== null && $v !== '');
+$listQuery = array_filter(['status' => $status, 'q' => $q], static fn ($v) => $v !== '');
 $listUrl   = url('orders', $listQuery + ($page > 1 ? ['p' => $page] : []));
-$without   = static fn (string ...$keys): string => url('orders', array_diff_key($listQuery, array_flip($keys)));
-$allCount  = array_sum($counts);
 $from      = $total === 0 ? 0 : ($page - 1) * $perPage + 1;
 $to        = min($total, $page * $perPage);
-$rangeText = $f['range'] === 'custom'
-    ? trim(($f['from'] ? date('j M Y', strtotime($f['from'])) : '…') . ' – ' . ($f['to'] ? date('j M Y', strtotime($f['to'])) : '…'))
-    : (OrderController::RANGES[$f['range']] ?? '');
-$hasFilters = $f['q'] !== '' || $f['range'] !== '' || $f['product'] !== '' || $f['sort'] !== 'review';
-$active = array_filter([
-    'range'   => $f['range'] !== '' ? $rangeText : null,
-    'product' => $f['product'] !== '' ? $f['product'] : null,
-    'q'       => $f['q'] !== '' ? '“' . $f['q'] . '”' : null,
-]);
+
+// One pill per status: label + colour.
+$pill = [
+    'pending_payment'   => ['Awaiting payment',   'grey'],
+    'payment_submitted' => ['Verify payment',     'amber'],
+    'paid'              => ['Payment successful', 'green'],
+    'shipped'           => ['Shipped',            'blue'],
+    'payment_rejected'  => ['Payment rejected',   'red'],
+    'cancelled'         => ['Cancelled',          'red'],
+];
+$when = static fn (?string $t): string => $t ? date('j M Y, g:i a', strtotime($t)) : '';
+$cards = [
+    ['payment_submitted', 'fa-solid fa-magnifying-glass-dollar', 'Verify Payment',      (string) (int) $overview['review'],  'Bank reference sent',  'amber'],
+    ['paid',              'fa-solid fa-box',                     'Ready to Ship',       (string) (int) $overview['to_ship'], 'Paid, not shipped',    'green'],
+    ['awaiting',          'fa-regular fa-hourglass-half',        'Waiting for Payment', (string) (int) $overview['waiting'], 'No bank reference yet', 'grey'],
+    [null,                'fa-solid fa-sack-dollar',             'Income Today',        (string) $overview['sales_today'],   'Payments approved today', 'purple'],
+];
 ?>
 <div class="page-body orders-page">
 
     <header class="orders-head">
-        <div>
-            <h1>Orders</h1>
-            <p>Check each customer's bank reference, approve it to issue the official receipt, then ship. Customers are told on Telegram at every step.</p>
-        </div>
+        <h1>Orders</h1>
+        <p>Orders from your AI assistant. Verify the customer's payment, then ship. Customers are told on Telegram at every step.</p>
     </header>
 
     <?php if ($missingTable): ?>
@@ -58,325 +59,142 @@ $active = array_filter([
             <i class="fa-solid fa-triangle-exclamation"></i>
             <div>
                 <strong>The orders table does not exist yet</strong>
-                <span>Run <code>C:\xampp\php\php.exe bin\migrate.php</code> in the project folder, then reload this page.</span>
+                <span>Run <code>php bin/migrate.php</code> in the project folder, then reload this page.</span>
             </div>
         </div>
     <?php endif; ?>
 
-    <section class="orders-kpis" aria-label="Summary">
-        <?php
-        $kpis = [
-            ['review',  'payment_submitted', 'fa-solid fa-receipt',        (string) (int) $overview['review'],  'Bank refs to review', 'Check and approve'],
-            ['waiting', 'pending_payment',   'fa-regular fa-hourglass-half', (string) (int) $overview['waiting'], 'Waiting for payment', 'No bank ref. yet'],
-            ['ship',    'paid',              'fa-solid fa-box',            (string) (int) $overview['to_ship'], 'Ready to ship',       'Paid, not shipped'],
-        ];
-        foreach ($kpis as [$kind, $st, $icon, $value, $label, $hint]):
-            $on = $status === $st; ?>
-            <a class="orders-kpi orders-kpi--<?= e($kind) ?><?= $kind === 'review' && $overview['review'] > 0 ? ' has-items' : '' ?><?= $on ? ' is-active' : '' ?>"
-               href="<?= e(url('orders', ['status' => $st])) ?>"<?= $on ? ' aria-current="true"' : '' ?>>
-                <span class="orders-kpi__icon" aria-hidden="true"><i class="<?= e($icon) ?>"></i></span>
-                <span class="orders-kpi__text">
+    <!-- 1. Summary cards (click = filter) -->
+    <section class="ocards" aria-label="Summary">
+        <?php foreach ($cards as [$filter, $icon, $label, $value, $hint, $tone]): ?>
+            <?php $tag = $filter !== null ? 'a' : 'div'; ?>
+            <<?= $tag ?> class="ocard ocard--<?= e($tone) ?><?= $filter !== null && $status === $filter ? ' is-active' : '' ?><?= $filter === 'payment_submitted' && (int) $value > 0 ? ' has-items' : '' ?>"
+                <?= $filter !== null ? 'href="' . e(url('orders', ['status' => $filter])) . '"' : '' ?>>
+                <span class="ocard__icon"><i class="<?= e($icon) ?>" aria-hidden="true"></i></span>
+                <span class="ocard__text">
                     <small><?= e($label) ?></small>
                     <strong><?= e($value) ?></strong>
                     <em><?= e($hint) ?></em>
                 </span>
-            </a>
+            </<?= $tag ?>>
         <?php endforeach; ?>
-        <a class="orders-kpi orders-kpi--today<?= $f['range'] === 'today' && $status === '' ? ' is-active' : '' ?>" href="<?= e(url('orders', ['range' => 'today'])) ?>">
-            <span class="orders-kpi__icon" aria-hidden="true"><i class="fa-solid fa-chart-line"></i></span>
-            <span class="orders-kpi__text">
-                <small>Paid today</small>
-                <strong><?= e($overview['sales_today']) ?></strong>
-                <em><?= (int) $overview['today'] ?> order<?= $overview['today'] === 1 ? '' : 's' ?> today</em>
-            </span>
-        </a>
     </section>
 
-    <section class="panel orders-panel">
-
-        <nav class="order-tabs" aria-label="Filter by status">
-            <a href="<?= e($without('status')) ?>"<?= $status === '' ? ' class="is-active" aria-current="page"' : '' ?>>
-                All <span class="order-tabs__n"><?= (int) $allCount ?></span>
-            </a>
-            <?php foreach (Order::STATUSES as $key => $label): ?>
-                <a class="order-tabs--<?= e($key) ?><?= $status === $key ? ' is-active' : '' ?>" href="<?= e(url('orders', ['status' => $key] + $listQuery)) ?>"<?= $status === $key ? ' aria-current="page"' : '' ?>>
-                    <i class="order-tabs__dot" aria-hidden="true"></i><?= e($label) ?> <span class="order-tabs__n"><?= (int) $counts[$key] ?></span>
-                </a>
-            <?php endforeach; ?>
-        </nav>
-
-        <form class="orders-filters" method="get" action="<?= e(url('orders')) ?>" data-orders-filters>
+    <section class="opanel">
+        <!-- 2. Filter bar -->
+        <form class="ofilter" method="get" action="<?= e(APP_URL . '/') ?>" role="search">
             <input type="hidden" name="page" value="orders">
-            <?php if ($status !== ''): ?><input type="hidden" name="status" value="<?= e($status) ?>"><?php endif; ?>
-
-            <div class="orders-search">
-                <label class="sr-only" for="orders-q">Search orders</label>
+            <label class="ofilter__status">
+                <span class="sr-only">Status</span>
+                <select name="status" onchange="this.form.submit()">
+                    <?php foreach (OrderController::FILTERS as $value => $label): ?>
+                        <option value="<?= e($value) ?>"<?= $status === $value ? ' selected' : '' ?>><?= e($label) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label class="ofilter__search">
                 <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                <input id="orders-q" name="q" type="search" placeholder="Search order no., customer or phone" value="<?= e($q) ?>">
-                <button type="submit" class="orders-search__go" aria-label="Search"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
-            </div>
-
-            <div class="orders-selects">
-                <label class="orders-select">
-                    <span>Date</span>
-                    <select name="range" data-range>
-                        <?php foreach (OrderController::RANGES as $key => $label): ?>
-                            <option value="<?= e($key) ?>"<?= $f['range'] === $key ? ' selected' : '' ?>><?= e($label) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
-                <label class="orders-select">
-                    <span>Product</span>
-                    <select name="product">
-                        <option value="">All products</option>
-                        <?php foreach ($products as $name): ?>
-                            <option value="<?= e($name) ?>"<?= $f['product'] === $name ? ' selected' : '' ?>><?= e($name) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
-                <label class="orders-select">
-                    <span>Sort</span>
-                    <select name="sort">
-                        <?php foreach (Order::SORTS as $key => $label): ?>
-                            <option value="<?= e($key) ?>"<?= $f['sort'] === $key ? ' selected' : '' ?>><?= e($label) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
-                <?php if ($hasFilters): ?>
-                    <a class="orders-reset" href="<?= e(url('orders', array_filter(['status' => $status]))) ?>"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Reset</a>
-                <?php endif; ?>
-            </div>
-
-            <div class="orders-dates" data-custom-dates<?= $f['range'] === 'custom' ? '' : ' hidden' ?>>
-                <label class="orders-select">
-                    <span>From</span>
-                    <input type="date" name="from" value="<?= e($f['range'] === 'custom' ? (string) $f['from'] : '') ?>" max="<?= e(date('Y-m-d')) ?>">
-                </label>
-                <label class="orders-select">
-                    <span>To</span>
-                    <input type="date" name="to" value="<?= e($f['range'] === 'custom' ? (string) $f['to'] : '') ?>" max="<?= e(date('Y-m-d')) ?>">
-                </label>
-                <button class="orders-apply" type="submit">Apply dates</button>
-            </div>
+                <span class="sr-only">Search</span>
+                <input type="search" name="q" value="<?= e($q) ?>" placeholder="Search order no., customer or phone" maxlength="100">
+            </label>
+            <?php if ($status !== '' || $q !== ''): ?>
+                <a class="ofilter__clear" href="<?= e(url('orders')) ?>">Clear</a>
+            <?php endif; ?>
         </form>
 
-        <div class="orders-resultbar">
-            <p class="orders-resultbar__text">
-                <?php if ($total > 0): ?>
-                    <strong><?= (int) $total ?></strong> order<?= $total === 1 ? '' : 's' ?>
-                    <span class="orders-sep" aria-hidden="true">·</span>
-                    <strong><?= e(format_money($summary['sum'], $summary['currency'])) ?></strong> total<?= $status === '' ? ' <span class="muted">(excl. cancelled)</span>' : '' ?>
-                <?php elseif ($allCount > 0 || $active !== []): ?>
-                    No orders match these filters.
-                <?php else: ?>
-                    No orders yet.
-                <?php endif; ?>
-            </p>
-            <?php if ($active !== []): ?>
-                <div class="orders-chips">
-                    <?php foreach ($active as $key => $label): ?>
-                        <a class="orders-chip" href="<?= e($key === 'range' ? $without('range', 'from', 'to') : $without($key)) ?>" title="Remove this filter">
-                            <?= e($label) ?> <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                        </a>
-                    <?php endforeach; ?>
-                </div>
-            <?php endif; ?>
-        </div>
+        <!-- Bulk delete: the row checkboxes belong to this form (form="bulkDelete") -->
+        <form class="obulk" id="bulkDelete" method="post" action="<?= e(url('orders', ['action' => 'delete'])) ?>" hidden
+              data-confirm="Delete the selected orders? This cannot be undone. Paid invoices stay in Financial &gt; Invoice."
+              data-confirm-title="Delete orders?" data-confirm-ok="Delete">
+            <?= csrf_field() ?>
+            <input type="hidden" name="return" value="<?= e($listUrl) ?>">
+            <span><strong data-bulk-count>0</strong> selected</span>
+            <button class="obtn obtn--ghost" type="button" data-bulk-clear>Clear</button>
+            <button class="obtn obtn--danger" type="submit"><i class="fa-regular fa-trash-can" aria-hidden="true"></i> Delete</button>
+        </form>
 
+        <!-- 3. Table -->
         <?php if ($orders === []): ?>
-            <div class="empty-state orders-empty">
-                <div class="empty-icon"><i class="fa-solid fa-bag-shopping"></i></div>
-                <h3><?= $allCount === 0 ? 'No orders yet' : 'Nothing here' ?></h3>
-                <p><?= $allCount === 0
-                    ? 'When a customer orders through your AI chatbot on Telegram, the order appears here. Their bank reference (transfer slip) arrives here too.'
-                    : 'No orders match this filter. Try another status or clear the filters.' ?></p>
+            <div class="oempty">
+                <i class="fa-solid fa-bag-shopping" aria-hidden="true"></i>
+                <strong><?= $status !== '' || $q !== '' ? 'No orders match' : 'No orders yet' ?></strong>
+                <span><?= $status !== '' || $q !== '' ? 'Try another status or search.' : 'Orders placed through your AI assistant on Telegram appear here.' ?></span>
             </div>
         <?php else: ?>
-            <div class="orders-table-wrap">
-                <table class="orders-table">
+            <div class="otable-wrap">
+                <table class="otable">
                     <thead>
-                        <tr>
-                            <th class="c-order">Order</th>
-                            <th class="c-customer">Customer</th>
-                            <th class="c-items">Items</th>
-                            <th class="c-total">Total</th>
-                            <th class="c-status">Payment</th>
-                            <th class="c-actions">Action</th>
-                        </tr>
+                        <tr><th class="is-check"><input type="checkbox" data-check-all aria-label="Select all orders on this page"></th><th>Order</th><th>Customer</th><th class="is-num">Total</th><th>Status</th><th class="is-act">Action</th></tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($orders as $order): ?>
-                            <?php
-                            $id        = (int) $order['id'];
-                            $st        = (string) $order['status'];
-                            $lines     = $items[$id] ?? [];
-                            $name      = trim((string) ($order['customer_name'] ?? '')) ?: 'Telegram ' . $order['customer_chat_id'];
-                            $parts     = preg_split('/\s+/u', $name) ?: [$name];
-                            $initials  = mb_strtoupper(mb_substr($parts[0], 0, 1) . (count($parts) > 1 ? mb_substr(end($parts), 0, 1) : mb_substr($parts[0], 1, 1)));
-                            $hue       = crc32((string) $order['customer_chat_id']) % 360;
-                            $sub       = array_filter([
-                                !empty($order['customer_username']) ? '@' . $order['customer_username'] : null,
-                                !empty($order['customer_phone']) ? $order['customer_phone'] : null,
-                            ]);
-                            $hasReceipt = !empty($order['receipt_path']);
-                            // Waiting for payment (no bank reference yet): Payment and Action stay blank.
-                            $waiting    = in_array($st, ['pending_payment', 'payment_rejected'], true) || ($st === 'payment_submitted' && !$hasReceipt);
-                            $canCancel  = $st === 'payment_submitted' && $hasReceipt;
-                            ?>
-                            <tr class="orders-row orders-row--<?= e($st) ?>">
-                                <td class="c-order">
-                                    <span class="order-no"><?= e($order['order_no']) ?></span>
-                                    <small class="order-date"><?= e(date('j M Y, g:i a', strtotime((string) $order['created_at']))) ?></small>
-                                </td>
-                                <td class="c-customer">
-                                    <div class="order-customer">
-                                        <span class="order-avatar" style="--h: <?= (int) $hue ?>" aria-hidden="true"><?= e($initials) ?></span>
-                                        <span class="order-customer__text">
-                                            <strong><?= e($name) ?></strong>
-                                            <?php if ($sub !== []): ?><small><?= e(implode(' · ', $sub)) ?></small><?php endif; ?>
-                                        </span>
-                                    </div>
-                                </td>
-                                <td class="c-items">
-                                    <?php if ($lines === []): ?>
-                                        <span class="muted">—</span>
-                                    <?php else: ?>
-                                        <ul class="order-items">
-                                            <?php foreach (array_slice($lines, 0, 2) as $item): ?>
-                                                <li><span class="order-qty"><?= (int) $item['quantity'] ?>×</span><span class="order-item-name"><?= e($item['product_name']) ?></span></li>
-                                            <?php endforeach; ?>
-                                            <?php if (count($lines) > 2): ?>
-                                                <li class="order-more" title="<?= e(implode(', ', array_map(static fn ($i) => $i['quantity'] . ' × ' . $i['product_name'], array_slice($lines, 2)))) ?>">+<?= count($lines) - 2 ?> more item<?= count($lines) - 2 === 1 ? '' : 's' ?></li>
-                                            <?php endif; ?>
-                                        </ul>
+                    <?php foreach ($orders as $order):
+                        $id         = (int) $order['id'];
+                        $st         = (string) $order['status'];
+                        [$stLabel, $stTone] = $pill[$st] ?? [$st, 'grey'];
+                        $hasReceipt = !empty($order['receipt_path']);
+                        $username   = trim((string) ($order['customer_username'] ?? ''));
+                        $sub        = $username !== '' ? '@' . $username : (string) ($order['customer_phone'] ?? '');
+                        ?>
+                        <tr class="orow">
+                            <td class="is-check"><input type="checkbox" name="ids[]" value="<?= $id ?>" form="bulkDelete" data-check
+                                                        aria-label="Select <?= e($order['order_no']) ?>"></td>
+                            <td data-label="Order">
+                                <strong class="ono"><?= e($order['order_no']) ?></strong>
+                                <small class="osub"><?= e($when($order['created_at'])) ?></small>
+                            </td>
+                            <td data-label="Customer">
+                                <strong class="oname"><?= e($order['customer_name'] ?: ($username !== '' ? '@' . $username : 'Customer')) ?></strong>
+                                <?php if ($sub !== '' && $sub !== ($order['customer_name'] ?? '')): ?><small class="osub"><?= e($sub) ?></small><?php endif; ?>
+                            </td>
+                            <td data-label="Total" class="is-num"><strong class="ototal"><?= e(format_money($order['total'], $order['currency'])) ?></strong></td>
+                            <td data-label="Status"><span class="opill opill--<?= e($stTone) ?>"><?= e($stLabel) ?></span></td>
+                            <td data-label="Action" class="is-act">
+                                <div class="oacts">
+                                    <?php if ($st === 'payment_submitted' && $hasReceipt): ?>
+                                        <form method="post" action="<?= e(url('orders', ['action' => 'approve'])) ?>">
+                                            <?= csrf_field() ?>
+                                            <input type="hidden" name="id" value="<?= $id ?>">
+                                            <input type="hidden" name="return" value="<?= e($listUrl) ?>">
+                                            <button class="obtn obtn--primary" type="submit"><i class="fa-solid fa-check" aria-hidden="true"></i> Approve</button>
+                                        </form>
+                                        <button class="obtn obtn--danger" type="button" data-reject="<?= $id ?>" data-order-no="<?= e($order['order_no']) ?>">
+                                            <i class="fa-solid fa-xmark" aria-hidden="true"></i> Reject
+                                        </button>
+                                    <?php elseif ($st === 'paid'): ?>
+                                        <form method="post" action="<?= e(url('orders', ['action' => 'ship'])) ?>"
+                                              data-confirm="Mark <?= e($order['order_no']) ?> as shipped and tell the customer on Telegram?"
+                                              data-confirm-title="Mark as shipped?" data-confirm-ok="Mark shipped" data-confirm-tone="primary">
+                                            <?= csrf_field() ?>
+                                            <input type="hidden" name="id" value="<?= $id ?>">
+                                            <input type="hidden" name="return" value="<?= e($listUrl) ?>">
+                                            <button class="obtn obtn--primary" type="submit"><i class="fa-solid fa-truck-fast" aria-hidden="true"></i> Mark shipped</button>
+                                        </form>
                                     <?php endif; ?>
-                                    <?php if (!empty($order['delivery_note'])): ?>
-                                        <small class="order-note"><i class="fa-regular fa-note-sticky" aria-hidden="true"></i> <?= e($order['delivery_note']) ?></small>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="c-total"><strong class="order-total"><?= e(format_money($order['total'], $order['currency'])) ?></strong></td>
-                                <td class="c-status">
-                                    <span class="order-status order-status--<?= e($st) ?>"><i aria-hidden="true"></i><?= e(Order::STATUSES[$st] ?? $st) ?></span>
-                                    <span class="order-pay">
-                                        <?php if ($hasReceipt): ?>
-                                            <a class="order-receipt" href="<?= e(url('orders', ['action' => 'receipt', 'id' => $id])) ?>" target="_blank" rel="noopener">
-                                                <i class="fa-regular <?= $order['receipt_mime'] === 'application/pdf' ? 'fa-file-pdf' : 'fa-file-image' ?>" aria-hidden="true"></i> Bank reference
-                                            </a>
-                                        <?php elseif ($st !== 'cancelled' && !$waiting): ?>
-                                            <span class="order-receipt order-receipt--none">No bank reference yet</span>
-                                        <?php endif; ?>
-                                        <?php if ($st === 'payment_rejected' && !empty($order['review_note'])): ?>
-                                            <small class="order-reason"><?= e($order['review_note']) ?></small>
-                                        <?php elseif ($st === 'shipped' && !empty($order['shipped_at'])): ?>
-                                            <small>Shipped <?= e(date('j M, g:i a', strtotime((string) $order['shipped_at']))) ?></small>
-                                        <?php endif; ?>
-                                        <?php if (in_array($st, ['paid', 'shipped'], true)): ?>
-                                            <small class="order-receipt-sent<?= empty($order['official_receipt_sent_at']) ? ' is-missing' : '' ?>">
-                                                <?= !empty($order['official_receipt_sent_at'])
-                                                    ? 'Official receipt sent ' . e(date('j M, g:i a', strtotime((string) $order['official_receipt_sent_at'])))
-                                                    : 'Official receipt not sent yet' ?>
-                                            </small>
-                                        <?php endif; ?>
-                                    </span>
-                                </td>
-                                <td class="c-actions">
-                                    <div class="order-actions">
-                                        <?php if ($st === 'payment_submitted' && $hasReceipt): ?>
-                                            <form method="post" action="<?= e(url('orders', ['action' => 'approve'])) ?>"
-                                                  data-confirm="Mark <?= e($order['order_no']) ?> as Payment successful and tell the customer &quot;Payment verified&quot; on Telegram?"
-                                                  data-confirm-title="Approve payment?" data-confirm-ok="Approve">
-                                                <?= csrf_field() ?>
-                                                <input type="hidden" name="id" value="<?= $id ?>">
-                                                <input type="hidden" name="return" value="<?= e($listUrl) ?>">
-                                                <button class="order-btn order-btn--approve" type="submit"><i class="fa-solid fa-check" aria-hidden="true"></i> Approve</button>
-                                            </form>
-                                            <details class="order-reject">
-                                                <summary class="order-btn order-btn--ghost"><i class="fa-solid fa-xmark" aria-hidden="true"></i> Reject</summary>
-                                                <form method="post" action="<?= e(url('orders', ['action' => 'reject'])) ?>">
-                                                    <?= csrf_field() ?>
-                                                    <input type="hidden" name="id" value="<?= $id ?>">
-                                                    <input type="hidden" name="return" value="<?= e($listUrl) ?>">
-                                                    <label for="reason-<?= $id ?>">Reason (sent to the customer)</label>
-                                                    <input id="reason-<?= $id ?>" name="reason" type="text" maxlength="300" placeholder="e.g. Amount does not match">
-                                                    <button class="danger-btn btn-sm" type="submit">Reject payment</button>
-                                                </form>
-                                            </details>
-                                        <?php elseif ($st === 'paid'): ?>
-                                            <form method="post" action="<?= e(url('orders', ['action' => 'ship'])) ?>"
-                                                  data-confirm="Mark <?= e($order['order_no']) ?> as Shipped and tell the customer on Telegram?"
-                                                  data-confirm-title="Mark as shipped?" data-confirm-ok="Mark as shipped">
-                                                <?= csrf_field() ?>
-                                                <input type="hidden" name="id" value="<?= $id ?>">
-                                                <input type="hidden" name="return" value="<?= e($listUrl) ?>">
-                                                <button class="order-btn order-btn--ship" type="submit"><i class="fa-solid fa-truck-fast" aria-hidden="true"></i> Mark shipped</button>
-                                            </form>
-                                            <a class="order-btn order-btn--doc" href="<?= e(url('orders', ['action' => 'official_receipt', 'id' => $id])) ?>" target="_blank" rel="noopener"
-                                               title="Official receipt (PDF)"><i class="fa-regular fa-file-pdf" aria-hidden="true"></i> Receipt</a>
-                                            <form method="post" action="<?= e(url('orders', ['action' => 'send_receipt'])) ?>"
-                                                  data-confirm="Send the official receipt of <?= e($order['order_no']) ?> to the customer on Telegram<?= !empty($order['official_receipt_sent_at']) ? ' again' : '' ?>?"
-                                                  data-confirm-title="Send official receipt?" data-confirm-ok="Send" data-confirm-tone="primary">
-                                                <?= csrf_field() ?>
-                                                <input type="hidden" name="id" value="<?= $id ?>">
-                                                <input type="hidden" name="return" value="<?= e($listUrl) ?>">
-                                                <button class="order-btn order-btn--icon order-btn--send" type="submit" title="Send the official receipt to the customer on Telegram"
-                                                        aria-label="Send official receipt of <?= e($order['order_no']) ?>"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i><span class="order-btn__label">Send receipt</span></button>
-                                            </form>
-                                        <?php elseif ($waiting): ?>
-                                        <?php elseif ($st === 'shipped'): ?>
-                                            <a class="order-btn order-btn--doc" href="<?= e(url('orders', ['action' => 'official_receipt', 'id' => $id])) ?>" target="_blank" rel="noopener"
-                                               title="Official receipt (PDF)"><i class="fa-regular fa-file-pdf" aria-hidden="true"></i> Official receipt</a>
-                                            <form method="post" action="<?= e(url('orders', ['action' => 'send_receipt'])) ?>"
-                                                  data-confirm="Send the official receipt of <?= e($order['order_no']) ?> to the customer on Telegram<?= !empty($order['official_receipt_sent_at']) ? ' again' : '' ?>?"
-                                                  data-confirm-title="Send official receipt?" data-confirm-ok="Send" data-confirm-tone="primary">
-                                                <?= csrf_field() ?>
-                                                <input type="hidden" name="id" value="<?= $id ?>">
-                                                <input type="hidden" name="return" value="<?= e($listUrl) ?>">
-                                                <button class="order-btn order-btn--icon order-btn--send" type="submit" title="Send the official receipt to the customer on Telegram"
-                                                        aria-label="Send official receipt of <?= e($order['order_no']) ?>"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i><span class="order-btn__label">Send receipt</span></button>
-                                            </form>
-                                        <?php else: ?>
-                                            <span class="order-wait order-wait--done">Closed</span>
-                                        <?php endif; ?>
-                                        <?php if ($canCancel): ?>
-                                            <form method="post" action="<?= e(url('orders', ['action' => 'cancel'])) ?>"
-                                                  data-confirm="Cancel <?= e($order['order_no']) ?>? The customer is told on Telegram."
-                                                  data-confirm-title="Cancel order?" data-confirm-ok="Cancel order">
-                                                <?= csrf_field() ?>
-                                                <input type="hidden" name="id" value="<?= $id ?>">
-                                                <input type="hidden" name="return" value="<?= e($listUrl) ?>">
-                                                <button class="order-btn order-btn--icon" type="submit" title="Cancel order" aria-label="Cancel <?= e($order['order_no']) ?>">
-                                                    <i class="fa-solid fa-ban" aria-hidden="true"></i><span class="order-btn__label">Cancel</span>
-                                                </button>
-                                            </form>
-                                        <?php endif; ?>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
+                                    <button class="obtn obtn--ghost" type="button" data-details="<?= $id ?>">Details</button>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
 
-            <footer class="orders-foot">
+            <footer class="ofoot">
                 <p>Showing <strong><?= $from ?>–<?= $to ?></strong> of <strong><?= (int) $total ?></strong></p>
                 <?php if ($pages > 1): ?>
-                    <nav class="orders-pager" aria-label="Pages">
+                    <nav class="opager" aria-label="Pages">
                         <?php if ($page > 1): ?>
                             <a href="<?= e(url('orders', $listQuery + ['p' => $page - 1])) ?>" aria-label="Previous page"><i class="fa-solid fa-chevron-left"></i></a>
-                        <?php else: ?>
-                            <span class="is-disabled" aria-hidden="true"><i class="fa-solid fa-chevron-left"></i></span>
                         <?php endif; ?>
                         <?php for ($i = 1; $i <= $pages; $i++): ?>
                             <?php if ($i === 1 || $i === $pages || abs($i - $page) <= 1): ?>
                                 <a href="<?= e(url('orders', $listQuery + ['p' => $i])) ?>"<?= $i === $page ? ' class="is-active" aria-current="page"' : '' ?>><?= $i ?></a>
                             <?php elseif (abs($i - $page) === 2): ?>
-                                <span class="orders-pager__gap" aria-hidden="true">…</span>
+                                <span aria-hidden="true">…</span>
                             <?php endif; ?>
                         <?php endfor; ?>
                         <?php if ($page < $pages): ?>
                             <a href="<?= e(url('orders', $listQuery + ['p' => $page + 1])) ?>" aria-label="Next page"><i class="fa-solid fa-chevron-right"></i></a>
-                        <?php else: ?>
-                            <span class="is-disabled" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>
                         <?php endif; ?>
                     </nav>
                 <?php endif; ?>
@@ -384,28 +202,233 @@ $active = array_filter([
         <?php endif; ?>
     </section>
 </div>
-<script>
-(function () {
-    var form = document.querySelector('[data-orders-filters]');
-    if (!form) { return; }
-    var range = form.querySelector('[data-range]');
-    var dates = form.querySelector('[data-custom-dates]');
-    // Apply as soon as a dropdown changes (custom dates wait for "Apply dates", search for Enter / the arrow).
-    form.querySelectorAll('select').forEach(function (sel) {
-        sel.addEventListener('change', function () {
-            if (sel === range) {
-                dates.hidden = range.value !== 'custom';
-                if (range.value === 'custom') { dates.querySelector('input').focus(); return; }
-            }
-            form.submit();
-        });
-    });
-    // Close an open "Reject" box when another one opens or on a click outside.
-    document.addEventListener('click', function (e) {
-        document.querySelectorAll('.order-reject[open]').forEach(function (d) {
-            if (!d.contains(e.target)) { d.removeAttribute('open'); }
-        });
-    });
-})();
-</script>
-<?php view('layouts/footer'); ?>
+
+<!-- Reject: the reason is sent to the customer -->
+<dialog class="odialog odialog--small" id="rejectDialog" aria-labelledby="rejectTitle">
+    <form method="post" action="<?= e(url('orders', ['action' => 'reject'])) ?>">
+        <?= csrf_field() ?>
+        <input type="hidden" name="id" value="" data-reject-id>
+        <input type="hidden" name="return" value="<?= e($listUrl) ?>">
+        <header class="odialog__head">
+            <h2 id="rejectTitle">Reject payment <span data-reject-no></span></h2>
+            <button class="odialog__x" type="button" data-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </header>
+        <div class="odialog__body">
+            <label class="ofield">
+                <span>Reason (sent to the customer on Telegram)</span>
+                <textarea name="reason" rows="3" maxlength="300" required placeholder="e.g. The amount does not match the order total."></textarea>
+            </label>
+            <p class="ohint">The customer is asked to send a new bank reference.</p>
+        </div>
+        <footer class="odialog__foot">
+            <button class="obtn obtn--ghost" type="button" data-close>Cancel</button>
+            <button class="obtn obtn--danger-solid" type="submit">Reject payment</button>
+        </footer>
+    </form>
+</dialog>
+
+<!-- Details: one popup per order on this page -->
+<?php foreach ($orders as $order):
+    $id         = (int) $order['id'];
+    $st         = (string) $order['status'];
+    [$stLabel, $stTone] = $pill[$st] ?? [$st, 'grey'];
+    $hasReceipt = !empty($order['receipt_path']);
+    $isImage    = $hasReceipt && str_starts_with((string) $order['receipt_mime'], 'image/');
+    $paid       = in_array($st, ['paid', 'shipped'], true);
+    $invoice    = $invoices[$id] ?? null;
+    $username   = trim((string) ($order['customer_username'] ?? ''));
+    $receiptUrl = url('orders', ['action' => 'receipt', 'id' => $id]);
+    $steps = array_filter([
+        ['Order placed', $order['created_at']],
+        !empty($order['receipt_uploaded_at']) ? ['Bank reference received', $order['receipt_uploaded_at']] : null,
+        $paid && !empty($order['reviewed_at']) ? ['Payment approved', $order['reviewed_at']] : null,
+        $st === 'payment_rejected' && !empty($order['reviewed_at']) ? ['Payment rejected', $order['reviewed_at']] : null,
+        !empty($order['official_receipt_sent_at']) ? ['Official receipt sent', $order['official_receipt_sent_at']] : null,
+        !empty($order['shipped_at']) ? ['Shipped', $order['shipped_at']] : null,
+        $st === 'cancelled' ? ['Cancelled', $order['reviewed_at'] ?? null] : null,
+    ]);
+    ?>
+    <dialog class="odialog" id="details-<?= $id ?>" aria-labelledby="details-title-<?= $id ?>">
+        <header class="odialog__head">
+            <div class="ohead">
+                <span class="ohead__icon"><i class="fa-solid fa-bag-shopping" aria-hidden="true"></i></span>
+                <div>
+                    <h2 id="details-title-<?= $id ?>"><?= e($order['order_no']) ?></h2>
+                    <p>Placed <?= e($when($order['created_at'])) ?></p>
+                </div>
+            </div>
+            <button class="odialog__x" type="button" data-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </header>
+
+        <div class="odialog__body odetail">
+            <!-- At a glance -->
+            <div class="osum">
+                <div><small>Status</small><span class="opill opill--<?= e($stTone) ?>"><?= e($stLabel) ?></span></div>
+                <div><small>Total</small><strong><?= e(format_money($order['total'], $order['currency'])) ?></strong></div>
+                <div><small>Items</small><strong><?= (int) array_sum(array_map(static fn (array $i): int => (int) $i['quantity'], $items[$id] ?? [])) ?></strong></div>
+                <div><small>Invoice</small><strong><?= $invoice !== null && !empty($invoice['invoice_number']) ? e($invoice['invoice_number']) : '—' ?></strong></div>
+            </div>
+
+            <div class="ogrid">
+                <!-- Customer -->
+                <section class="obox">
+                    <h3><i class="fa-regular fa-user" aria-hidden="true"></i> Customer</h3>
+                    <dl class="odl">
+                        <dt>Name</dt><dd><?= e($order['customer_name'] ?: '—') ?></dd>
+                        <?php if ($username !== ''): ?><dt>Telegram</dt><dd>@<?= e($username) ?></dd><?php endif; ?>
+                        <dt>Phone</dt><dd><?= e($order['customer_phone'] ?: '—') ?></dd>
+                        <?php if (!empty($order['delivery_note'])): ?><dt>Note</dt><dd><?= e($order['delivery_note']) ?></dd><?php endif; ?>
+                    </dl>
+                </section>
+
+                <!-- Payment -->
+                <section class="obox">
+                    <h3><i class="fa-regular fa-credit-card" aria-hidden="true"></i> Payment</h3>
+                    <dl class="odl">
+                        <dt>Status</dt><dd><span class="opill opill--<?= e($stTone) ?>"><?= e($stLabel) ?></span></dd>
+                        <?php if ($paid && !empty($order['reviewed_at'])): ?><dt>Approved</dt><dd><?= e($when($order['reviewed_at'])) ?></dd><?php endif; ?>
+                        <?php if ($st === 'payment_rejected' && !empty($order['review_note'])): ?>
+                            <dt>Reason</dt><dd class="is-red"><?= e($order['review_note']) ?></dd>
+                        <?php endif; ?>
+                    </dl>
+                    <?php if ($hasReceipt): ?>
+                        <a class="oref" href="<?= e($receiptUrl) ?>" target="_blank" rel="noopener" title="Open the bank reference full size">
+                            <?php if ($isImage): ?>
+                                <img src="<?= e($receiptUrl) ?>" alt="Bank reference of <?= e($order['order_no']) ?>" loading="lazy">
+                            <?php else: ?>
+                                <span class="oref__file"><i class="fa-regular fa-file-pdf" aria-hidden="true"></i> Bank reference (PDF)</span>
+                            <?php endif; ?>
+                            <span class="oref__open">Bank reference · open full size <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></span>
+                        </a>
+                    <?php else: ?>
+                        <p class="oempty-note"><i class="fa-regular fa-hourglass-half" aria-hidden="true"></i> No bank reference from the customer yet.</p>
+                    <?php endif; ?>
+                </section>
+            </div>
+
+            <!-- Items -->
+            <section class="obox">
+                <h3><i class="fa-solid fa-list-ul" aria-hidden="true"></i> Items</h3>
+                <table class="oitems">
+                    <thead><tr><th>Product</th><th class="is-num">Qty</th><th class="is-num">Price</th><th class="is-num">Amount</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($items[$id] ?? [] as $item): ?>
+                        <tr>
+                            <td><?= e($item['product_name']) ?><?php if (!empty($item['sku'])): ?> <small><?= e($item['sku']) ?></small><?php endif; ?></td>
+                            <td class="is-num"><?= (int) $item['quantity'] ?></td>
+                            <td class="is-num"><?= e(number_format((float) $item['unit_price'], 2)) ?></td>
+                            <td class="is-num"><?= e(number_format((float) $item['line_total'], 2)) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                    <tfoot><tr><td colspan="3">Total</td><td class="is-num"><?= e(format_money($order['total'], $order['currency'])) ?></td></tr></tfoot>
+                </table>
+            </section>
+
+            <div class="ogrid">
+                <!-- Documents -->
+                <section class="obox">
+                    <h3><i class="fa-regular fa-folder-open" aria-hidden="true"></i> Documents</h3>
+                    <ul class="odocs">
+                        <li>
+                            <span class="odocs__name"><i class="fa-solid fa-file-invoice" aria-hidden="true"></i>
+                                <span><strong>Invoice</strong>
+                                    <?php if ($invoice !== null && !empty($invoice['invoice_number'])): ?>
+                                        <em><?= e($invoice['invoice_number']) ?> · <?= e(ucfirst((string) $invoice['status'])) ?></em>
+                                    <?php else: ?>
+                                        <em>Not created</em>
+                                    <?php endif; ?>
+                                </span>
+                            </span>
+                            <?php if ($invoice !== null && !empty($invoice['invoice_number'])): ?>
+                                <a href="<?= e(url('financial', ['action' => 'print', 'id' => (int) $invoice['id']])) ?>" target="_blank" rel="noopener">Open</a>
+                            <?php endif; ?>
+                        </li>
+                        <li>
+                            <span class="odocs__name"><i class="fa-solid fa-receipt" aria-hidden="true"></i>
+                                <span><strong>Official receipt</strong>
+                                    <em><?= $paid
+                                        ? (!empty($order['official_receipt_sent_at']) ? 'Sent ' . e(date('j M, g:i a', strtotime((string) $order['official_receipt_sent_at']))) : 'Not sent yet')
+                                        : 'After the payment is approved' ?></em>
+                                </span>
+                            </span>
+                            <?php if ($paid): ?>
+                                <a href="<?= e(url('orders', ['action' => 'official_receipt', 'id' => $id])) ?>" target="_blank" rel="noopener">Open</a>
+                            <?php endif; ?>
+                        </li>
+                    </ul>
+                    <?php if ($paid && $order['channel'] === 'telegram'): ?>
+                        <div class="osend">
+                            <form method="post" action="<?= e(url('orders', ['action' => 'send_invoice'])) ?>">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="id" value="<?= $id ?>">
+                                <input type="hidden" name="return" value="<?= e($listUrl) ?>">
+                                <button class="obtn obtn--ghost" type="submit"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Send invoice</button>
+                            </form>
+                            <form method="post" action="<?= e(url('orders', ['action' => 'send_receipt'])) ?>">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="id" value="<?= $id ?>">
+                                <input type="hidden" name="return" value="<?= e($listUrl) ?>">
+                                <button class="obtn obtn--ghost" type="submit"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Send receipt</button>
+                            </form>
+                        </div>
+                        <p class="ohint">Sent as a PDF to the customer on Telegram.</p>
+                    <?php endif; ?>
+                </section>
+
+                <!-- Timeline -->
+                <section class="obox">
+                    <h3><i class="fa-regular fa-clock" aria-hidden="true"></i> Timeline</h3>
+                    <ol class="otime">
+                        <?php foreach ($steps as [$label, $at]): ?>
+                            <li><strong><?= e($label) ?></strong><?php if ($at): ?><small><?= e($when($at)) ?></small><?php endif; ?></li>
+                        <?php endforeach; ?>
+                    </ol>
+                </section>
+            </div>
+        </div>
+
+        <footer class="odialog__foot">
+            <form method="post" action="<?= e(url('orders', ['action' => 'delete'])) ?>" class="odialog__left"
+                  data-confirm="Delete <?= e($order['order_no']) ?>? This cannot be undone.<?= $paid ? ' Its paid invoice stays in Financial &gt; Invoice.' : '' ?>"
+                  data-confirm-title="Delete order?" data-confirm-ok="Delete">
+                <?= csrf_field() ?>
+                <input type="hidden" name="ids[]" value="<?= $id ?>">
+                <input type="hidden" name="return" value="<?= e($listUrl) ?>">
+                <button class="obtn obtn--link-danger" type="submit"><i class="fa-regular fa-trash-can" aria-hidden="true"></i> Delete order</button>
+            </form>
+            <?php if (in_array($st, ['pending_payment', 'payment_submitted', 'payment_rejected'], true)): ?>
+                <form method="post" action="<?= e(url('orders', ['action' => 'cancel'])) ?>"
+                      data-confirm="Cancel <?= e($order['order_no']) ?>? The customer is told on Telegram."
+                      data-confirm-title="Cancel order?" data-confirm-ok="Cancel order">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="id" value="<?= $id ?>">
+                    <input type="hidden" name="return" value="<?= e($listUrl) ?>">
+                    <button class="obtn obtn--danger" type="submit"><i class="fa-solid fa-ban" aria-hidden="true"></i> Cancel order</button>
+                </form>
+            <?php endif; ?>
+            <?php if ($st === 'payment_submitted' && $hasReceipt): ?>
+                <button class="obtn obtn--danger" type="button" data-reject="<?= $id ?>" data-order-no="<?= e($order['order_no']) ?>">Reject</button>
+                <form method="post" action="<?= e(url('orders', ['action' => 'approve'])) ?>">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="id" value="<?= $id ?>">
+                    <input type="hidden" name="return" value="<?= e($listUrl) ?>">
+                    <button class="obtn obtn--primary" type="submit"><i class="fa-solid fa-check" aria-hidden="true"></i> Approve</button>
+                </form>
+            <?php elseif ($st === 'paid'): ?>
+                <form method="post" action="<?= e(url('orders', ['action' => 'ship'])) ?>"
+                      data-confirm="Mark <?= e($order['order_no']) ?> as shipped and tell the customer on Telegram?"
+                      data-confirm-title="Mark as shipped?" data-confirm-ok="Mark shipped" data-confirm-tone="primary">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="id" value="<?= $id ?>">
+                    <input type="hidden" name="return" value="<?= e($listUrl) ?>">
+                    <button class="obtn obtn--primary" type="submit"><i class="fa-solid fa-truck-fast" aria-hidden="true"></i> Mark shipped</button>
+                </form>
+            <?php else: ?>
+                <button class="obtn obtn--ghost" type="button" data-close>Close</button>
+            <?php endif; ?>
+        </footer>
+    </dialog>
+<?php endforeach; ?>
+
+<?php view('layouts/footer', ['scripts' => ['assets/js/orders.js']]); ?>

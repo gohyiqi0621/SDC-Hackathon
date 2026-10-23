@@ -49,6 +49,19 @@ view('layouts/header', [
 <div class="page-body">
     <?php view('partials/setup_checklist', ['steps' => $steps, 'tryUrl' => $chatUrl, 'tryLabel' => 'Open chats']); ?>
 
+    <div class="ai-settings staff-ai-settings" id="assistant"
+         data-ai-settings
+         data-user-id="<?= (int) $userId ?>"
+         data-endpoints="<?= e(json_encode($endpoints, JSON_UNESCAPED_SLASHES)) ?>">
+        <div class="staff-ai-heading">
+            <h2><i class="fa-solid fa-robot" aria-hidden="true"></i> AI Assistant Settings</h2>
+            <p>How the customer assistant talks, which AI model it uses, and the instructions (SOPs) it follows.</p>
+        </div>
+        <section class="ai-panel" data-panel="assistant">
+            <?php view('ai_settings/_ai_assistant_settings_form', ['aiModels' => $aiModels]); ?>
+        </section>
+    </div>
+
     <section class="panel pay-method" id="payment" data-payment-method data-save-url="<?= e($paymentSaveUrl) ?>">
         <div class="panel-header">
             <div>
@@ -108,12 +121,12 @@ view('layouts/header', [
                         <span class="pay-qr__empty" data-qr-empty<?= $payment['qr_url'] ? ' hidden' : '' ?>><i class="fa-solid fa-qrcode" aria-hidden="true"></i></span>
                     </div>
                     <div class="pay-qr__body">
-                        <strong>Payment QR code <span class="field-optional">(optional)</span></strong>
+                        <strong>Payment QR code *</strong>
                         <p class="field-hint">Your DuitNow / bank QR. Sent to the customer on Telegram with the order total. JPG, PNG or WebP, up to 2 MB.</p>
                         <div class="pay-qr__actions">
                             <label class="secondary-btn" for="payment_qr"><i class="fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i> <span data-qr-label><?= $payment['qr_url'] ? 'Replace QR' : 'Upload QR' ?></span></label>
                             <input class="sr-only" id="payment_qr" name="payment_qr" type="file" accept="image/jpeg,image/png,image/webp" data-qr-input>
-                            <button class="link-btn pay-qr__remove" type="button" data-qr-remove<?= $payment['qr_url'] ? '' : ' hidden' ?>>Remove</button>
+                            <button class="link-btn pay-qr__remove" type="button" data-qr-remove hidden>Remove</button>
                         </div>
                         <p class="field-error" data-error-for="payment_qr"></p>
                     </div>
@@ -126,18 +139,5 @@ view('layouts/header', [
             </form>
         </div>
     </section>
-
-    <div class="ai-settings staff-ai-settings" id="assistant"
-         data-ai-settings
-         data-user-id="<?= (int) $userId ?>"
-         data-endpoints="<?= e(json_encode($endpoints, JSON_UNESCAPED_SLASHES)) ?>">
-        <div class="staff-ai-heading">
-            <h2><i class="fa-solid fa-robot" aria-hidden="true"></i> AI Assistant Settings</h2>
-            <p>How the customer assistant talks, which AI model it uses, and the instructions (SOPs) it follows.</p>
-        </div>
-        <section class="ai-panel" data-panel="assistant">
-            <?php view('ai_settings/_ai_assistant_settings_form', ['aiModels' => $aiModels]); ?>
-        </section>
-    </div>
 </div>
-<?php view('layouts/footer', ['scripts' => ['assets/js/ai-settings-api.js', 'assets/js/ai-settings.js', 'assets/js/payment-method.js']]); ?>
+<?php view('layouts/footer', ['scripts' => ['assets/js/ai-settings-api.js', 'assets/js/ai-settings.js', 'assets/js/payment-method.js', 'assets/js/setup-checklist.js']]); ?>
