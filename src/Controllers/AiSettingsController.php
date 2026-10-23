@@ -753,6 +753,14 @@ final class AiSettingsController
         $this->run(function (int $userId): void {
             $google = new GoogleCalendarService();
 
+            // Shown in System > Flow Log, so a failed connect on the live site can be traced.
+            \Src\Support\FlowLog::write('gcal.start', [
+                'redirect_uri'      => $google->redirectUri(),
+                'app_url'           => APP_URL,
+                'client_id_set'     => trim((string) env('GOOGLE_CLIENT_ID', '')) !== '',
+                'client_secret_set' => trim((string) env('GOOGLE_CLIENT_SECRET', '')) !== '',
+                'session'           => substr(sha1((string) session_id()), 0, 8),
+            ]);
             if (!$google->isConfigured()) {
                 json_response(false, ['redirect_uri' => $google->redirectUri()],
                     'Google sign-in is not set up on this server yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env, '
@@ -782,7 +790,17 @@ final class AiSettingsController
         $saved  = $_SESSION[self::OAUTH_SESSION_KEY] ?? null;
         unset($_SESSION[self::OAUTH_SESSION_KEY]); // single use
 
+        \Src\Support\FlowLog::write('gcal.callback', [
+            'session'        => substr(sha1((string) session_id()), 0, 8),
+            'state_saved'    => is_array($saved),
+            'state_matches'  => is_array($saved) && hash_equals((string) ($saved['state'] ?? ''), (string) ($_GET['state'] ?? '')),
+            'google_error'   => isset($_GET['error']) ? substr((string) $_GET['error'], 0, 60) : null,
+            'has_code'       => !empty($_GET['code']),
+            'redirect_uri'   => (new GoogleCalendarService())->redirectUri(),
+        ]);
+
         $back = static function (string $outcome, string $message = ''): never {
+            \Src\Support\FlowLog::write('gcal.result', ['outcome' => $outcome, 'message' => $message]);
             $params = ['action' => 'connections', 'gcal' => $outcome];
             if ($message !== '') {
                 $params['gcal_message'] = $message;

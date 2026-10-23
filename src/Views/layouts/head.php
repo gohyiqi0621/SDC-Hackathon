@@ -15,6 +15,8 @@ $styles    = $styles ?? [];
     <title><?= e($pageTitle) ?> | <?= e(APP_NAME) ?></title>
     <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
     <meta name="description" content="<?= e(APP_NAME) ?> - finance and AI assistant portal.">
+    <!-- Google Search Console: proves ownership of sme-smart.replit.app (Google sign-in branding). -->
+    <meta name="google-site-verification" content="<?= e((string) (env('GOOGLE_SITE_VERIFICATION', '') ?: '3FfOmO2TeT0l5w8lkJ74Tk7csIM8hdb3NOMmqUH2kLk')) ?>">
     <link rel="icon" type="image/svg+xml" href="<?= e(asset_versioned('assets/favicon.svg')) ?>" sizes="any">
 
     <!-- Restore a collapsed sidebar before first paint, so it never flickers open. -->

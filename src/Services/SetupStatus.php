@@ -88,8 +88,8 @@ final class SetupStatus
                 $products > 0, false, url('products'), 'Add'),
             self::step('telegram', 'Telegram bot connected', 'Customers chat with your assistant on Telegram.',
                 ($telegram['connection_status'] ?? '') === 'connected', false, $connect . '#telegram', 'Connect'),
-            self::step('calendar', 'Google Calendar for bookings', 'Only needed if customers book appointments or classes.',
-                ($calendar['connection_status'] ?? '') === 'connected' && !empty($calendar['calendar_id']), true, $connect . '#calendar', 'Connect'),
+            self::step('calendar', 'Google Calendar for bookings', 'Customers book appointments or classes into this calendar.',
+                ($calendar['connection_status'] ?? '') === 'connected' && !empty($calendar['calendar_id']), false, $connect . '#calendar', 'Connect'),
         ];
     }
 
