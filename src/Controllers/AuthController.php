@@ -171,9 +171,7 @@ final class AuthController
     /**
      * POST /?page=auth&action=forgot
      *
-     * The response is identical whether or not the address exists: the same
-     * message, the same redirect and the same timing envelope. An unknown
-     * address simply never receives a mail.
+     * Keep the response identical whether or not the address exists.
      */
     public function forgot(): void
     {
@@ -212,44 +210,17 @@ final class AuthController
             redirect(url('auth', ['action' => 'forgot']));
         }
 
-        $result = (new PasswordResetService())->request($email, client_ip());
-
-        if (!$result['ok']) {
-            $error = (string) ($result['error'] ?? '');
-            [$field, $message, $status] = match ($error) {
-                'not_found' => ['No account found with this email. Please create an account first.',
-                                'No account found with this email. Please create an account first.', 404],
-                'disabled'  => ['This account is not active. Contact the administrator.',
-                                'This account is not active. Contact the administrator.', 403],
-                'too_many'  => ['Too many reset requests. Please wait a while and try again.',
-                                'Too many reset requests. Please wait a while and try again.', 429],
-                default     => ['', 'The reset email could not be sent. Please try again in a few minutes.', 502],
-            };
-            $errors = $field !== '' ? ['email' => $field] : [];
-
-            if (wants_json()) {
-                json_response(false, ['errors' => $errors, 'register_url' => $error === 'not_found' ? url('auth', ['action' => 'register']) : null], $message, $status);
-            }
-
-            set_status($status);
-            if ($field === '') {
-                flash('error', $message, 'Email not sent');
-            }
-            view('auth/forgot', [
-                'title'    => 'Forgot password',
-                'errors'   => $errors,
-                'old'      => ['email' => $email],
-                'ready'    => true,
-                'notFound' => $error === 'not_found',
-            ]);
-            return;
+        try {
+            (new PasswordResetService())->request($email, client_ip());
+        } catch (\Throwable $e) {
+            // Keep infrastructure failures from creating an account-enumeration response.
+            error_log('[password_reset] request failed: ' . $e->getMessage());
         }
 
-        $message = 'A password reset link has been sent to ' . $email . '. '
+        $message = 'If that email is registered, a password reset link is on its way. '
             . 'The link works once and expires in ' . PasswordResetService::TTL_MINUTES . ' minutes.';
 
-        // Shown on the sign-in page after the redirect (the form is sent with fetch, then the page changes).
-        flash('success', $message, 'Reset email sent');
+        flash('success', $message, 'Check your email');
 
         if (wants_json()) {
             json_response(true, ['redirect' => url('auth', ['action' => 'login'])], $message);

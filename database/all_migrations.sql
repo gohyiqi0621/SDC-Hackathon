@@ -528,7 +528,7 @@ END $$;
 -- payments are receipts (partial allowed), per-company SST setting.
 ALTER TABLE invoices ALTER COLUMN invoice_number DROP NOT NULL;
 ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_status_check;
-ALTER TABLE invoices ADD CONSTRAINT invoices_status_check CHECK (status IN ('draft', 'unpaid', 'partial', 'paid'));
+ALTER TABLE invoices ADD CONSTRAINT invoices_status_check CHECK (status IN ('draft', 'unpaid', 'partial', 'paid', 'voided'));
 ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_number_unless_draft_check;
 ALTER TABLE invoices ADD CONSTRAINT invoices_number_unless_draft_check CHECK (status = 'draft' OR invoice_number IS NOT NULL);
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS amount_paid NUMERIC(12,2) NOT NULL DEFAULT 0;
@@ -574,6 +574,11 @@ CREATE TABLE IF NOT EXISTS finance_settings (
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT finance_settings_sst_rate_check CHECK (sst_rate >= 0 AND sst_rate <= 100)
 );
+
+-- 023: retain issued invoices as voided records when an order is cancelled.
+ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_status_check;
+ALTER TABLE invoices ADD CONSTRAINT invoices_status_check
+    CHECK (status IN ('draft', 'unpaid', 'partial', 'paid', 'voided'));
 COMMIT;
 
 -- ----------------------------------------------------------------------------

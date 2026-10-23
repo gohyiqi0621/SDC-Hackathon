@@ -22,28 +22,26 @@ final class PasswordResetService
     public const TTL_MINUTES = PasswordReset::TTL_MINUTES;
 
     /**
-     * Start a reset. Always reports success to the caller unless the mail
-     * transport itself failed; an unknown address is indistinguishable from a
-     * known one in the UI.
+     * Start a reset without revealing whether the account exists or is active.
      *
-     * @return array{ok:bool, sent:bool, error?:string}
+     * @return array{ok:bool, sent:bool}
      */
     public function request(string $email, ?string $ip = null): array
     {
         $user = (new User())->findByEmail($email);
 
-        // Unknown or disabled account: no mail; the page tells the person.
+        // Keep unknown, disabled, rate-limited, and active accounts externally indistinguishable.
         if ($user === null) {
-            return ['ok' => false, 'sent' => false, 'error' => 'not_found'];
+            return ['ok' => true, 'sent' => false];
         }
         if ($user['status'] !== 'active') {
-            return ['ok' => false, 'sent' => false, 'error' => 'disabled'];
+            return ['ok' => true, 'sent' => false];
         }
 
         $resets = new PasswordReset();
 
         if ($resets->countRecent((int) $user['id']) >= PasswordReset::MAX_PER_WINDOW) {
-            return ['ok' => false, 'sent' => false, 'error' => 'too_many'];
+            return ['ok' => true, 'sent' => false];
         }
 
         $token     = bin2hex(random_bytes(32));
@@ -68,7 +66,7 @@ final class PasswordResetService
             // The code that was never delivered must not stay live.
             $resets->delete($rowId);
 
-            return ['ok' => false, 'sent' => false, 'error' => (string) ($mail['error'] ?? 'mail_failed')];
+            return ['ok' => true, 'sent' => false];
         }
 
         return ['ok' => true, 'sent' => true];

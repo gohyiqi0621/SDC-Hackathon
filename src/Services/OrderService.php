@@ -353,7 +353,7 @@ final class OrderService
         }
 
         $order = (new Order())->update($userId, (int) $order['id'], ['status' => 'cancelled', 'reviewed_at' => date('c')]) ?? $order;
-        (new OrderInvoiceService())->removeFor($userId, [(string) $order['order_no']]);
+        (new OrderInvoiceService())->cancelForOrders($userId, [(string) $order['order_no']]);
         $text  = "Order {$order['order_no']} has been cancelled. Reply here if you have any questions.";
         $sent  = $this->notifyCustomer($userId, $order, $text);
         $this->remember($userId, $order, 'assistant', $text);

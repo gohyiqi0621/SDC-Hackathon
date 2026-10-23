@@ -20,7 +20,7 @@ use Src\Support\Database;
 
 final class Invoice
 {
-    public const STATUSES = ['draft', 'unpaid', 'partial', 'paid'];
+    public const STATUSES = ['draft', 'unpaid', 'partial', 'paid', 'voided'];
 
     /** Label and badge modifier for each status, shared by the views. */
     public const STATUS_LABELS = [
@@ -28,6 +28,7 @@ final class Invoice
         'unpaid'  => ['Unpaid',         'badge--warn'],
         'partial' => ['Partially paid', 'badge--info'],
         'paid'    => ['Paid',           'badge--success'],
+        'voided'  => ['Voided',         'badge--muted'],
     ];
 
     /**

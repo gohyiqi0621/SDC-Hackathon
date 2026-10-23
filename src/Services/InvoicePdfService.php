@@ -149,7 +149,7 @@ final class InvoicePdfService
         $this->summaryLine('GRAND TOTAL (' . $currency . ')', $this->money($invoice['amount'] ?? 0, $currency), 18, true);
 
         $this->text(57, $this->y + 42, 'Terms: ' . ($invoice['payment_terms'] ?: 'As agreed.'), 7, 'black');
-        $status = ['unpaid' => 'Unpaid', 'partial' => 'Partially paid', 'paid' => 'Paid'][$invoice['status'] ?? ''] ?? ucfirst((string) ($invoice['status'] ?? ''));
+        $status = ['unpaid' => 'Unpaid', 'partial' => 'Partially paid', 'paid' => 'Paid', 'voided' => 'Voided'][$invoice['status'] ?? ''] ?? ucfirst((string) ($invoice['status'] ?? ''));
         $this->text(57, $this->y + 54, 'Status: ' . $status, 7, 'black');
         $this->text(57, $this->y + 66, 'Thank you for your business.', 7, 'black');
         $this->textRight(545, self::H - 23, 'SME Smart  |  ' . $this->date(date('Y-m-d')), 7, 'muted');

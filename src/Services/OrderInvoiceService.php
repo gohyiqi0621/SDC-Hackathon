@@ -4,7 +4,7 @@
  *
  *   order placed (buy_product)        -> invoice created, status Unpaid
  *   bank reference approved by staff  -> payment recorded, invoice Paid
- *   order cancelled / replaced        -> its unpaid invoice is removed
+ *   order cancelled / replaced        -> its unissued draft is removed and its issued invoice is voided
  *
  * The invoice uses the order's own lines and prices (what the customer was
  * quoted), so its total always equals the order total. No SST is added on
@@ -118,8 +118,11 @@ final class OrderInvoiceService
         }
     }
 
-    /** Orders that were cancelled: remove their invoices that have no payments yet. */
-    public function removeFor(int $userId, array $orderNos): void
+    /**
+     * Cancel invoices for orders that were cancelled or replaced.
+     * Unissued drafts can be removed; numbered invoices are retained as voided records.
+     */
+    public function cancelForOrders(int $userId, array $orderNos): void
     {
         $orderNos = array_values(array_filter(array_map('strval', $orderNos)));
         if ($orderNos === []) {
@@ -128,13 +131,27 @@ final class OrderInvoiceService
 
         try {
             $marks = implode(',', array_fill(0, count($orderNos), '?'));
-            $stmt  = Database::connection()->prepare(
-                "DELETE FROM invoices
-                  WHERE user_id = ? AND status IN ('draft', 'unpaid') AND amount_paid = 0
-                    AND order_id IN (SELECT id FROM orders WHERE user_id = ? AND order_no IN ($marks))
-                    AND NOT EXISTS (SELECT 1 FROM receipts r WHERE r.invoice_id = invoices.id)"
-            );
-            $stmt->execute(array_merge([$userId, $userId], $orderNos));
+            Database::transaction(static function ($pdo) use ($userId, $orderNos, $marks): void {
+                $params = array_merge([$userId, $userId], $orderNos);
+                $whereOrders = "order_id IN (SELECT id FROM orders WHERE user_id = ? AND order_no IN ($marks))";
+
+                $drafts = $pdo->prepare(
+                    "DELETE FROM invoices
+                      WHERE user_id = ? AND status = 'draft' AND amount_paid = 0
+                        AND $whereOrders
+                        AND NOT EXISTS (SELECT 1 FROM receipts r WHERE r.invoice_id = invoices.id)"
+                );
+                $drafts->execute($params);
+
+                $issued = $pdo->prepare(
+                    "UPDATE invoices
+                        SET status = 'voided', updated_at = CURRENT_TIMESTAMP
+                      WHERE user_id = ? AND status = 'unpaid' AND amount_paid = 0
+                        AND $whereOrders
+                        AND NOT EXISTS (SELECT 1 FROM receipts r WHERE r.invoice_id = invoices.id)"
+                );
+                $issued->execute($params);
+            });
         } catch (Throwable $e) {
             error_log('[invoice] remove for cancelled orders: ' . $e->getMessage());
         }
