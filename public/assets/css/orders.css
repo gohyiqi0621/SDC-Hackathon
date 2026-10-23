@@ -311,3 +311,10 @@
     .order-reject form { width: min(280px, calc(100vw - 60px)); }
     .orders-foot { justify-content: center; }
 }
+
+/* Official receipt (PDF) button */
+.order-btn--doc { border-color: var(--border); background: #fff; color: var(--primary); text-decoration: none; }
+.order-btn--doc:hover { border-color: var(--primary); background: var(--primary-light); color: var(--primary); text-decoration: none; }
+.order-btn--send:hover { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+.order-receipt-sent { color: var(--success) !important; }
+.order-receipt-sent.is-missing { color: #a86f05 !important; }

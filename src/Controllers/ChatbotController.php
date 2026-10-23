@@ -69,9 +69,22 @@ final class ChatbotController
             'aiModels'       => AiSettingsController::AI_MODELS,
             'chatUrl'        => url('customer', ['action' => 'chat']),
             'steps'          => SetupStatus::customer((int) $user['id']),
+            'payment'        => AiSettingsController::presentPayment(self::companyRow((int) $user['id'])),
+            'banks'          => \Src\Models\CompanyProfile::BANKS,
+            'paymentSaveUrl' => url('ai_settings', ['action' => 'payment_method_save']),
             'companyUrl'     => url('company'),
             'connectionsUrl' => url('customer', ['action' => 'connections']),
         ]);
+    }
+
+    /** The company_profiles row of this business, or null (table missing / not saved). */
+    private static function companyRow(int $userId): ?array
+    {
+        try {
+            return (new \Src\Models\CompanyProfile())->find($userId);
+        } catch (Throwable $e) {
+            return null;
+        }
     }
 
     /** GET /?page=customer&action=connections - Telegram bot and Google Calendar. */

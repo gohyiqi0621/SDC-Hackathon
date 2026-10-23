@@ -221,6 +221,31 @@ final class TelegramService
         return $ok;
     }
 
+    /** Send a file (e.g. the official receipt PDF) with an optional caption. */
+    public function sendDocument(string $token, string $chatId, string $path, string $fileName, string $caption = ''): bool
+    {
+        if (!is_file($path)) {
+            return false;
+        }
+
+        try {
+            $response = Http::request('POST', $this->url($token, 'sendDocument'), [], [
+                'chat_id'  => $chatId,
+                'caption'  => mb_substr($caption, 0, 1000),
+                'document' => new \CURLFile($path, (string) (mime_content_type($path) ?: 'application/pdf'), $fileName),
+            ], 30);
+        } catch (RuntimeException $e) {
+            FlowLog::write('telegram.document_failed', ['chat_id' => $chatId, 'error' => $e->getMessage()]);
+            return false;
+        }
+
+        $ok = is_array($response['json']) && !empty($response['json']['ok']);
+        FlowLog::write('telegram.document', ['chat_id' => $chatId, 'ok' => $ok, 'file' => $fileName,
+                                             'description' => $ok ? null : ($response['json']['description'] ?? null)]);
+
+        return $ok;
+    }
+
     /**
      * Set the bot's display name (what customers see at the top of the chat).
      * Best effort: the bot still works if Telegram refuses (e.g. rate limit).

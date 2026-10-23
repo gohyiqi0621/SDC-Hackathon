@@ -615,14 +615,16 @@
         }
 
         var logo = imageField('logo', 'company_logo', 'remove_logo');
-        var qr = imageField('qr', 'payment_qr', 'remove_payment_qr');
 
         function schema() {
             return {
                 company_name: [Rules.required('Company name'), Rules.minLength(2, 'Company name'), Rules.maxLength(150, 'Company name')],
                 business_category: [Rules.required('Business category'), Rules.oneOf(selectOptions(category), 'Choose a category from the list.')],
                 company_background: [Rules.maxLength(3000, 'Company background')],
-                payment_instructions: [Rules.maxLength(1000, 'Payment instructions')]
+                registration_no: [Rules.maxLength(60, 'Registration no.')],
+                company_phone: [Rules.maxLength(40, 'Phone')],
+                company_email: [Rules.maxLength(150, 'Email')],
+                company_address: [Rules.maxLength(500, 'Address')]
             };
         }
 
@@ -632,12 +634,13 @@
                 company_name: p.company_name || '',
                 business_category: p.business_category || '',
                 company_background: p.company_background || '',
-                payment_instructions: p.payment_instructions || '',
+                registration_no: p.registration_no || '',
+                company_phone: p.company_phone || '',
+                company_email: p.company_email || '',
+                company_address: p.company_address || '',
                 remove_logo: false,
-                remove_payment_qr: false
             });
             logo.setSaved(p.company_logo_url);
-            qr.setSaved(p.payment_qr_url);
             emptyNote.hidden = !!profile;
             ctrl.setSavedMeta(savedMetaText(p.updated_at, demo));
         }
@@ -663,7 +666,8 @@
             }
 
             var body = new FormData();
-            ['company_name', 'business_category', 'company_background', 'payment_instructions'].forEach(function (key) {
+            ['company_name', 'business_category', 'company_background',
+             'registration_no', 'company_phone', 'company_email', 'company_address'].forEach(function (key) {
                 body.append(key, trimmed(values[key]));
             });
             images.forEach(function (img) { img.appendTo(body); });

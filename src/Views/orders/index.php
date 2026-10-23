@@ -49,7 +49,7 @@ $active = array_filter([
     <header class="orders-head">
         <div>
             <h1>Orders</h1>
-            <p>Review payment receipts, then ship paid orders. Customers are told on Telegram at every step.</p>
+            <p>Check each customer's bank reference, approve it to issue the official receipt, then ship. Customers are told on Telegram at every step.</p>
         </div>
     </header>
 
@@ -66,8 +66,8 @@ $active = array_filter([
     <section class="orders-kpis" aria-label="Summary">
         <?php
         $kpis = [
-            ['review',  'payment_submitted', 'fa-solid fa-receipt',        (string) (int) $overview['review'],  'Receipts to review',  'Check and approve'],
-            ['waiting', 'pending_payment',   'fa-regular fa-hourglass-half', (string) (int) $overview['waiting'], 'Waiting for payment', 'No receipt yet'],
+            ['review',  'payment_submitted', 'fa-solid fa-receipt',        (string) (int) $overview['review'],  'Bank refs to review', 'Check and approve'],
+            ['waiting', 'pending_payment',   'fa-regular fa-hourglass-half', (string) (int) $overview['waiting'], 'Waiting for payment', 'No bank ref. yet'],
             ['ship',    'paid',              'fa-solid fa-box',            (string) (int) $overview['to_ship'], 'Ready to ship',       'Paid, not shipped'],
         ];
         foreach ($kpis as [$kind, $st, $icon, $value, $label, $hint]):
@@ -188,7 +188,7 @@ $active = array_filter([
                 <div class="empty-icon"><i class="fa-solid fa-bag-shopping"></i></div>
                 <h3><?= $allCount === 0 ? 'No orders yet' : 'Nothing here' ?></h3>
                 <p><?= $allCount === 0
-                    ? 'When a customer orders through your AI chatbot on Telegram, the order appears here. Their payment receipt arrives here too.'
+                    ? 'When a customer orders through your AI chatbot on Telegram, the order appears here. Their bank reference (transfer slip) arrives here too.'
                     : 'No orders match this filter. Try another status or clear the filters.' ?></p>
             </div>
         <?php else: ?>
@@ -219,7 +219,9 @@ $active = array_filter([
                                 !empty($order['customer_phone']) ? $order['customer_phone'] : null,
                             ]);
                             $hasReceipt = !empty($order['receipt_path']);
-                            $canCancel  = !in_array($st, ['paid', 'shipped', 'cancelled'], true);
+                            // Waiting for payment (no bank reference yet): Payment and Action stay blank.
+                            $waiting    = in_array($st, ['pending_payment', 'payment_rejected'], true) || ($st === 'payment_submitted' && !$hasReceipt);
+                            $canCancel  = $st === 'payment_submitted' && $hasReceipt;
                             ?>
                             <tr class="orders-row orders-row--<?= e($st) ?>">
                                 <td class="c-order">
@@ -258,15 +260,22 @@ $active = array_filter([
                                     <span class="order-pay">
                                         <?php if ($hasReceipt): ?>
                                             <a class="order-receipt" href="<?= e(url('orders', ['action' => 'receipt', 'id' => $id])) ?>" target="_blank" rel="noopener">
-                                                <i class="fa-regular <?= $order['receipt_mime'] === 'application/pdf' ? 'fa-file-pdf' : 'fa-file-image' ?>" aria-hidden="true"></i> View receipt
+                                                <i class="fa-regular <?= $order['receipt_mime'] === 'application/pdf' ? 'fa-file-pdf' : 'fa-file-image' ?>" aria-hidden="true"></i> Bank reference
                                             </a>
-                                        <?php elseif ($st !== 'cancelled'): ?>
-                                            <span class="order-receipt order-receipt--none">No receipt yet</span>
+                                        <?php elseif ($st !== 'cancelled' && !$waiting): ?>
+                                            <span class="order-receipt order-receipt--none">No bank reference yet</span>
                                         <?php endif; ?>
                                         <?php if ($st === 'payment_rejected' && !empty($order['review_note'])): ?>
                                             <small class="order-reason"><?= e($order['review_note']) ?></small>
                                         <?php elseif ($st === 'shipped' && !empty($order['shipped_at'])): ?>
                                             <small>Shipped <?= e(date('j M, g:i a', strtotime((string) $order['shipped_at']))) ?></small>
+                                        <?php endif; ?>
+                                        <?php if (in_array($st, ['paid', 'shipped'], true)): ?>
+                                            <small class="order-receipt-sent<?= empty($order['official_receipt_sent_at']) ? ' is-missing' : '' ?>">
+                                                <?= !empty($order['official_receipt_sent_at'])
+                                                    ? 'Official receipt sent ' . e(date('j M, g:i a', strtotime((string) $order['official_receipt_sent_at'])))
+                                                    : 'Official receipt not sent yet' ?>
+                                            </small>
                                         <?php endif; ?>
                                     </span>
                                 </td>
@@ -301,10 +310,32 @@ $active = array_filter([
                                                 <input type="hidden" name="return" value="<?= e($listUrl) ?>">
                                                 <button class="order-btn order-btn--ship" type="submit"><i class="fa-solid fa-truck-fast" aria-hidden="true"></i> Mark shipped</button>
                                             </form>
-                                        <?php elseif (in_array($st, ['pending_payment', 'payment_rejected', 'payment_submitted'], true)): ?>
-                                            <span class="order-wait"><i class="fa-regular fa-clock" aria-hidden="true"></i> Waiting for receipt</span>
+                                            <a class="order-btn order-btn--doc" href="<?= e(url('orders', ['action' => 'official_receipt', 'id' => $id])) ?>" target="_blank" rel="noopener"
+                                               title="Official receipt (PDF)"><i class="fa-regular fa-file-pdf" aria-hidden="true"></i> Receipt</a>
+                                            <form method="post" action="<?= e(url('orders', ['action' => 'send_receipt'])) ?>"
+                                                  data-confirm="Send the official receipt of <?= e($order['order_no']) ?> to the customer on Telegram<?= !empty($order['official_receipt_sent_at']) ? ' again' : '' ?>?"
+                                                  data-confirm-title="Send official receipt?" data-confirm-ok="Send" data-confirm-tone="primary">
+                                                <?= csrf_field() ?>
+                                                <input type="hidden" name="id" value="<?= $id ?>">
+                                                <input type="hidden" name="return" value="<?= e($listUrl) ?>">
+                                                <button class="order-btn order-btn--icon order-btn--send" type="submit" title="Send the official receipt to the customer on Telegram"
+                                                        aria-label="Send official receipt of <?= e($order['order_no']) ?>"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i><span class="order-btn__label">Send receipt</span></button>
+                                            </form>
+                                        <?php elseif ($waiting): ?>
+                                        <?php elseif ($st === 'shipped'): ?>
+                                            <a class="order-btn order-btn--doc" href="<?= e(url('orders', ['action' => 'official_receipt', 'id' => $id])) ?>" target="_blank" rel="noopener"
+                                               title="Official receipt (PDF)"><i class="fa-regular fa-file-pdf" aria-hidden="true"></i> Official receipt</a>
+                                            <form method="post" action="<?= e(url('orders', ['action' => 'send_receipt'])) ?>"
+                                                  data-confirm="Send the official receipt of <?= e($order['order_no']) ?> to the customer on Telegram<?= !empty($order['official_receipt_sent_at']) ? ' again' : '' ?>?"
+                                                  data-confirm-title="Send official receipt?" data-confirm-ok="Send" data-confirm-tone="primary">
+                                                <?= csrf_field() ?>
+                                                <input type="hidden" name="id" value="<?= $id ?>">
+                                                <input type="hidden" name="return" value="<?= e($listUrl) ?>">
+                                                <button class="order-btn order-btn--icon order-btn--send" type="submit" title="Send the official receipt to the customer on Telegram"
+                                                        aria-label="Send official receipt of <?= e($order['order_no']) ?>"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i><span class="order-btn__label">Send receipt</span></button>
+                                            </form>
                                         <?php else: ?>
-                                            <span class="order-wait order-wait--done"><?= $st === 'shipped' ? 'Completed' : 'Closed' ?></span>
+                                            <span class="order-wait order-wait--done">Closed</span>
                                         <?php endif; ?>
                                         <?php if ($canCancel): ?>
                                             <form method="post" action="<?= e(url('orders', ['action' => 'cancel'])) ?>"

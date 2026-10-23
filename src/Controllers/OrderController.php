@@ -21,6 +21,7 @@ namespace Src\Controllers;
 use PDOException;
 use RuntimeException;
 use Src\Models\Order;
+use Src\Services\OfficialReceiptPdf;
 use Src\Services\OrderService;
 use Src\Services\PrivateFiles;
 
@@ -127,7 +128,7 @@ final class OrderController
         ];
     }
 
-    /** GET orders/receipt?id= */
+    /** GET orders/receipt?id= - the bank reference (transfer slip) the customer sent. */
     public function receipt(): void
     {
         $user  = require_login();
@@ -136,10 +137,42 @@ final class OrderController
         $path  = $order !== null ? $files->pathFor((int) $user['id'], $order['receipt_path']) : null;
 
         if ($path === null) {
-            abort(404, 'This order has no payment receipt yet.');
+            abort(404, 'This order has no bank reference yet.');
         }
 
-        $files->send($path, (string) $order['receipt_mime'], (string) ($order['receipt_name'] ?: 'receipt'), !empty($_GET['download']));
+        $files->send($path, (string) $order['receipt_mime'], (string) ($order['receipt_name'] ?: 'bank-reference'), !empty($_GET['download']));
+    }
+
+    /**
+     * GET orders/official_receipt?id=[&download=1] - the official receipt PDF
+     * (only for "Payment successful" and "Shipped" orders).
+     */
+    public function officialReceipt(): void
+    {
+        $user  = require_login();
+        $order = (new Order())->find((int) $user['id'], (int) ($_GET['id'] ?? 0));
+
+        if ($order === null) {
+            abort(404, 'That order was not found.');
+        }
+        if (!in_array((string) $order['status'], OfficialReceiptPdf::STATUSES, true)) {
+            abort(404, 'The official receipt is issued after the payment is approved.');
+        }
+
+        try {
+            $pdf = (new OrderService())->officialReceipt((int) $user['id'], $order);
+        } catch (\Throwable $e) {
+            error_log('[official-receipt] ' . $e->getMessage());
+            abort(500, 'The official receipt could not be created: ' . $e->getMessage());
+        }
+
+        header('Content-Type: application/pdf');
+        header('Content-Length: ' . strlen($pdf));
+        header('Content-Disposition: ' . (!empty($_GET['download']) ? 'attachment' : 'inline') . '; filename="' . OfficialReceiptPdf::fileName($order) . '"');
+        header('Cache-Control: private, no-store');
+        header('X-Content-Type-Options: nosniff');
+        echo $pdf;
+        exit;
     }
 
     /** POST orders/approve */
@@ -148,9 +181,21 @@ final class OrderController
         $this->change(function (int $userId, array $order): void {
             $result = (new OrderService())->approve($userId, $order);
             flash('success', $result['notified']
-                ? 'The customer was told on Telegram: "Payment verified".'
-                : 'Marked as paid. The customer could not be messaged on Telegram (check the Telegram connection).',
+                ? 'The customer was told on Telegram: "Payment verified"' . (!empty($result['receipt_sent']) ? ', with the official receipt (PDF).' : '. The official receipt could not be sent; download it from the order.')
+                : 'Marked as paid. The customer could not be messaged on Telegram (check the Telegram connection). The official receipt is on the order.',
                 'Order ' . $order['order_no'] . ': payment successful');
+        });
+    }
+
+    /** POST orders/send_receipt - send the official receipt PDF to the customer on Telegram (again). */
+    public function sendReceipt(): void
+    {
+        $this->change(function (int $userId, array $order): void {
+            if ((new OrderService())->resendOfficialReceipt($userId, $order)) {
+                flash('success', 'The official receipt (PDF) was sent to the customer on Telegram.', 'Receipt sent');
+            } else {
+                flash('error', 'Telegram did not accept the file. Check the Telegram connection, or download the receipt and send it yourself.', 'Receipt not sent');
+            }
         });
     }
 

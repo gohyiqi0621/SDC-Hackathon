@@ -242,12 +242,12 @@
         return card;
     }
 
-    /** Receipt to review: the picture, the order, and Approve / Reject buttons (staff decide, not the AI). */
+    /** Bank reference to review: the picture, the order, and Approve / Reject buttons (staff decide, not the AI). After approval: the official receipt PDF. */
     function receiptCard(c) {
         var card = node('div', 'mcard mcard--receipt');
         var head = node('div', 'mcard__head');
         head.innerHTML = '<i class="fa-solid fa-receipt" aria-hidden="true"></i>';
-        head.appendChild(node('strong', null, 'Receipt · ' + (c.order_no || '')));
+        head.appendChild(node('strong', null, 'Bank reference · ' + (c.order_no || '')));
         var badge = node('span', 'rcpt-pill');
         head.appendChild(badge);
         card.appendChild(head);
@@ -257,7 +257,7 @@
         pic.href = c.receipt_url || '#';
         pic.target = '_blank';
         pic.rel = 'noopener';
-        pic.title = 'Open the receipt in full size';
+        pic.title = 'Open the bank reference in full size';
         if (/^image\//.test(c.receipt_type || '')) {
             var img = node('img');
             img.src = c.receipt_url;
@@ -268,7 +268,7 @@
         } else {
             pic.classList.add('rcpt__pic--file');
             pic.innerHTML = '<i class="fa-regular fa-file-pdf" aria-hidden="true"></i>';
-            pic.appendChild(node('span', null, 'Open receipt (PDF)'));
+            pic.appendChild(node('span', null, 'Open bank reference (PDF)'));
         }
         grid.appendChild(pic);
 
@@ -292,6 +292,15 @@
             badge.className = 'rcpt-pill rcpt-pill--' + (status === 'payment_submitted' ? 'warn' : (status === 'payment_rejected' ? 'bad' : 'ok'));
             badge.textContent = label || status;
             bar.innerHTML = '';
+            if ((status === 'paid' || status === 'shipped') && c.official_receipt_url) {
+                var doc = node('a', 'mcard__btn mcard__btn--primary', null);
+                doc.href = c.official_receipt_url;
+                doc.target = '_blank';
+                doc.rel = 'noopener';
+                doc.innerHTML = '<i class="fa-regular fa-file-pdf" aria-hidden="true"></i> ';
+                doc.appendChild(document.createTextNode('Official receipt'));
+                bar.appendChild(doc);
+            }
             if (status !== 'payment_submitted') { return; }
             var ok = node('button', 'mcard__btn mcard__btn--ok', 'Approve payment');
             ok.type = 'button';
@@ -345,7 +354,7 @@
                 });
         }
 
-        state(c.status || 'payment_submitted', c.status_label || 'Receipt to review');
+        state(c.status || 'payment_submitted', c.status_label || 'Bank ref. to review');
         if (c.others_waiting) { card.appendChild(node('p', 'rcpt__more', c.others_waiting + ' more receipt' + (c.others_waiting > 1 ? 's' : '') + ' waiting for review.')); }
         return card;
     }

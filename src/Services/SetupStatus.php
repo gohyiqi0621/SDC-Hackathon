@@ -64,6 +64,8 @@ final class SetupStatus
         $calendar  = self::row(new GoogleCalendarIntegration(), $userId);
         $setup     = url('customer', ['action' => 'settings']);
         $connect   = url('customer', ['action' => 'connections']);
+        $company   = self::row(new CompanyProfile(), $userId);
+        $payment   = CompanyProfile::paymentText($company);
 
         try {
             $products = (new Product())->countForUser($userId);
@@ -78,6 +80,8 @@ final class SetupStatus
                 false, $setup . '#assistant', 'Set up'),
             self::step('instructions', 'Instructions (SOPs) written', 'How the assistant answers, sells and handles problems. "Generate with AI" can write them for you.',
                 trim((string) ($assistant['system_instructions'] ?? '')) !== '', true, $setup . '#assistant', 'Write'),
+            self::step('payment', 'Payment method set', $payment !== '' ? $payment : 'The bank account (or e-wallet) customers pay to, and an optional payment QR.',
+                $payment !== '' || !empty($company['payment_qr_url']), false, $setup . '#payment', 'Set up'),
             self::step('products', 'Products & services added', $products > 0 ? $products . ' item' . ($products === 1 ? '' : 's') . ' the assistant can sell and answer about.' : 'Add what you sell, with prices, so the assistant can answer and take orders.',
                 $products > 0, false, url('products'), 'Add'),
             self::step('telegram', 'Telegram bot connected', 'Customers chat with your assistant on Telegram.',

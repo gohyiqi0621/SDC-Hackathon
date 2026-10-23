@@ -388,7 +388,7 @@ function nav_items(): array
             'match' => ['orders', 'orders/receipt'],
             // Receipts waiting for review.
             'badge' => $status['to_review'] > 0 ? (string) $status['to_review'] : null,
-            'badge_title' => $status['to_review'] . ' receipt' . ($status['to_review'] === 1 ? '' : 's') . ' to review',
+            'badge_title' => $status['to_review'] . ' bank reference' . ($status['to_review'] === 1 ? '' : 's') . ' to review',
         ],
         [
             'kind'     => 'group',

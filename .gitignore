@@ -26,3 +26,8 @@ composer.lock
 public/uploads/products/
 
 .workbuddy-ai/
+
+# tFPDF font metric cache (made on first PDF)
+src/Lib/tfpdf/font/unifont/*.mtx.php
+src/Lib/tfpdf/font/unifont/*.cw127.php
+src/Lib/tfpdf/font/unifont/*.cw.dat

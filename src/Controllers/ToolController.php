@@ -27,6 +27,12 @@
  *     Checks again, adds the event to Google Calendar and saves the booking
  *     (AI Chatbot > Customer > Bookings). See BookingService for the rules.
  *
+ *   POST /tools/send_official_receipt
+ *     JSON body: { "order_no": "ORD-..." }   (optional: the latest paid order)
+ *     The customer asks for their official receipt again: the PDF is sent to
+ *     this Telegram chat. Only for this chat's own orders whose payment staff
+ *     have verified.
+ *
  *   Staff assistant (staff tokens only, each needs its Function ticked):
  *   POST /tools/check_invoice | check_claims | check_orders   read records
  *   POST /tools/check_email       { "folder": "important", "query": "invoice", "period": "this_week" }
@@ -240,7 +246,7 @@ final class ToolController
         }
 
         $company      = (new CompanyProfile())->find($userId) ?? [];
-        $instructions = trim((string) ($company['payment_instructions'] ?? ''));
+        $instructions = CompanyProfile::paymentText($company);
         // The QR goes out once, with the new order (not again for a repeated call).
         $qrSent       = !$duplicate && (new OrderService())->sendPaymentQr($userId, $order, $company);
         $hasQr        = !empty($company['payment_qr_url']);
@@ -268,8 +274,9 @@ final class ToolController
                 ? 'The payment QR code image has already been sent to the customer in this chat. Tell them to scan it to pay.'
                 : ($hasQr ? 'payment_qr_url: ' . asset((string) $company['payment_qr_url']) : 'none'),
             'next_step'            => 'Tell the customer the order number, the items and the total, give the payment instructions, '
-                                    . 'and ask them to send a photo or PDF of the payment receipt in this chat. '
-                                    . 'Do not say the order is paid or confirmed: staff verify the receipt first. '
+                                    . 'and ask them to send a photo or PDF of their bank reference (transfer slip) in this chat. '
+                                    . 'Do not say the order is paid or confirmed: staff verify the bank reference first, then the '
+                                    . 'customer gets the official receipt. '
                                     . 'The order is done: do NOT call buy_product again for it.',
         ];
         if ($duplicate) {
@@ -635,7 +642,7 @@ final class ToolController
         $order  = $this->orderByNo($userId, (string) ($input['order_no'] ?? $input['order'] ?? $input['query'] ?? ''));
 
         if ($order['status'] !== 'payment_submitted' || empty($order['receipt_path'])) {
-            $this->fail('Order ' . $order['order_no'] . ' has no receipt waiting for review (status: '
+            $this->fail('Order ' . $order['order_no'] . ' has no bank reference waiting for review (status: '
                 . (Order::STATUSES[$order['status']] ?? $order['status']) . ').');
         }
 
@@ -654,9 +661,10 @@ final class ToolController
             'ordered_at'      => date('D j M Y, g:i A', strtotime((string) $order['created_at'])),
             'receipt_sent_at' => $order['receipt_uploaded_at'] ? date('D j M Y, g:i A', strtotime((string) $order['receipt_uploaded_at'])) : null,
             'receipt_url'     => url('orders', ['action' => 'receipt', 'id' => (int) $order['id']]),
+            'official_receipt_url' => url('orders', ['action' => 'official_receipt', 'id' => (int) $order['id']]),
             'receipt_type'    => (string) $order['receipt_mime'],
             'others_waiting'  => max(0, $toReview - 1),
-            'note'            => 'The chat now shows this receipt picture with the order and Approve / Reject buttons. The staff '
+            'note'            => 'The chat now shows this bank reference picture with the order and Approve / Reject buttons. The staff '
                                . 'member checks the picture and decides with the buttons. You cannot see the picture and cannot '
                                . 'approve or reject: do not judge the receipt. Say in one sentence which order it is (customer, '
                                . 'total) and that they can approve or reject it on the card.',
@@ -677,12 +685,73 @@ final class ToolController
         }
         $ids = $stmt->fetchAll(\PDO::FETCH_COLUMN);
         if ($ids === []) {
-            $this->fail($no === '' ? 'No order is waiting for a receipt review.' : 'No order ' . $no . ' found. Use check_orders with status to_review to see the orders waiting.');
+            $this->fail($no === '' ? 'No bank reference is waiting for review.' : 'No order ' . $no . ' found. Use check_orders with status to_review to see the orders waiting.');
         }
         if (count($ids) > 1) {
             $this->fail('More than one order matches "' . $no . '". Use the full order number.');
         }
         return (new Order())->find($userId, (int) $ids[0]) ?? $this->fail('Order not found.');
+    }
+
+    /**
+     * POST /tools/send_official_receipt - customer chat: send the official
+     * receipt PDF of one of this customer's verified orders again.
+     */
+    public function sendOfficialReceipt(): void
+    {
+        $auth  = $this->token();
+        $input = $this->input();
+        FlowLog::write('tool.send_official_receipt', ['user_id' => $auth['user_id'], 'chat' => $auth['channel'] . ':' . $auth['chat_id'], 'input' => $input]);
+
+        if ($auth['chat_id'] === null || !in_array($auth['channel'], ['telegram', 'web'], true)) {
+            $this->json(400, ['success' => false, 'error' => 'This tool token is not linked to a customer chat.']);
+        }
+
+        $userId = $auth['user_id'];
+        $no     = strtoupper(trim((string) ($input['order_no'] ?? $input['order'] ?? ''), " #\t\n"));
+        $stmt   = Database::connection()->prepare(
+            'SELECT * FROM orders WHERE user_id = ? AND channel = ? AND customer_chat_id = ? ORDER BY id DESC LIMIT 20'
+        );
+        $stmt->execute([$userId, $auth['channel'], $auth['chat_id']]);
+        $mine = $stmt->fetchAll();
+
+        if ($no !== '') {
+            $mine = array_values(array_filter($mine, static fn (array $o): bool => strtoupper((string) $o['order_no']) === $no
+                || str_ends_with(strtoupper((string) $o['order_no']), $no)));
+            if ($mine === []) {
+                $this->fail('No order ' . $no . ' was found for this customer. Ask them to check the order number.');
+            }
+        }
+        $paid = array_values(array_filter($mine, static fn (array $o): bool => in_array($o['status'], ['paid', 'shipped'], true)));
+        if ($paid === []) {
+            $this->fail($mine === []
+                ? 'This customer has no orders yet, so there is no official receipt.'
+                : 'The payment for this order has not been verified yet. The official receipt is sent automatically once our staff '
+                  . 'verify the bank reference.');
+        }
+        $order = $paid[0];
+
+        if ($auth['channel'] !== 'telegram') {
+            $this->fail('The official receipt can only be sent on Telegram. Tell the customer our staff will send it to them.');
+        }
+        try {
+            $ok = (new OrderService())->resendOfficialReceipt($userId, $order);
+        } catch (RuntimeException $e) {
+            $this->fail($e->getMessage());
+        }
+        if (!$ok) {
+            $this->fail('The receipt could not be sent right now. Tell the customer our staff will send it shortly.');
+        }
+
+        FlowLog::write('tool.send_official_receipt_ok', ['order_no' => $order['order_no']]);
+        $this->json(200, [
+            'success'    => true,
+            'sent'       => true,
+            'order_no'   => $order['order_no'],
+            'receipt_no' => \Src\Services\OfficialReceiptPdf::receiptNo($order),
+            'total'      => format_money($order['total'], $order['currency']),
+            'note'       => 'The official receipt PDF has been sent in this chat. Tell the customer in one short sentence.',
+        ]);
     }
 
     /** Email folders for check_email: Gmail label ids. */

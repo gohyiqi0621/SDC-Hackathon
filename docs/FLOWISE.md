@@ -307,6 +307,27 @@ add these two: the website now talks to Google Calendar itself (with the
 account connected in AI Settings → Google Calendar), so the AI must not create
 events on its own.
 
+### Custom tool 5: `send_official_receipt`
+Description: *Send the customer their official receipt (PDF) again in this chat. Use when the customer asks for their
+receipt / official receipt / invoice for an order that is already paid. Only works after staff verified the payment.*
+
+| Property | Type | Description | Required |
+|---|---|---|---|
+| `order_no` | string | The order number, e.g. ORD-261021-25NJ (empty: the customer's latest paid order) | no |
+
+```javascript
+const httpFetch = typeof globalThis.fetch === 'function' ? globalThis.fetch : require('node-fetch');
+const res = await httpFetch($vars.tool_base_url + '/send_official_receipt', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + $vars.tool_token, 'ngrok-skip-browser-warning': 'true' },
+  body: JSON.stringify({ order_no: String(typeof $order_no !== 'undefined' && $order_no !== null ? $order_no : '') })
+});
+return await res.text();
+```
+
+The official receipt is also sent automatically when staff approve the payment, and staff can resend it with
+**Send receipt** on the Orders page.
+
 ### How a slot is counted (AI Settings → Google Calendar → Booking rules)
 
 | Setting | Effect |

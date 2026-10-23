@@ -198,9 +198,11 @@ $router->post(
     // Orders from the AI chatbot (buy_product): review payment receipts
     $router->get('orders', [OrderController::class, 'index'], $auth);
     $router->get('orders/receipt', [OrderController::class, 'receipt'], $auth);
+    $router->get('orders/official_receipt', [OrderController::class, 'officialReceipt'], $auth);
     $router->post('orders/approve', [OrderController::class, 'approve'], $auth);
     $router->post('orders/reject', [OrderController::class, 'reject'], $auth);
     $router->post('orders/ship', [OrderController::class, 'ship'], $auth);
+    $router->post('orders/send_receipt', [OrderController::class, 'sendReceipt'], $auth);
     $router->post('orders/cancel', [OrderController::class, 'cancel'], $auth);
 
     $router->get('categories', [CategoryController::class, 'index'], $auth);
@@ -213,6 +215,7 @@ $router->post(
     // always taken from the session; POSTs are CSRF-checked by the Router.
     $router->get('ai_settings/company_profile', [AiSettingsController::class, 'companyProfile'], $auth);
     $router->post('ai_settings/company_profile_save', [AiSettingsController::class, 'companyProfileSave'], $auth);
+    $router->post('ai_settings/payment_method_save', [AiSettingsController::class, 'paymentMethodSave'], $auth);
     $router->get('ai_settings/assistant', [AiSettingsController::class, 'assistant'], $auth);
     $router->post('ai_settings/assistant_save', [AiSettingsController::class, 'assistantSave'], $auth);
     $router->post('ai_settings/generate_sops', [AiSettingsController::class, 'generateSops'], $auth);
@@ -241,6 +244,7 @@ $router->post(
     $router->post('tools/buy_product', [ToolController::class, 'buyProduct'], [], false);
     $router->post('tools/check_availability', [ToolController::class, 'checkAvailability'], [], false);
     $router->post('tools/make_booking', [ToolController::class, 'makeBooking'], [], false);
+    $router->post('tools/send_official_receipt', [ToolController::class, 'sendOfficialReceipt'], [], false);
     // Staff assistant tools (staff tokens only; send_email_reply needs the staff member's OK).
     $router->post('tools/check_invoice', [ToolController::class, 'checkInvoice'], [], false);
     $router->post('tools/check_claims', [ToolController::class, 'checkClaims'], [], false);

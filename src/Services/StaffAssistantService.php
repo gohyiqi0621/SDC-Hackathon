@@ -204,10 +204,10 @@ final class StaffAssistantService
                     'body'    => mb_substr((string) ($data['body'] ?? ''), 0, 4000),
                 ];
             } elseif ($name === 'review_receipt') {
-                $receipt = ['type' => 'receipt', 'status' => 'payment_submitted', 'status_label' => 'Receipt to review']
+                $receipt = ['type' => 'receipt', 'status' => 'payment_submitted', 'status_label' => 'Bank ref. to review']
                     + array_intersect_key($data, array_flip([
                     'order_id', 'order_no', 'customer', 'phone', 'total', 'items', 'ordered_at', 'receipt_sent_at', 'receipt_url',
-                    'receipt_type', 'others_waiting']));
+                    'receipt_type', 'official_receipt_url', 'others_waiting']));
             } elseif (in_array($name, ['send_email_reply', 'send_email'], true) && !empty($data['sent'])) {
                 $sent[] = ['type' => 'sent', 'to' => (string) ($data['to'] ?? ''), 'subject' => (string) ($data['subject'] ?? '')];
             }
