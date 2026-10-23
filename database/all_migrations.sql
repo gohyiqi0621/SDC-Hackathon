@@ -528,7 +528,7 @@ END $$;
 -- payments are receipts (partial allowed), per-company SST setting.
 ALTER TABLE invoices ALTER COLUMN invoice_number DROP NOT NULL;
 ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_status_check;
-ALTER TABLE invoices ADD CONSTRAINT invoices_status_check CHECK (status IN ('draft', 'unpaid', 'partial', 'paid', 'voided'));
+ALTER TABLE invoices ADD CONSTRAINT invoices_status_check CHECK (status IN ('draft', 'unpaid', 'partial', 'paid'));
 ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_number_unless_draft_check;
 ALTER TABLE invoices ADD CONSTRAINT invoices_number_unless_draft_check CHECK (status = 'draft' OR invoice_number IS NOT NULL);
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS amount_paid NUMERIC(12,2) NOT NULL DEFAULT 0;
@@ -575,7 +575,17 @@ CREATE TABLE IF NOT EXISTS finance_settings (
     CONSTRAINT finance_settings_sst_rate_check CHECK (sst_rate >= 0 AND sst_rate <= 100)
 );
 
--- 023: retain issued invoices as voided records when an order is cancelled.
+-- 023: preserve uploaded files across deployments.
+CREATE TABLE IF NOT EXISTS file_backups (
+    area        VARCHAR(10)  NOT NULL,
+    path        VARCHAR(255) NOT NULL,
+    mime        VARCHAR(100) NULL,
+    data        BYTEA        NOT NULL,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (area, path)
+);
+
+-- 024: retain issued invoices as voided records when an order is cancelled.
 ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_status_check;
 ALTER TABLE invoices ADD CONSTRAINT invoices_status_check
     CHECK (status IN ('draft', 'unpaid', 'partial', 'paid', 'voided'));
@@ -587,9 +597,9 @@ COMMIT;
 --   SELECT table_name FROM information_schema.tables
 --    WHERE table_schema = 'public' ORDER BY table_name;
 --
--- Expected (21): ai_assistant_settings, bookings, chat_messages, claims,
+-- Expected (22): ai_assistant_settings, bookings, chat_messages, claims,
 -- company_profiles, document_counters, finance_settings, gmail_connections,
--- google_calendar_integrations, invoice_items, receipts,
+-- file_backups, google_calendar_integrations, invoice_items, receipts,
 -- invoices, order_items, orders, password_resets, product_categories, products,
 -- staff_ai_assistant_settings, telegram_integrations, telegram_updates, users
 -- ----------------------------------------------------------------------------
