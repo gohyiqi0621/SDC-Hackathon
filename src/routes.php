@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 use Src\Controllers\AiSettingsController;
 use Src\Controllers\AuthController;
+use Src\Controllers\LegalController;
 use Src\Controllers\CategoryController;
 use Src\Controllers\ChatbotController;
 use Src\Controllers\ClaimController;
@@ -44,6 +45,11 @@ return static function (Router $router): void {
     $router->get('auth/reset', [AuthController::class, 'showReset'], [GuestMiddleware::class]);
     $router->post('auth/reset', [AuthController::class, 'reset'], [GuestMiddleware::class]);
     $router->post('auth/logout', [AuthController::class, 'logout'], $auth);
+
+    /* ----------------------------------------------- legal (public) --- */
+    // No sign-in: Google's OAuth consent screen links here, and visitors read them before registering.
+    $router->get('privacy', [LegalController::class, 'privacy']);
+    $router->get('terms', [LegalController::class, 'terms']);
 
     /* ------------------------------------------------------- dashboard --- */
     $router->get('dashboard', [DashboardController::class, 'index'], $auth);

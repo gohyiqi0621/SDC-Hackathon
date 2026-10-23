@@ -2376,6 +2376,44 @@ code {
     line-height: 1.6;
 }
 
+/* Terms / Privacy: links under every auth screen, consent line on Create account */
+.auth-legal {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 18px;
+    color: var(--muted);
+    font-size: 12px;
+}
+.auth-legal a { color: var(--muted); }
+.auth-legal a:hover { color: var(--primary, #5b4bdb); }
+.auth-consent {
+    margin: 12px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+    text-align: center;
+}
+
+/* Privacy Policy / Terms of Service */
+.auth-wrap--wide { max-width: 820px; }
+.legal { padding: 36px 40px; }
+.legal-head { padding-bottom: 18px; margin-bottom: 8px; border-bottom: 1px solid #ece9ff; }
+.legal-head h1 { margin: 0 0 6px; font-size: 28px; }
+.legal-head p { margin: 0; color: var(--muted); font-size: 13px; }
+.legal h2 { margin: 28px 0 8px; font-size: 17px; color: #26245a; }
+.legal h3 { margin: 18px 0 6px; font-size: 14px; color: #26245a; }
+.legal p, .legal li { color: #4a4867; font-size: 14px; line-height: 1.7; }
+.legal p { margin: 0 0 10px; }
+.legal ul { margin: 0 0 10px; padding-left: 20px; }
+.legal li { margin-bottom: 4px; }
+.legal-note { padding: 14px 16px; border-radius: 12px; background: #f6f4ff; border: 1px solid #e5e1ff; }
+.legal-back { display: inline-flex; align-items: center; gap: 6px; margin-top: 24px; font-size: 13px; }
+@media (max-width: 600px) {
+    .legal { padding: 24px 18px; }
+    .legal-head h1 { font-size: 23px; }
+}
+
 .auth-switch {
     margin-top: 18px;
     color: var(--muted);
