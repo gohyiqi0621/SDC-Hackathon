@@ -1,3 +1,4 @@
+
 <?php
 /**
  * partials/topbar.php - the top navigation from the email dashboard.
@@ -33,6 +34,83 @@
             </button>
         <?php endif; ?>
 
+        <!-- ========== AI CHATBOT ========== -->
+        <div class="header-chatbot" id="headerChatbot">
+
+            <button
+                type="button"
+                class="header-chatbot-trigger"
+                id="headerChatbotBtn"
+                aria-label="Open AI Assistant"
+                aria-expanded="false"
+                aria-controls="headerChatbotPanel"
+            >
+                <span class="header-chatbot-icon">
+                    <i class="fa-solid fa-robot"></i>
+                </span>
+
+                <span class="header-chatbot-text">
+                    <strong>AI Assistant</strong>
+                    <small>Hey! Need help with your emails?</small>
+                </span>
+            </button>
+
+            <!-- CHATBOT POPUP -->
+            <div class="header-chatbot-panel" id="headerChatbotPanel" hidden>
+
+                <div class="header-chatbot-panel-top">
+                    <div class="header-chatbot-title">
+                        <i class="fa-solid fa-robot"></i>
+                        <strong>AI Assistant</strong>
+                    </div>
+
+                    <button
+                        type="button"
+                        id="closeHeaderChatbot"
+                        aria-label="Close chatbot"
+                    >
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <!-- Reserved for chatbot animation -->
+                <div class="header-chatbot-animation" id="headerChatbotAnimation">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+
+                <!-- Chat messages -->
+                <div class="header-chatbot-messages"
+                     id="headerChatbotMessages"
+                     aria-live="polite">
+
+                    <div class="header-chatbot-bubble">
+                        Hi there! 👋 How can I help you today?
+                    </div>
+
+                </div>
+
+                <!-- Chat input -->
+                <form class="header-chatbot-form" id="headerChatbotForm">
+
+                    <input
+                        type="text"
+                        id="headerChatbotInput"
+                        placeholder="Ask me anything..."
+                        aria-label="Message AI Assistant"
+                        required
+                    >
+
+                    <button type="submit" aria-label="Send message">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+
+                </form>
+
+            </div>
+        </div>
+        <!-- ========== END AI CHATBOT ========== -->
+
+        <!-- ========== PROFILE ========== -->
         <div class="profile-menu" data-profile-menu>
             <button class="profile" type="button" data-profile-toggle aria-haspopup="true" aria-expanded="false">
                 <span class="avatar"><?= e(initials_of($user)) ?></span>
@@ -48,9 +126,11 @@
                     <strong><?= e($user['name']) ?></strong>
                     <span><?= e($user['email']) ?></span>
                 </div>
+
                 <a role="menuitem" href="<?= e(url('profile')) ?>">
                     <i class="fa-regular fa-circle-user"></i> Profile
                 </a>
+
                 <form method="post" action="<?= e(url('auth', ['action' => 'logout'])) ?>">
                     <?= csrf_field() ?>
                     <button class="is-danger" type="submit" role="menuitem">

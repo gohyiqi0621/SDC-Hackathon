@@ -43,16 +43,17 @@ final class InvoicePdfService
         $this->rect(0, 0, self::W, self::H, [1, 1, 1]);
         if ($cover) {
             $this->rect(50, 42, 495, 78, self::BLUE);
-            $this->drawLogo();
+            // No logo: the invoice belongs to the user's company, so the header is
+            // its name and details only (from Company Profile via company()).
             $company = \company();
             $name = (string) ($company['name'] ?? APP_NAME);
-            $this->text(115, 66, $name, 16, 'white', true);
+            $this->text(66, 66, $name, 16, 'white', true);
             $addressLines = preg_split('/\R/', trim((string) ($company['address'] ?? ''))) ?: [];
-            $this->text(115, 84, (string) ($addressLines[0] ?? ''), 7, 'white');
+            $this->text(66, 84, (string) ($addressLines[0] ?? ''), 7, 'white');
             $addressRemainder = implode(', ', array_slice($addressLines, 1));
-            if ($addressRemainder !== '') $this->text(115, 95, $addressRemainder, 7, 'white');
+            if ($addressRemainder !== '') $this->text(66, 95, $addressRemainder, 7, 'white');
             $issuerContact = trim('Tel: ' . (string) ($company['tel'] ?? '') . '  |  Co. Reg. No. ' . (string) ($company['reg_no'] ?? ''), ' |');
-            $this->text(115, 108, $issuerContact, 7, 'white');
+            $this->text(66, 108, $issuerContact, 7, 'white');
             $invoiceType = ($invoice['type'] ?? 'purchase') === 'sales' ? 'SALES INVOICE' : 'INVOICE';
             $this->textRight(545, 150, $invoiceType, 19, 'black', true);
 
@@ -147,11 +148,6 @@ final class InvoicePdfService
         $this->y += $advance;
     }
 
-    private function drawLogo(): void
-    {
-        $path = PUBLIC_ROOT . '/assets/gemini_logo_print.jpg';
-        if (is_file($path) && @getimagesize($path)) $this->content .= 'q 48 0 0 48 58 ' . (self::H - 99) . " cm /Im0 Do Q\n";
-    }
 
     private function text(float $x, float $top, string $value, int $size = 9, string $color = 'black', bool $bold = false): void
     {
@@ -209,12 +205,7 @@ final class InvoicePdfService
         $catalog = $add(''); $pagesObject = $add('');
         $font = $add('<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman /Encoding /WinAnsiEncoding >>');
         $boldFont = $add('<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>');
-        $imageObject = 0; $imageResource = '';
-        $logo = PUBLIC_ROOT . '/assets/gemini_logo_print.jpg';
-        if (is_file($logo) && ($info = @getimagesize($logo)) && ($bytes = file_get_contents($logo)) !== false) {
-            $imageObject = $add('<< /Type /XObject /Subtype /Image /Width ' . $info[0] . ' /Height ' . $info[1] . ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' . strlen($bytes) . ">>\nstream\n" . $bytes . "\nendstream");
-            $imageResource = ' /XObject << /Im0 ' . $imageObject . ' 0 R >>';
-        }
+        $imageResource = '';
         $pageRefs = [];
         foreach ($this->pages as $page) {
             $stream = $add('<< /Length ' . strlen($page) . ">>\nstream\n" . $page . "endstream");

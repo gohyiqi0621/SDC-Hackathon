@@ -17,8 +17,8 @@
   15. Popups            <dialog class="modal"> opened by [data-modal-open="#id"]
   16. File preview      [data-file-preview] shows the chosen PDF / image
   17. Submit confirm    <form data-submit-confirm="Message"> asks once before sending
-  18. Invoice items     [data-items] line-item rows with live totals
-  19. AI auto-fill      [data-ai-fill] reads the chosen file and fills the popup form
+  18. Invoice picker    [data-picker] tick products + qty, live totals; customer suggestions
+  19. AI auto-fill      [data-ai-fill] reads a claim receipt and fills the claim form
 ===================================== */
 
 (function () {
@@ -710,6 +710,8 @@
 
     // <form data-submit-confirm="Message"> asks once ("Yes, submit" / "Review again")
     // before sending - used where the sender cannot change the record afterwards.
+    // With data-submit-confirm-intent="issue" it only asks when the form's
+    // intent field has that value (so "Save as draft" goes straight through).
     // Runs before the AJAX handler (capture phase) and hands back to it on "yes".
     document.addEventListener('submit', function (e) {
         var form = e.target;
@@ -719,6 +721,10 @@
             delete form.dataset.submitConfirmed;
             return;
         }
+
+        var onlyFor = form.getAttribute('data-submit-confirm-intent');
+        var intent = form.querySelector('[data-intent-field]');
+        if (onlyFor && (!intent || intent.value !== onlyFor)) { return; }
 
         // Required fields still empty: let the server's field errors show first.
         var missing = Array.prototype.some.call(form.querySelectorAll('[required]'), function (field) {
@@ -741,126 +747,168 @@
         });
     }, true);
 
-    /* ---------- 18. Invoice items ---------- */
+    // <button type="submit" data-intent="draft"> puts its intent in the form's
+    // [data-intent-field] first (FormData does not include the clicked button).
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('button[data-intent]');
+        if (!btn || !btn.form) { return; }
+        var field = btn.form.querySelector('[data-intent-field]');
+        if (field) { field.value = btn.getAttribute('data-intent'); }
+    });
 
-    // Add / remove item rows and show the sums live: line = qty x price - disc,
-    // total = subtotal - discount + SST. The server recalculates on save; this
-    // is only what the user sees while typing. window.App.setInvoiceItems(rows)
-    // lets other code (e.g. AI auto-fill) fill the table.
-    document.querySelectorAll('[data-items]').forEach(function (editor) {
-        var body = editor.querySelector('[data-items-body]');
-        var template = editor.querySelector('[data-item-template]');
-        var empty = editor.querySelector('[data-items-empty]');
-        var form = editor.closest('form');
-        var amount = form.querySelector('[data-total-amount]');
-        var next = body.querySelectorAll('[data-item-row]').length;
+    /* ---------- 18. Invoice: product picker + customer suggestions ---------- */
 
-        function toCents(value) {
-            var n = parseFloat(String(value || '').replace(/,/g, ''));
-            return isNaN(n) ? 0 : Math.round(n * 100);
-        }
+    // Every active product is listed; ticking one enables its quantity box and
+    // the totals update (subtotal + the company's SST = total). Products priced
+    // in another currency than the invoice cannot be ticked. The server prices
+    // the invoice again from the database - this is only what the user sees.
+    document.querySelectorAll('[data-picker]').forEach(function (picker) {
+        var form = picker.closest('form');
+        var rate = parseFloat(picker.getAttribute('data-sst-rate')) || 0;
+        var currencySelect = form.querySelector('[data-invoice-currency]');
+        var search = picker.querySelector('[data-picker-search]');
+        var noMatch = picker.querySelector('[data-picker-nomatch]');
+        var rows = Array.prototype.slice.call(picker.querySelectorAll('[data-picker-row]'));
 
-        function show(cents) {
-            return padMoney((cents / 100).toFixed(2));
-        }
-
-        function rowHasValue(row) {
-            return Array.prototype.some.call(row.querySelectorAll('input'), function (input) {
-                return input.value.trim() !== '';
-            });
-        }
+        function show(cents, cur) { return (cur ? cur + ' ' : '') + padMoney((cents / 100).toFixed(2)); }
 
         function recalc() {
-            var rows = body.querySelectorAll('[data-item-row]');
+            var cur = currencySelect ? currencySelect.value : 'MYR';
             var subtotal = 0;
-            var active = false;
+            var count = 0;
 
-            rows.forEach(function (row, i) {
-                row.querySelector('[data-item-num]').textContent = String(i + 1);
+            rows.forEach(function (row) {
+                var check = row.querySelector('[data-picker-check]');
+                var qty = row.querySelector('[data-picker-qty]');
+                var otherCurrency = row.getAttribute('data-currency') !== cur;
 
-                var qty = parseFloat(String(row.querySelector('[data-item-qty]').value).replace(/,/g, '')) || 0;
-                var line = Math.max(0, Math.round(qty * toCents(row.querySelector('[data-item-price]').value))
-                    - toCents(row.querySelector('[data-item-disc]').value));
-                row.querySelector('[data-item-total]').textContent = show(line);
+                if (otherCurrency && check.checked) { check.checked = false; }
+                check.disabled = otherCurrency;
+                row.classList.toggle('is-disabled', otherCurrency);
+                row.querySelector('[data-picker-currency-note]').hidden = !otherCurrency;
 
-                if (rowHasValue(row)) {
-                    active = true;
-                    subtotal += line;
+                qty.disabled = !check.checked;
+                row.classList.toggle('is-picked', check.checked);
+
+                var cents = 0;
+                if (check.checked) {
+                    var q = parseFloat(String(qty.value).replace(/,/g, '')) || 0;
+                    cents = Math.round(q * Math.round(parseFloat(row.getAttribute('data-price')) * 100));
+                    subtotal += cents;
+                    count++;
                 }
+                row.querySelector('[data-picker-total]').textContent = check.checked ? padMoney((cents / 100).toFixed(2)) : '—';
             });
 
-            if (empty) { empty.hidden = rows.length > 0; }
-
-            editor.querySelectorAll('[data-when-items]').forEach(function (el) { el.hidden = !active; });
-            amount.readOnly = active;
-            amount.classList.toggle('is-computed', active);
-            if (!active) { return; }
-
-            var discount = Math.min(toCents(form.querySelector('[name="discount_amount"]').value), subtotal);
-            var rate = parseFloat(String(form.querySelector('[name="sst_rate"]').value).replace(/[,%\s]/g, '')) || 0;
-            var sst = Math.round((subtotal - discount) * Math.min(Math.max(rate, 0), 100) / 100);
-
-            editor.querySelector('[data-total-subtotal]').textContent = show(subtotal);
-            editor.querySelector('[data-total-sst]').textContent = show(sst);
-            amount.value = show(subtotal - discount + sst);
+            var sst = Math.round(subtotal * rate / 100);
+            picker.querySelector('[data-picker-subtotal]').textContent = show(subtotal, cur);
+            if (rate > 0) { picker.querySelector('[data-picker-sst]').textContent = show(sst, cur); }
+            picker.querySelector('[data-picker-grand]').textContent = show(subtotal + sst, cur);
+            picker.querySelector('[data-picker-count]').textContent = count ? '(' + count + ' item' + (count === 1 ? '' : 's') + ')' : '';
         }
 
-        function addRow(values) {
-            var holder = document.createElement('tbody');
-            holder.innerHTML = template.innerHTML.replace(/__i__/g, String(next++));
-            var row = holder.firstElementChild;
+        picker.addEventListener('change', function (e) {
+            if (e.target.matches('[data-picker-check]') && e.target.checked) {
+                var qty = e.target.closest('[data-picker-row]').querySelector('[data-picker-qty]');
+                if (!(parseFloat(qty.value) > 0)) { qty.value = '1'; }
+                recalc();
+                qty.focus();
+                qty.select();
+                return;
+            }
+            recalc();
+        });
+        picker.addEventListener('input', recalc);
+        if (currencySelect) { currencySelect.addEventListener('change', recalc); }
 
-            Object.keys(values || {}).forEach(function (key) {
-                var input = row.querySelector('[name$="[' + key + ']"]');
-                if (input && values[key] !== null && values[key] !== undefined) {
-                    input.value = input.hasAttribute('data-money') && values[key] !== '' ? padMoney(String(values[key])) : String(values[key]);
-                }
+        if (search) {
+            search.addEventListener('input', function () {
+                var term = search.value.trim().toLowerCase();
+                var shown = 0;
+                rows.forEach(function (row) {
+                    // A ticked product always stays visible.
+                    var match = term === '' || row.getAttribute('data-search').indexOf(term) !== -1
+                        || row.querySelector('[data-picker-check]').checked;
+                    row.hidden = !match;
+                    if (match) { shown++; }
+                });
+                if (noMatch) { noMatch.hidden = shown > 0; }
             });
-
-            body.appendChild(row);
-            return row;
+            // Enter in the search box must not submit the invoice.
+            search.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); } });
         }
-
-        editor.querySelector('[data-item-add]').addEventListener('click', function () {
-            var row = addRow();
-            recalc();
-            row.querySelector('[name$="[description]"]').focus();
-        });
-
-        editor.addEventListener('click', function (e) {
-            var remove = e.target.closest('[data-item-remove]');
-            if (!remove) { return; }
-            remove.closest('[data-item-row]').remove();
-            recalc();
-        });
-
-        form.addEventListener('input', recalc);
-        form.addEventListener('focusout', function () { setTimeout(recalc, 0); });
-
-        // Purchase / Sales: the other party is a Supplier or a Customer.
-        form.querySelectorAll('[data-invoice-type] input[name="type"]').forEach(function (radio) {
-            radio.addEventListener('change', function () {
-                var label = form.querySelector('[data-party-label]');
-                if (label && radio.checked) { label.textContent = radio.getAttribute('data-party'); }
-            });
-        });
-
-        window.App.setInvoiceItems = function (rows) {
-            body.innerHTML = '';
-            (rows || []).forEach(function (r) { addRow(r); });
-            recalc();
-        };
-
-        window.App.invoiceHasItems = function () {
-            return Array.prototype.some.call(body.querySelectorAll('[data-item-row]'), rowHasValue);
-        };
 
         recalc();
     });
 
+    // Customer: picking a name used on an earlier invoice fills its address and
+    // phone (only into empty fields, so nothing typed is overwritten).
+    document.querySelectorAll('[data-customer-input]').forEach(function (input) {
+        var form = input.form;
+        var dataEl = form.querySelector('[data-customer-data]');
+        var hint = form.querySelector('[data-customer-hint]');
+        var customers = [];
+        try { customers = JSON.parse(dataEl ? dataEl.textContent : '[]') || []; } catch (err) { customers = []; }
+
+        function matchFor(value) {
+            var name = value.trim().toLowerCase();
+            return customers.find(function (c) { return String(c.party_name).toLowerCase() === name; });
+        }
+
+        function apply() {
+            var match = matchFor(input.value);
+            var filled = false;
+            if (match) {
+                [['party_address', match.party_address], ['party_phone', match.party_phone]].forEach(function (pair) {
+                    var field = form.elements[pair[0]];
+                    if (field && !field.value.trim() && pair[1]) {
+                        field.value = pair[1];
+                        filled = true;
+                    }
+                });
+            }
+            if (hint) { hint.hidden = !filled; }
+        }
+
+        input.addEventListener('change', apply);
+        // Picking from the browser's suggestion list fires "input" with the full name.
+        input.addEventListener('input', function () { if (matchFor(input.value)) { apply(); } });
+    });
+
+    // Payment terms: a standard term sets the due date (invoice date + its days);
+    // "Custom…" shows a text box and leaves the due date to the user.
+    document.querySelectorAll('[data-payment-terms]').forEach(function (select) {
+        var form = select.form;
+        var custom = form.querySelector('[data-payment-terms-custom]');
+        var issue = form.elements.issue_date;
+        var due = form.elements.due_date;
+
+        function addDays(ymd, days) {
+            var p = String(ymd).split('-').map(Number);
+            if (p.length !== 3 || !p[0]) { return ''; }
+            var d = new Date(Date.UTC(p[0], p[1] - 1, p[2] + days));
+            return d.toISOString().slice(0, 10);
+        }
+
+        function sync(fromIssue) {
+            var opt = select.selectedOptions[0];
+            var isCustom = select.value === '__custom';
+            if (custom) {
+                custom.hidden = !isCustom;
+                if (isCustom && !fromIssue) { custom.focus(); }
+            }
+            if (opt && opt.hasAttribute('data-days') && issue && issue.value && due) {
+                due.value = addDays(issue.value, parseInt(opt.getAttribute('data-days'), 10) || 0);
+            }
+        }
+
+        select.addEventListener('change', function () { sync(false); });
+        if (issue) { issue.addEventListener('change', function () { sync(true); }); }
+    });
+
     /* ---------- 19. AI auto-fill ---------- */
 
-    // When a file is chosen in an upload popup, the browser turns it into page
+    // When a receipt is chosen in the New claim popup, the browser turns it into page
     // images (pdf.js for PDFs, a resize for photos), POSTs them to the
     // extract endpoint, and fills the form. Fields the user already typed are
     // kept; "Read again" overwrites. Nothing is saved until the user submits.
@@ -983,40 +1031,12 @@
             return true;
         }
 
-        function fillInvoice(f, force) {
-            var n = 0;
-            ['invoice_number', 'party_name', 'party_address', 'party_phone', 'payment_terms', 'reference_no',
-                'issue_date', 'due_date', 'currency'].forEach(function (k) { if (put(k, f[k], force)) { n++; } });
-            if (f.type && put('type', f.type, force)) { n++; }
-
-            var hasItems = window.App.invoiceHasItems && window.App.invoiceHasItems();
-            if (f.items && f.items.length && window.App.setInvoiceItems && (force || !hasItems)) {
-                window.App.setInvoiceItems(f.items);
-                n += f.items.length;
-                if (put('discount_amount', f.discount_amount, force)) { n++; }
-                if (put('sst_rate', f.sst_rate, force)) { n++; }
-            } else if (!hasItems && put('amount', f.total, force)) {
-                n++;
-            }
-            return n;
-        }
-
         function fillClaim(f, force) {
             var n = 0;
             if (put('title', f.title || f.merchant, force)) { n++; }
             ['expense_date', 'amount', 'currency', 'category'].forEach(function (k) { if (put(k, f[k], force)) { n++; } });
             if (f.merchant && f.title && f.title.indexOf(f.merchant) === -1 && put('notes', 'Merchant: ' + f.merchant, false)) { n++; }
             return n;
-        }
-
-        // The AI's own total vs the items it read: a gap means something was misread.
-        function totalWarning(f) {
-            if (kind !== 'invoice' || !f.total || !f.items || !f.items.length) { return ''; }
-            var shown = parseFloat(String(form.elements.amount.value).replace(/,/g, '')) || 0;
-            var read = parseFloat(f.total) || 0;
-            return Math.abs(shown - read) > 0.009
-                ? ' The invoice says total ' + padMoney(String(read)) + ' but the items add up to ' + padMoney(String(shown)) + ' - please check.'
-                : '';
         }
 
         function run(blob, force) {
@@ -1040,12 +1060,11 @@
             }).then(function (result) {
                 if (!result.success) { throw new Error(result.message || 'AI could not read this file.'); }
                 var f = result.data.fields || {};
-                var filled = kind === 'claim' ? fillClaim(f, force) : fillInvoice(f, force);
-                var warn = totalWarning(f);
+                var filled = fillClaim(f, force);
                 if (filled === 0) {
                     status('warn', 'AI found nothing new to fill. Please type the details.');
                 } else {
-                    status(warn ? 'warn' : 'ok', 'Filled ' + filled + ' field' + (filled === 1 ? '' : 's') + ' with ' + result.data.model + '. Please check every field.' + warn);
+                    status('ok', 'Filled ' + filled + ' field' + (filled === 1 ? '' : 's') + ' with ' + result.data.model + '. Please check every field.');
                 }
             }).catch(function (err) {
                 status('error', (err && err.message ? err.message : 'AI could not read this file.') + ' You can still type the details.');

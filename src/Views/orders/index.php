@@ -337,6 +337,11 @@ $active = array_filter([
                                         <?php else: ?>
                                             <span class="order-wait order-wait--done">Closed</span>
                                         <?php endif; ?>
+                                        <?php if (!in_array($st, ['cancelled', 'payment_rejected'], true)): ?>
+                                            <!-- Financial > Invoice: opens the create popup filled from this order (one invoice per order). -->
+                                            <a class="order-btn order-btn--doc" href="<?= e(url('financial', ['action' => 'invoice', 'from_order' => $id])) ?>"
+                                               title="Create an invoice from this order"><i class="fa-solid fa-file-invoice" aria-hidden="true"></i> Invoice</a>
+                                        <?php endif; ?>
                                         <?php if ($canCancel): ?>
                                             <form method="post" action="<?= e(url('orders', ['action' => 'cancel'])) ?>"
                                                   data-confirm="Cancel <?= e($order['order_no']) ?>? The customer is told on Telegram."

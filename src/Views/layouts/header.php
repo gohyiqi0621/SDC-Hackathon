@@ -8,6 +8,8 @@
  * Optional: 'styles' => ['assets/css/x.css'], 'search' => true (topbar search box).
  * Close it with layouts/footer.php using the same 'bare' value.
  */
+
+
 $bare      = $bare ?? false;
 $pageTitle = $title ?? $pageTitle ?? 'Dashboard';
 

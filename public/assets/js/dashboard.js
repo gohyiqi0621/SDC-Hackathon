@@ -969,6 +969,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
         selectedEmailId = id;
 
+
+        document.dispatchEvent(
+            new CustomEvent("sme:mascot", {
+                detail: {
+                    state: email.sent ? "sent" : "reading"
+                }
+            })
+        );
+
+
         if (emailBody) {
             emailBody.classList.add("email-body-collapsed");
         }
@@ -1292,6 +1302,26 @@ function clearSelectedEmail() {
             const data = await requestJSON(
                 gmailInboxUrl
             );
+
+            const incomingIds = (data.emails || [])
+                .map(mail => String(mail.id || ""))
+                .filter(Boolean);
+
+            const previousIds = window.smartMascotInboxIds;
+
+            if (
+                previousIds instanceof Set &&
+                incomingIds.some(id => !previousIds.has(id))
+            ) {
+                document.dispatchEvent(
+                    new CustomEvent("sme:mascot", {
+                        detail: { state: "new-email" }
+                    })
+                );
+            }
+
+            window.smartMascotInboxIds = new Set(incomingIds);
+
 
             showList(
                 (data.emails || []).map(fromGmail)
@@ -1655,6 +1685,13 @@ function removeEmailFromView(email) {
     async function generateReply() {
         const email = selectedEmail();
 
+        document.dispatchEvent(
+            new CustomEvent("sme:mascot", {
+                detail: { state: "thinking" }
+            })
+        );
+
+
         if (!email || email.sent) {
             notify(
                 "Please select an Inbox email.",
@@ -1772,6 +1809,13 @@ function removeEmailFromView(email) {
                 "AI reply generated successfully!",
                 "success"
             );
+
+            document.dispatchEvent(
+                new CustomEvent("sme:mascot", {
+                    detail: { state: "draft" }
+                })
+            );
+
 
         } catch (error) {
             console.error("AI error:", error);
@@ -1997,6 +2041,14 @@ function removeEmailFromView(email) {
                 }
 
                 sentSuccessfully = true;
+
+
+                document.dispatchEvent(
+                    new CustomEvent("sme:mascot", {
+                        detail: { state: "celebrate" }
+                    })
+                );
+
 
                 notify(
                     "Reply sent successfully!",

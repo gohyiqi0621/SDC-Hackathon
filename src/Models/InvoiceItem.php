@@ -5,6 +5,10 @@
  * Items have no user_id of their own: they are always reached through an
  * invoice the caller has already loaded for that user (Invoice::find), so
  * ownership is checked once, on the invoice.
+ *
+ * product_id links a line to the Products & Services entry it came from; the
+ * name, SKU and price are COPIED onto the line, so a later price change never
+ * alters an invoice already sent.
  */
 declare(strict_types=1);
 
@@ -21,7 +25,7 @@ final class InvoiceItem
     public function forInvoice(int $invoiceId): array
     {
         $stmt = Database::connection()->prepare(
-            'SELECT id, position, sku, description, uom, quantity, unit_price, discount, amount
+            'SELECT id, position, product_id, sku, description, uom, quantity, unit_price, discount, amount
                FROM invoice_items
               WHERE invoice_id = ?
               ORDER BY position, id'
@@ -49,14 +53,15 @@ final class InvoiceItem
 
         $stmt = $pdo->prepare(
             'INSERT INTO invoice_items
-                (invoice_id, position, sku, description, uom, quantity, unit_price, discount, amount)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                (invoice_id, position, product_id, sku, description, uom, quantity, unit_price, discount, amount)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
 
         foreach (array_values($items) as $i => $item) {
             $stmt->execute([
                 $invoiceId,
                 $i + 1,
+                $item['product_id'] ?? null,
                 $item['sku'],
                 $item['description'],
                 $item['uom'],

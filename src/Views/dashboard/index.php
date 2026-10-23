@@ -2,8 +2,6 @@
 /**
  * dashboard/index.php - the home screen: the SME Smart AI email dashboard.
  *
- * Expects: $user, $brevoReady, $gmailReady, $gmailTable, $gmailEmail.
- *
  * The inbox shows the user's real Gmail when connected (loaded as JSON from
  * /gmail/inbox by assets/js/dashboard.js), otherwise demo emails. The AI
  * summary, reply draft and suggested follow-up are generated in the browser.
@@ -20,39 +18,127 @@ view('layouts/header', [
 ]);
 ?>
 
+
 <!-- ========== WELCOME BANNER ========== -->
-<section class="welcome-banner">
+
+<!-- ========== PREMIUM WELCOME BANNER ========== -->
+<section class="welcome-banner" id="welcomeBanner">
 
     <div class="welcome-text">
-        <h1><?= e($greeting) ?>, <?= e($firstName) ?>! <?= $greetingIcon ?></h1>
+        <h1>
+            <?= e($greeting) ?>,
+            <?= e($firstName) ?>!
+            <?= $greetingIcon ?>
+        </h1>
 
         <p>Here's what matters in your emails today.</p>
+
+        <!-- EMAIL STATISTICS -->
+        <section class="stats-grid" aria-label="Email statistics">
+
+            <div class="stat-card purlpe">
+                <div class="stat-icon">
+                    <i class="fa-solid fa-envelope"></i>
+                </div>
+                <div class="stat-details">
+                    <h2 id="newEmailCount">24</h2>
+                    <p>New emails</p>
+                </div>
+                <span class="stat-trend positive">↑ 28%</span>
+            </div>
+
+            <div class="stat-card blue">
+                <div class="stat-icon">
+                    <i class="fa-solid fa-star"></i>
+                </div>
+                <div class="stat-details">
+                    <h2 id="replyCount">5</h2>
+                    <p>Need your reply</p>
+                </div>
+                <span class="stat-trend negative">↑ 2</span>
+            </div>
+
+            <div class="stat-card teal">
+                <div class="stat-icon">
+                    <i class="fa-solid fa-calendar-days"></i>
+                </div>
+                <div class="stat-details">
+                    <h2 id="meetingCount">3</h2>
+                    <p>Meeting requests</p>
+                </div>
+                <span class="stat-trend positive">↑ 1</span>
+            </div>
+
+            <div class="stat-card yellow">
+                <div class="stat-icon">
+                    <i class="fa-solid fa-flag"></i>
+                </div>
+                <div class="stat-details">
+                    <h2 id="importantCount">7</h2>
+                    <p>Important updates</p>
+                </div>
+                <span class="stat-trend warning">↑ 3</span>
+            </div>
+
+        </section>
     </div>
 
-    <div class="ai-assistant">
+    <!-- 3D ROBOT POSITION -->
+    <div class="ai-bot-space" id="aiBotSpace"></div>
 
-        <div class="assistant-message">
-            <strong>Let AI handle your emails</strong>
-
-            <p>
-                Summarize, draft replies and never
-                miss what's important.
-            </p>
+    <!-- ANIMATED AI ELEMENTS -->
+    <div class="wb-float wb-mail" aria-hidden="true">
+        <i class="fa-solid fa-envelope"></i>
+        <div>
+            <strong>New Email</strong>
+            <small></small>
         </div>
-
-        <div class="assistant-robot">
-            <i class="fa-solid fa-robot"></i>
-        </div>
-
     </div>
+
+    <div class="wb-float wb-summary" aria-hidden="true">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+        <div>
+            <strong>AI Summary</strong>
+            <small></small>
+        </div>
+    </div>
+
+    <div class="wb-float wb-reply" aria-hidden="true">
+        <i class="fa-solid fa-paper-plane"></i>
+        <div>
+            <strong>Smart Reply</strong>
+            <small></small>
+        </div>
+    </div>
+
+    <span class="wb-spark one" aria-hidden="true"></span>
+    <span class="wb-spark two" aria-hidden="true"></span>
 
 </section>
 
 
+<!-- ========== 3D AI BOT ========== -->
+<div
+    class="ai-bot-3d"
+    id="aiBot3D"
+    data-chatbot-url="<?= e(url('chatbot')) ?>"
+>
+    <div id="aiBotCanvas"></div>
+
+    <a
+        class="ai-bot-open"
+        id="aiBotOpen"
+        href="<?= e(url('chatbot')) ?>"
+        aria-label="Go to AI Assistant"
+        title="Chat with AI Assistant">
+    </a>
+</div>
+
 <div class="page-body" id="dashboardRoot"
      data-user-id="<?= (int) $user['id'] ?>"
      data-csrf-token="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>"
-     data-gmail-send="<?= htmlspecialchars(url('gmail', ['action' => 'send']), ENT_QUOTES, 'UTF-8') ?>"     data-gmail-inbox="<?= $gmailEmail ? e(url('gmail', ['action' => 'inbox'])) : '' ?>"
+     data-gmail-send="<?= htmlspecialchars(url('gmail', ['action' => 'send']), ENT_QUOTES, 'UTF-8') ?>"     
+     data-gmail-inbox="<?= $gmailEmail ? e(url('gmail', ['action' => 'inbox'])) : '' ?>"
      data-gmail-message="<?= $gmailEmail ? e(url('gmail', ['action' => 'message'])) : '' ?>"
      data-ai-summarize="<?= htmlspecialchars(url('ai', ['action' => 'summarize']), ENT_QUOTES, 'UTF-8') ?>"
      data-ai-regenerate="<?= htmlspecialchars(url('ai', ['action' => 'regenerate']), ENT_QUOTES, 'UTF-8') ?>"
@@ -80,7 +166,7 @@ view('layouts/header', [
             </strong>
             <span id="gmailStatus">
                 <?php if ($gmailEmail): ?>
-                    Showing the latest emails from <?= e($gmailEmail) ?> (read-only).
+                    Showing the latest emails from <?= e($gmailEmail) ?>.
                 <?php elseif ($gmailReady): ?>
                     Connect your Gmail account to view and manage your emails.
                 <?php elseif (!($gmailTable ?? true)): ?>
@@ -112,32 +198,173 @@ view('layouts/header', [
         </div>
     </section>
 
-    <!-- ========== TEAM WORKSPACE PLANNER ========== -->
-    <section class="workspace-planner" id="workspacePlanner" aria-label="Team tasks and calendar">
-        <div class="wp-heading">
-            <div><h2><i class="fa-solid fa-briefcase"></i> Team Workspace Planner</h2><p>Assign tasks, track deadlines and organize your team's schedule.</p></div>
-            <span class="wp-label">Workspace</span>
+
+<!-- ========== PREMIUM TEAM WORKSPACE PLANNER ========== -->
+<section class="workspace-planner" id="workspacePlanner" aria-label="Team tasks and calendar">
+
+    <div class="wp-heading">
+        <div class="wp-heading-info">
+            <div class="wp-heading-title">
+                <span class="wp-heading-icon">
+                    <i class="fa-solid fa-briefcase"></i>
+                </span>
+                <h2>Team Workspace Planner</h2>
+            </div>
+            <p>Assign tasks, track deadlines and organize your team's schedule.</p>
         </div>
-        <div class="wp-summary">
-            <div><span>Total tasks</span><strong id="wpTotal">0</strong></div>
-            <div><span>Pending</span><strong id="wpPending">0</strong></div>
-            <div><span>Completed</span><strong id="wpCompleted">0</strong></div>
+
+        <span class="wp-label">
+            <i class="fa-solid fa-users"></i>
+            Workspace
+        </span>
+    </div>
+
+    <!-- SUMMARY CARDS -->
+    <div class="wp-summary">
+
+        <div class="wp-summary-card wp-summary-total">
+            <span class="wp-summary-icon">
+                <i class="fa-solid fa-chart-pie"></i>
+            </span>
+            <div class="wp-summary-info">
+                <span>Total tasks</span>
+                <strong id="wpTotal">0</strong>
+            </div>
+            <div class="wp-summary-extra">
+                <div class="wp-progress-track">
+                    <div class="wp-progress-fill" id="wpProgressFill"></div>
+                </div>
+                <small id="wpProgressText">0% completed</small>
+            </div>
         </div>
-        <div class="wp-columns">
-            <section class="wp-card" aria-label="Team to-do list">
-                <div class="wp-card-heading"><h3><i class="fa-solid fa-list-check"></i> Team To-Do List</h3><button class="wp-primary" type="button" id="wpAddTask"><i class="fa-solid fa-plus"></i> Add Task</button></div>
-                <div class="wp-filters"><button type="button" class="wp-filter is-active" data-wp-filter="all">All</button><button type="button" class="wp-filter" data-wp-filter="pending">Pending</button><button type="button" class="wp-filter" data-wp-filter="done">Completed</button></div>
-                <div id="wpTaskList" class="wp-task-list" aria-live="polite"></div>
-            </section>
-            <section class="wp-card" aria-label="Team calendar">
-                <div class="wp-card-heading"><h3><i class="fa-regular fa-calendar-days"></i> Team Calendar</h3><button class="wp-primary" type="button" id="wpAddEvent"><i class="fa-solid fa-plus"></i> Event</button></div>
-                <div class="wp-monthbar"><button type="button" id="wpPrevMonth" aria-label="Previous month"><i class="fa-solid fa-chevron-left"></i></button><strong id="wpMonthTitle"></strong><button type="button" id="wpNextMonth" aria-label="Next month"><i class="fa-solid fa-chevron-right"></i></button></div>
+
+        <div class="wp-summary-card wp-summary-pending">
+            <span class="wp-summary-icon">
+                <i class="fa-regular fa-clock"></i>
+            </span>
+            <div class="wp-summary-info">
+                <span>Pending</span>
+                <strong id="wpPending">0</strong>
+            </div>
+            <div class="wp-summary-extra wp-summary-status">
+                <i class="fa-solid fa-circle"></i>
+                <span id="wpPendingStatus">No pending tasks</span>
+            </div>
+        </div>
+
+        <div class="wp-summary-card wp-summary-completed">
+            <span class="wp-summary-icon">
+                <i class="fa-regular fa-circle-check"></i>
+            </span>
+            <div class="wp-summary-info">
+                <span>Completed</span>
+                <strong id="wpCompleted">0</strong>
+            </div>
+            <div class="wp-summary-extra wp-summary-status">
+                <span class="wp-complete-line"></span>
+                <span id="wpCompletedStatus">All caught up!</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MAIN WORKSPACE -->
+    <div class="wp-columns">
+
+        <!-- TO-DO LIST -->
+        <section class="wp-card wp-todo-panel" aria-label="Team to-do list">
+
+            <div class="wp-card-heading">
+                <h3>
+                    <i class="fa-solid fa-list-check"></i>
+                    Team To-Do List
+                </h3>
+
+                <button class="wp-primary" type="button" id="wpAddTask">
+                    <i class="fa-solid fa-plus"></i>
+                    Add Task
+                </button>
+            </div>
+
+            <div class="wp-filters">
+                <button type="button" class="wp-filter is-active" data-wp-filter="all">
+                    All <span id="wpAllFilterCount"></span>
+                </button>
+                <button type="button" class="wp-filter" data-wp-filter="pending">
+                    Pending <span id="wpPendingFilterCount"></span>
+                </button>
+                <button type="button" class="wp-filter" data-wp-filter="done">
+                    Completed <span id="wpDoneFilterCount"></span>
+                </button>
+            </div>
+
+            <div id="wpTaskList" class="wp-task-list" aria-live="polite"></div>
+
+        </section>
+
+        <!-- CALENDAR + EVENTS -->
+        <div class="wp-calendar-area">
+
+            <section class="wp-card wp-calendar-panel" aria-label="Team calendar">
+
+                <div class="wp-card-heading">
+                    <h3>
+                        <i class="fa-regular fa-calendar-days"></i>
+                        Team Calendar
+                    </h3>
+                </div>
+
+                <div class="wp-monthbar">
+                    <button type="button" id="wpPrevMonth" aria-label="Previous month">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+
+                    <strong id="wpMonthTitle"></strong>
+
+                    <button type="button" id="wpNextMonth" aria-label="Next month">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+
                 <div class="wp-calendar" id="wpCalendar" aria-label="Calendar days"></div>
-                <div class="wp-agenda"><h4 id="wpAgendaTitle">Selected date</h4><div id="wpAgendaItems"></div></div>
+
+                <div class="wp-agenda">
+                    <h4 id="wpAgendaTitle">Selected date</h4>
+                    <div id="wpAgendaItems"></div>
+                </div>
+
             </section>
+
+            <section class="wp-card wp-events-panel" aria-label="Upcoming events">
+
+                <div class="wp-card-heading">
+                    <h3>
+                        <i class="fa-regular fa-calendar-check"></i>
+                        Upcoming Events
+                    </h3>
+
+                    <button class="wp-primary" type="button" id="wpAddEvent">
+                        <i class="fa-solid fa-plus"></i>
+                        Event
+                    </button>
+                </div>
+
+                <div class="wp-upcoming-list" id="wpUpcomingEvents">
+                    <div class="wp-empty">No upcoming events.</div>
+                </div>
+
+            </section>
+
         </div>
-        <p class="wp-disclaimer"><i class="fa-solid fa-circle-info"></i> Tasks and events are saved in this browser for now. Shared worker accounts and automatic notifications require a database API.</p>
-    </section>
+    </div>
+
+    <p class="wp-disclaimer">
+        <i class="fa-solid fa-circle-info"></i>
+        Tasks and events are saved in this browser for now.
+    </p>
+
+</section>
+
     <div class="wp-modal-backdrop" id="wpModal" hidden>
         <div class="wp-modal" role="dialog" aria-modal="true" aria-labelledby="wpModalTitle">
             <div class="wp-modal-heading"><h3 id="wpModalTitle">New task</h3><button type="button" id="wpCloseModal" aria-label="Close">&times;</button></div>
@@ -199,7 +426,74 @@ view('layouts/header', [
           const items=[...data.tasks.filter(t=>t.date===selected).map(t=>({title:t.title,kind:t.done?'Completed task':'Task',assignee:t.assignee})),...data.events.filter(e=>e.date===selected).map(e=>({title:e.title,kind:'Event',assignee:''}))];
           el('wpAgendaItems').innerHTML=items.length?items.map(i=>'<div class="wp-agenda-item"><strong>'+escapeHTML(i.title)+'</strong><br><span>'+escapeHTML(i.kind)+(i.assignee?' · '+escapeHTML(i.assignee):'')+'</span></div>').join(''):'<div class="wp-empty">Nothing scheduled for this date.</div>';
         }
-        function render(){renderTasks();renderCalendar();}
+        
+function renderUpcomingEvents() {
+    const container = el('wpUpcomingEvents');
+    if (!container) return;
+
+    const todayISO = localISO(new Date());
+
+    const upcoming = data.events
+        .filter(event => event.date >= todayISO)
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .slice(0, 4);
+
+    container.innerHTML = upcoming.length
+        ? upcoming.map(event => {
+            const dateText = new Date(
+                event.date + 'T12:00:00'
+            ).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+
+            return `
+                <div class="wp-upcoming-item">
+                    <span class="wp-event-dot"></span>
+                    <div class="wp-event-info">
+                        <strong>${escapeHTML(event.title)}</strong>
+                        <small>${escapeHTML(dateText)}</small>
+                    </div>
+                </div>
+            `;
+        }).join('')
+        : '<div class="wp-empty">No upcoming events. Click + Event to add one.</div>';
+}
+
+function renderPlannerSummary() {
+    const total = data.tasks.length;
+    const completed = data.tasks.filter(task => task.done).length;
+    const pending = total - completed;
+    const percentage = total
+        ? Math.round((completed / total) * 100)
+        : 0;
+
+    el('wpProgressFill').style.width = percentage + '%';
+    el('wpProgressText').textContent = percentage + '% completed';
+
+    el('wpPendingStatus').textContent =
+        pending === 0
+            ? 'No pending tasks'
+            : pending + ' task' + (pending === 1 ? '' : 's') + ' remaining';
+
+    el('wpCompletedStatus').textContent =
+        total > 0 && pending === 0
+            ? 'All caught up!'
+            : completed + ' completed';
+
+    el('wpAllFilterCount').textContent = '(' + total + ')';
+    el('wpPendingFilterCount').textContent = '(' + pending + ')';
+    el('wpDoneFilterCount').textContent = '(' + completed + ')';
+}
+
+function render() {
+    renderTasks();
+    renderCalendar();
+    renderPlannerSummary();
+    renderUpcomingEvents();
+}
+
         function openModal(type,prefill='') {modalType=type;el('wpModalTitle').textContent=type==='task'?'Create Team Task':'Add Calendar Event';el('wpTaskFields').hidden=type==='event';el('wpTitle').value=prefill;el('wpAssignee').value='';el('wpPriority').value='Medium';el('wpDate').value=selected;el('wpModal').hidden=false;el('wpTitle').focus();}
         function closeModal(){el('wpModal').hidden=true;}
         el('wpAddTask').addEventListener('click',()=>openModal('task'));
@@ -217,85 +511,16 @@ view('layouts/header', [
     })();
     </script>
 
-        <?php if ($brevoReady): ?>
-            <form method="post" action="<?= e(url('dashboard', ['action' => 'test_email'])) ?>">
-                <?= csrf_field() ?>
-                <button class="primary-btn" type="submit">
-                    <i class="fa-regular fa-envelope"></i>
-                    Send test email
-                </button>
-            </form>
-        <?php endif; ?>
-    </section>
+    <?php if ($brevoReady): ?>
+    <form method="post" action="<?= e(url('dashboard', ['action' => 'test_email'])) ?>">
+        <?= csrf_field() ?>
+        <button class="primary-btn" type="submit">
+            <i class="fa-regular fa-envelope"></i>
+            Send test email
+        </button>
+    </form>
+<?php endif; ?>
 
-
-    <!-- ========== STATISTICS CARDS ========== -->
-    <section class="stats-grid">
-
-        <div class="stat-card blue">
-
-            <div class="stat-icon">
-                <i class="fa-solid fa-envelope"></i>
-            </div>
-
-            <div class="stat-details">
-                <h2 id="newEmailCount">24</h2>
-                <p>New emails</p>
-            </div>
-
-            <span class="stat-trend positive">↑ 28%</span>
-
-        </div>
-
-
-        <div class="stat-card pink">
-
-            <div class="stat-icon">
-                <i class="fa-solid fa-star"></i>
-            </div>
-
-            <div class="stat-details">
-                <h2 id="replyCount">5</h2>
-                <p>Need your reply</p>
-            </div>
-
-            <span class="stat-trend negative">↑ 2</span>
-
-        </div>
-
-
-        <div class="stat-card green">
-
-            <div class="stat-icon">
-                <i class="fa-solid fa-calendar-days"></i>
-            </div>
-
-            <div class="stat-details">
-                <h2 id="meetingCount">3</h2>
-                <p>Meeting requests</p>
-            </div>
-
-            <span class="stat-trend positive">↑ 1</span>
-
-        </div>
-
-
-        <div class="stat-card yellow">
-
-            <div class="stat-icon">
-                <i class="fa-solid fa-flag"></i>
-            </div>
-
-            <div class="stat-details">
-                <h2 id="importantCount">7</h2>
-                <p>Important updates</p>
-            </div>
-
-            <span class="stat-trend warning">↑ 3</span>
-
-        </div>
-
-    </section>
 
 
     <!-- ========== MAIN CONTENT ========== -->
@@ -774,5 +999,317 @@ view('layouts/header', [
     </div>
 
 </div>
+
+
+<!-- Three.js 3D Engine -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.152.2/three.min.js"></script>
+<!-- PREMIUM GLB ROBOT LOADER -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+  
+const ROBOT_MODEL_URL =
+  "/SDC-Hackathon/public/assets/roboter_cute.glb";
+
+
+
+function initGLBRobot() {
+  const space = document.getElementById("aiBotSpace");
+  const bot = document.getElementById("aiBot3D");
+  const host = document.getElementById("aiBotCanvas");
+
+  if (!space || !bot || !host) return;
+
+  space.appendChild(bot);
+
+  Object.assign(bot.style, {
+    position: "absolute",
+    inset: "0",
+    width: "100%",
+    height: "100%",
+    transform: "none",
+    cursor: "pointer"
+  });
+
+  host.style.width = "100%";
+  host.style.height = "100%";
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+  camera.position.set(0, 0.3, 6);
+
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true,
+    powerPreference: "high-performance"
+  });
+
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.25;
+  renderer.domElement.style.pointerEvents = "none";
+  host.replaceChildren(renderer.domElement);
+
+  // Soft studio lighting
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xb5a7ed, 2));
+
+  const keyLight = new THREE.DirectionalLight(0xffffff, 3);
+  keyLight.position.set(-3, 5, 6);
+  scene.add(keyLight);
+
+  const fillLight = new THREE.DirectionalLight(0xc6bcff, 1.8);
+  fillLight.position.set(4, 1, 3);
+  scene.add(fillLight);
+
+  const rimLight = new THREE.DirectionalLight(0xece5ff, 2.5);
+  rimLight.position.set(1, 3, -4);
+  scene.add(rimLight);
+
+  const robot = new THREE.Group();
+  const movement = new THREE.Group();
+  scene.add(robot);
+  robot.add(movement);
+
+  let loaded = false;
+  let state = "idle";
+  let mixer = null;
+  let currentAction = null;
+  let hover = false;
+
+let mouseX = 0;
+let mouseY = 0;
+
+space.addEventListener("pointermove", (event) => {
+  const rect = space.getBoundingClientRect();
+
+  mouseX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouseY = ((event.clientY - rect.top) / rect.height) * 2 - 1;
+});
+
+space.addEventListener("pointerleave", () => {
+  mouseX = 0;
+  mouseY = 0;
+});
+
+  let reactionUntil = 0;
+  let reactionStart = 0;
+
+  const clock = new THREE.Clock();
+  const reduceMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)"
+  ).matches;
+
+  new GLTFLoader().load(
+    ROBOT_MODEL_URL,
+    gltf => {
+      const model = gltf.scene;
+
+      const bounds = new THREE.Box3().setFromObject(model);
+      const center = bounds.getCenter(new THREE.Vector3());
+      const size = bounds.getSize(new THREE.Vector3());
+      const maxSize = Math.max(size.x, size.y, size.z);
+
+      if (maxSize <= 0) return;
+
+      model.position.sub(center);
+      movement.scale.setScalar(2.9 / maxSize);
+      movement.add(model);
+
+      model.traverse(child => {
+        if (!child.isMesh) return;
+
+        child.frustumCulled = false;
+
+        if (child.material) {
+          const materials = Array.isArray(child.material)
+            ? child.material
+            : [child.material];
+
+          materials.forEach(mat => {
+            if ("envMapIntensity" in mat) {
+              mat.envMapIntensity = 1.1;
+            }
+          });
+        }
+      });
+
+      // Use built-in GLB animation if available
+      if (gltf.animations && gltf.animations.length) {
+        mixer = new THREE.AnimationMixer(model);
+
+        const preferred = gltf.animations.find(clip =>
+          /idle|float|hover|breath/i.test(clip.name)
+        ) || gltf.animations[0];
+
+        currentAction = mixer.clipAction(preferred);
+        currentAction.play();
+      }
+
+      loaded = true;
+      console.log("Animated Robot ready");
+    },
+    undefined,
+    error => console.error("Robot loading failed:", error)
+  );
+
+  function react(next) {
+    state = next;
+    bot.dataset.state = next;
+
+    if (next === "success" || next === "happy") {
+      reactionStart = clock.getElapsedTime();
+      reactionUntil = reactionStart + 1.2;
+    }
+  }
+
+  window.smartMascot = { react };
+
+  document.addEventListener("sme:mascot", event => {
+    if (event.detail?.state) react(event.detail.state);
+  });
+
+  bot.addEventListener("mouseenter", () => {
+    hover = true;
+  });
+
+  bot.addEventListener("mouseleave", () => {
+    hover = false;
+  });
+
+  bot.addEventListener("click", () => {
+    const url = bot.dataset.chatbotUrl;
+    if (url) window.location.href = url;
+  });
+
+  function resize() {
+    const width = Math.max(host.clientWidth, 1);
+    const height = Math.max(host.clientHeight, 1);
+
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height, false);
+  }
+
+  if (window.ResizeObserver) {
+    new ResizeObserver(resize).observe(host);
+  }
+
+  window.addEventListener("resize", resize);
+  resize();
+
+  function animate() {
+    requestAnimationFrame(animate);
+
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const t = clock.getElapsedTime();
+
+    if (loaded) {
+      if (mixer && !reduceMotion) mixer.update(dt);
+
+      if (!reduceMotion) {
+        // Natural floating with secondary movement
+        robot.position.y =
+          0.45 +
+          Math.sin(t * 1.15) * 0.085 +
+          Math.sin(t * 0.43) * 0.025;
+
+        // Gentle turning and tilting
+        
+
+// ===== CUTE MOUSE FOLLOW (FRONT VIEW ONLY) =====
+
+// Very small left/right movement
+const targetY =
+  Math.sin(t * 0.52) * 0.035 + mouseX * 0.06;
+
+// Slightly look up/down
+const targetX = -mouseY * 0.035;
+
+// Gentle head-like tilt
+const targetZ =
+  Math.sin(t * 0.85) * 0.018 - mouseX * 0.025;
+
+robot.rotation.y = THREE.MathUtils.lerp(
+  robot.rotation.y,
+  targetY,
+  0.045
+);
+
+robot.rotation.x = THREE.MathUtils.lerp(
+  robot.rotation.x,
+  targetX,
+  0.045
+);
+
+robot.rotation.z = THREE.MathUtils.lerp(
+  robot.rotation.z,
+  targetZ,
+  0.045
+);
+   
+
+        // Subtle breathing effect
+        const breathing = 1 + Math.sin(t * 1.7) * 0.012;
+        robot.scale.setScalar(breathing);
+
+        // Friendly hover response
+        
+if (hover) {
+  // Slight happy lift without turning around
+  robot.position.y += 0.045;
+  robot.scale.multiplyScalar(1.025);
+}
+
+
+        // Thinking reaction
+        if (state === "thinking") {
+          robot.rotation.z += Math.sin(t * 2.2) * 0.045;
+          robot.rotation.y += Math.sin(t * 1.8) * 0.06;
+        }
+
+        // One-time happy bounce
+        if (t < reactionUntil) {
+          const progress = Math.min(
+            (t - reactionStart) / 1.2, 1
+          );
+
+          const bounce =
+            Math.sin(progress * Math.PI) *
+            Math.abs(Math.sin(progress * Math.PI * 3));
+
+          robot.position.y += bounce * 0.2;
+          robot.rotation.z += Math.sin(progress * Math.PI * 2) * 0.09;
+        }
+      } else {
+        robot.position.y = 0.45;
+        robot.rotation.set(0, 0, 0);
+        robot.scale.setScalar(1);
+      }
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  animate();
+}
+
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initGLBRobot);
+} else {
+  initGLBRobot();
+}
+</script>
 
 <?php view('layouts/footer', ['scripts' => ['assets/js/dashboard.js']]); ?>
