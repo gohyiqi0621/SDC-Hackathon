@@ -4469,3 +4469,72 @@ body.dashboard-is-dragging * {
         overscroll-behavior: contain;
     }
 }
+
+
+/* ==========================================================
+   TEAM TO-DO: EDIT BUTTON + EXPIRED TASKS
+   ========================================================== */
+
+#workspacePlanner .wp-task-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 0 0 auto;
+}
+
+#workspacePlanner .wp-edit,
+#workspacePlanner .wp-delete {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #a0a0b9;
+    cursor: pointer;
+    transition: background-color .15s, color .15s;
+}
+
+#workspacePlanner .wp-edit:hover {
+    background: #f0eaff;
+    color: #7552ec;
+}
+
+#workspacePlanner .wp-delete:hover {
+    background: #ffe8ec;
+    color: #e4496b;
+}
+
+#workspacePlanner .wp-edit:focus-visible,
+#workspacePlanner .wp-delete:focus-visible {
+    outline: 2px solid #7555f6;
+    outline-offset: 1px;
+}
+
+/* Not done and the deadline is before today. */
+#workspacePlanner .wp-task.is-expired {
+    border-color: #ffd3dc !important;
+    background: #fffafb;
+    box-shadow: inset 3px 0 0 #e34562, 0 3px 10px rgba(85,81,160,.04) !important;
+}
+
+#workspacePlanner .wp-task.is-expired .wp-task-title {
+    color: #b8364f;
+}
+
+#workspacePlanner .wp-task.is-expired .wp-due {
+    color: #e34562;
+    font-weight: 700;
+}
+
+#workspacePlanner .wp-expired {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    background: #ffe8ec;
+    color: #e34562;
+    font-weight: 750;
+}
