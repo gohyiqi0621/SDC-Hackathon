@@ -821,22 +821,30 @@
         picker.addEventListener('input', recalc);
         if (currencySelect) { currencySelect.addEventListener('change', recalc); }
 
-        if (search) {
-            search.addEventListener('input', function () {
-                var term = search.value.trim().toLowerCase();
-                var shown = 0;
-                rows.forEach(function (row) {
-                    // A ticked product always stays visible.
-                    var match = term === '' || row.getAttribute('data-search').indexOf(term) !== -1
-                        || row.querySelector('[data-picker-check]').checked;
-                    row.hidden = !match;
-                    if (match) { shown++; }
-                });
-                if (noMatch) { noMatch.hidden = shown > 0; }
+        // Category dropdown + search box narrow the list together.
+        var category = picker.querySelector('[data-picker-category]');
+
+        function filter() {
+            var term = search ? search.value.trim().toLowerCase() : '';
+            var cat = category ? category.value : '';
+            var shown = 0;
+            rows.forEach(function (row) {
+                // A ticked product always stays visible, so it can be unticked.
+                var match = row.querySelector('[data-picker-check]').checked
+                    || ((cat === '' || row.getAttribute('data-category') === cat)
+                        && (term === '' || row.getAttribute('data-search').indexOf(term) !== -1));
+                row.hidden = !match;
+                if (match) { shown++; }
             });
+            if (noMatch) { noMatch.hidden = shown > 0; }
+        }
+
+        if (search) {
+            search.addEventListener('input', filter);
             // Enter in the search box must not submit the invoice.
             search.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); } });
         }
+        if (category) { category.addEventListener('change', filter); }
 
         recalc();
     });

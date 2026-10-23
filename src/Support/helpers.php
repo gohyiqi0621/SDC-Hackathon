@@ -361,6 +361,17 @@ function company(): array
         }
     }
 
+    // The user's own logo (Company Profile), as a file path for the PDFs. Never
+    // the app's logo: a business's invoice shows only that business.
+    $company['logo_path'] = null;
+    $logo = (string) ($profile['company_logo_url'] ?? '');
+    if ($logo !== '' && !str_contains($logo, '..') && !preg_match('#^https?://#i', $logo)) {
+        $path = PUBLIC_ROOT . '/' . ltrim($logo, '/');
+        if (is_file($path)) {
+            $company['logo_path'] = $path;
+        }
+    }
+
     return $company;
 }
 

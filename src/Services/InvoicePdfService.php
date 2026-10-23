@@ -1,5 +1,9 @@
 <?php
-/** Dependency-free A4 invoice renderer, styled after the supplied purchase invoice. */
+/**
+ * Dependency-free A4 invoice renderer, styled after the supplied purchase invoice.
+ * Header: the user's company from Company Profile (company()), with its logo
+ * when one is saved (PNG / JPEG, read by PdfImage); no logo otherwise.
+ */
 declare(strict_types=1);
 
 namespace Src\Services;
@@ -13,11 +17,14 @@ final class InvoicePdfService
     private string $content = '';
     private float $y = 0;
     private int $rowNo = 0;
+    /** The user's company logo (PdfImage::load), or null for no logo. */
+    private ?array $logo = null;
 
     public function render(array $invoice, array $items): string
     {
         $this->pages = [];
         $this->rowNo = 0;
+        $this->logo = PdfImage::load(\company()['logo_path'] ?? null);
         $this->startPage($invoice, true);
         foreach ($items as $item) {
             $lines = $this->wrap((string) ($item['description'] ?? ''), 34);
@@ -43,17 +50,24 @@ final class InvoicePdfService
         $this->rect(0, 0, self::W, self::H, [1, 1, 1]);
         if ($cover) {
             $this->rect(50, 42, 495, 78, self::BLUE);
-            // No logo: the invoice belongs to the user's company, so the header is
-            // its name and details only (from Company Profile via company()).
+            // The user's own company logo (Company Profile) on a white tile;
+            // no logo saved = no tile, and the details start at the left.
+            $textX = 66;
+            if ($this->logo !== null) {
+                $this->rect(58, 55, 52, 52, [1, 1, 1]);
+                [$w, $h] = PdfImage::fit($this->logo, 46, 46);
+                $this->content .= sprintf("q %.2F 0 0 %.2F %.2F %.2F cm /Im0 Do Q\n", $w, $h, 58 + (52 - $w) / 2, self::H - 55 - 52 + (52 - $h) / 2);
+                $textX = 122;
+            }
             $company = \company();
             $name = (string) ($company['name'] ?? APP_NAME);
-            $this->text(66, 66, $name, 16, 'white', true);
+            $this->text($textX, 66, $name, 16, 'white', true);
             $addressLines = preg_split('/\R/', trim((string) ($company['address'] ?? ''))) ?: [];
-            $this->text(66, 84, (string) ($addressLines[0] ?? ''), 7, 'white');
+            $this->text($textX, 84, (string) ($addressLines[0] ?? ''), 7, 'white');
             $addressRemainder = implode(', ', array_slice($addressLines, 1));
-            if ($addressRemainder !== '') $this->text(66, 95, $addressRemainder, 7, 'white');
+            if ($addressRemainder !== '') $this->text($textX, 95, $addressRemainder, 7, 'white');
             $issuerContact = trim('Tel: ' . (string) ($company['tel'] ?? '') . '  |  Co. Reg. No. ' . (string) ($company['reg_no'] ?? ''), ' |');
-            $this->text(66, 108, $issuerContact, 7, 'white');
+            $this->text($textX, 108, $issuerContact, 7, 'white');
             $invoiceType = ($invoice['type'] ?? 'purchase') === 'sales' ? 'SALES INVOICE' : 'INVOICE';
             $this->textRight(545, 150, $invoiceType, 19, 'black', true);
 
@@ -79,7 +93,7 @@ final class InvoicePdfService
             $address = $this->wrap((string) ($invoice['party_address'] ?? ''), 78);
             foreach (array_slice($address, 0, 3) as $i => $line) $this->text(57, 275 + $i * 12, $line, 8, 'black');
             $contactY = 275 + min(3, count($address)) * 12;
-            if (!empty($invoice['party_phone'])) $this->text(57, $contactY, 'Tel: ' . $invoice['party_phone'], 8, 'black');
+            if (!empty($invoice['party_phone'])) $this->text(57, $contactY, 'Tel: ' . preg_replace('/^\s*(tel|phone|hp|h\/p)\s*[:.]\s*/i', '', (string) $invoice['party_phone']), 8, 'black');
             $this->y = max(326, $contactY + 18);
         } else {
             $this->text(50, 52, (string) ($invoice['invoice_number'] ?? '') . ' - continued', 10, 'blue', true);
@@ -198,6 +212,39 @@ final class InvoicePdfService
     }
     private function finishPage(): void { $this->pages[] = $this->content; }
 
+    /**
+     * Write a PdfImage as PDF objects (palette and soft mask first, so the
+     * image can point at them) and return the image's object number.
+     */
+    private function imageObject(array $img, callable $add): int
+    {
+        $extra = '';
+        if (($img['cs'] ?? '') === 'Indexed') {
+            $pal = (string) $img['pal'];
+            $palette = $add('<< /Length ' . strlen($pal) . ">>\nstream\n" . $pal . "\nendstream");
+            $colorSpace = '[/Indexed /DeviceRGB ' . (strlen($pal) / 3 - 1) . ' ' . $palette . ' 0 R]';
+        } else {
+            $colorSpace = '/' . $img['cs'] . (($img['cs'] ?? '') === 'DeviceCMYK' ? ' /Decode [1 0 1 0 1 0 1 0]' : '');
+        }
+        if (isset($img['trns']) && is_array($img['trns'])) {
+            $extra .= ' /Mask [' . implode(' ', array_map(static fn ($t) => $t . ' ' . $t, $img['trns'])) . ']';
+        }
+        if (isset($img['smask'])) {
+            $smask = $add('<< /Type /XObject /Subtype /Image /Width ' . $img['w'] . ' /Height ' . $img['h']
+                . ' /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /' . $img['f']
+                . ' /DecodeParms << /Predictor 15 /Colors 1 /BitsPerComponent 8 /Columns ' . $img['w'] . ' >>'
+                . ' /Length ' . strlen((string) $img['smask']) . ">>\nstream\n" . $img['smask'] . "\nendstream");
+            $extra .= ' /SMask ' . $smask . ' 0 R';
+        }
+
+        return $add('<< /Type /XObject /Subtype /Image /Width ' . $img['w'] . ' /Height ' . $img['h']
+            . ' /ColorSpace ' . $colorSpace . ' /BitsPerComponent ' . $img['bpc']
+            . (isset($img['f']) ? ' /Filter /' . $img['f'] : '')
+            . (isset($img['dp']) ? ' /DecodeParms <<' . $img['dp'] . '>>' : '')
+            . $extra
+            . ' /Length ' . strlen((string) $img['data']) . ">>\nstream\n" . $img['data'] . "\nendstream");
+    }
+
     private function pdf(): string
     {
         $objects = [];
@@ -206,6 +253,9 @@ final class InvoicePdfService
         $font = $add('<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman /Encoding /WinAnsiEncoding >>');
         $boldFont = $add('<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>');
         $imageResource = '';
+        if ($this->logo !== null) {
+            $imageResource = ' /XObject << /Im0 ' . $this->imageObject($this->logo, $add) . ' 0 R >>';
+        }
         $pageRefs = [];
         foreach ($this->pages as $page) {
             $stream = $add('<< /Length ' . strlen($page) . ">>\nstream\n" . $page . "endstream");

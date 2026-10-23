@@ -43,7 +43,9 @@ final class InvoiceService
         }
 
         $address = self::text($input['party_address'] ?? '', 1000, 'party_address', 'Keep the address under 1,000 characters.', $errors);
-        $phone   = self::text($input['party_phone'] ?? '', 50, 'party_phone', 'Keep the phone number under 50 characters.', $errors);
+        // "Tel: 03-..." typed by hand would print as "Tel: Tel: 03-..." - keep the number only.
+        $phoneRaw = preg_replace('/^\s*(tel|phone|hp|h\/p)\s*[:.]\s*/i', '', (string) ($input['party_phone'] ?? ''));
+        $phone    = self::text($phoneRaw, 50, 'party_phone', 'Keep the phone number under 50 characters.', $errors);
         // Payment terms: one of Invoice::PAYMENT_TERMS, or "__custom" + free text.
         $termsRaw = (string) ($input['payment_terms'] ?? '');
         if ($termsRaw === '__custom') {

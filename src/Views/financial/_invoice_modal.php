@@ -173,10 +173,19 @@ $title = !$editing ? 'Create invoice'
                 <div class="picker-head">
                     <h3 class="modal-pane-title"><i class="fa-solid fa-box-open"></i> Items</h3>
                     <?php if ($products !== []): ?>
-                        <div class="toolbar-search picker-search">
-                            <i class="fa-solid fa-magnifying-glass"></i>
-                            <label class="sr-only" for="picker-q">Search products</label>
-                            <input id="picker-q" type="search" placeholder="Search products..." autocomplete="off" data-picker-search>
+                        <div class="picker-filters">
+                            <label class="sr-only" for="picker-cat">Category</label>
+                            <select id="picker-cat" class="picker-category" data-picker-category>
+                                <option value="">All categories</option>
+                                <?php foreach (array_unique(array_column($products, 'category_name')) as $cat): ?>
+                                    <option value="<?= e(mb_strtolower((string) $cat)) ?>"><?= e($cat) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="toolbar-search picker-search">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <label class="sr-only" for="picker-q">Search products</label>
+                                <input id="picker-q" type="search" placeholder="Search products..." autocomplete="off" data-picker-search>
+                            </div>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -202,6 +211,7 @@ $title = !$editing ? 'Create invoice'
                             ?>
                             <label class="picker-row<?= $checked ? ' is-picked' : '' ?>" data-picker-row
                                    data-price="<?= e((string) $p['price']) ?>" data-currency="<?= e((string) $p['currency']) ?>"
+                                   data-category="<?= e(mb_strtolower((string) $p['category_name'])) ?>"
                                    data-search="<?= e(mb_strtolower($p['name'] . ' ' . ($p['sku'] ?? '') . ' ' . $p['category_name'])) ?>">
                                 <input type="checkbox" class="picker-check" data-picker-check<?= $checked ? ' checked' : '' ?>>
                                 <span class="picker-name">

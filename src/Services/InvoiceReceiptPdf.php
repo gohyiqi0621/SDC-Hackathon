@@ -2,10 +2,11 @@
 /**
  * InvoiceReceiptPdf.php - the official receipt for one payment on an invoice (A4 PDF).
  *
- * One receipt per payment (partial payments get one each). Same black-and-white
- * look as OfficialReceiptPdf (orders), without a logo (like the invoice): the
- * company top left, the title, "Received From" and the receipt facts, then
- * what was paid, the invoice balance and the amount in words.
+ * One receipt per payment (partial payments get one each). Black-and-white,
+ * like OfficialReceiptPdf (orders): "OFFICIAL RECEIPT" centred at the top, the
+ * company top left with the user's own logo on the right (none if not saved),
+ * "Received From" and the receipt facts, then what was paid, the invoice
+ * balance and the amount in words.
  *
  * Company details come from company() (the signed-in user's Company Profile,
  * falling back to src/company.php). Uses the bundled tFPDF (src/Lib/tfpdf)
@@ -50,8 +51,26 @@ final class InvoiceReceiptPdf
         $R = 192;
         $W = $R - $L;
 
-        /* ---- Company (left) and logo (right) ---- */
-        $pdf->SetXY($L, 20);
+        /* ---- Title, centred at the very top ---- */
+        $pdf->SetXY($L, 14);
+        $this->font($pdf, 'B', 22, self::BLACK);
+        $pdf->Cell($W, 11, 'OFFICIAL RECEIPT', 0, 1, 'C');
+        $pdf->SetDrawColor(...self::BLACK);
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line($L, 28, $R, 28);
+        $top = 34;
+
+        /* ---- Company (left) and the user's logo (right, only when saved) ---- */
+        $logoBottom = $top;
+        $logo = $company['logo_path'] ?? null;
+        $img  = PdfImage::load($logo);
+        if ($img !== null) {
+            [$lw, $lh] = PdfImage::fit($img, 55, 24);
+            $pdf->Image($logo, $R - $lw, $top, $lw, $lh);
+            $logoBottom = $top + $lh;
+        }
+
+        $pdf->SetXY($L, $top);
         $this->font($pdf, '', 15, self::BLACK);
         $pdf->MultiCell(100, 7, $name, 0, 'L');
         $pdf->Ln(1.5);
@@ -72,13 +91,7 @@ final class InvoiceReceiptPdf
             $pdf->SetX($L);
             $pdf->MultiCell(100, 4.6, (string) $line, 0, 'L');
         }
-        $leftBottom = $pdf->GetY();
-
-        /* ---- Title (no logo: the receipt belongs to the user's company, like the invoice) ---- */
-        $pdf->SetXY($L, $leftBottom + 12);
-        $this->font($pdf, 'B', 24, self::BLACK);
-        $pdf->Cell($W, 11, 'OFFICIAL RECEIPT', 0, 1, 'R');
-        $y = $pdf->GetY() + 8;
+        $y = max($pdf->GetY(), $logoBottom) + 12;
 
         /* ---- Received from (left) and receipt facts (right) ---- */
         $pdf->SetXY($L, $y);
@@ -94,7 +107,7 @@ final class InvoiceReceiptPdf
         }
         if (!empty($receipt['party_phone'])) {
             $pdf->SetX($L);
-            $pdf->Cell(90, 5.2, 'Tel: ' . $receipt['party_phone'], 0, 1, 'L');
+            $pdf->Cell(90, 5.2, 'Tel: ' . preg_replace('/^\s*(tel|phone|hp|h\/p)\s*[:.]\s*/i', '', (string) $receipt['party_phone']), 0, 1, 'L');
         }
         $leftEnd = $pdf->GetY();
 
