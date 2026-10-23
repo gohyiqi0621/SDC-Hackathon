@@ -12,6 +12,10 @@
  *
  * Every method is best effort: an invoice problem is logged and never stops
  * the order itself (the customer is already chatting about it).
+ *
+ * If the invoice tables are missing or old (migration 022 not run on this
+ * database, e.g. a fresh Replit deployment), they are created first from the
+ * idempotent migration files 005, 016, 018 and 022.
  */
 declare(strict_types=1);
 
@@ -30,6 +34,7 @@ final class OrderInvoiceService
     public function createFor(int $userId, array $order): ?array
     {
         try {
+            self::ensureSchema();
             $invoices = new Invoice();
             $existing = $invoices->findByOrder($userId, (int) $order['id']);
             if ($existing !== null) {
@@ -116,6 +121,43 @@ final class OrderInvoiceService
             FlowLog::write('invoice.paid_from_order_error', ['order_no' => $order['order_no'] ?? null, 'error' => $e->getMessage()]);
             return null;
         }
+    }
+
+    private static bool $schemaChecked = false;
+
+    /** Create / update the invoice tables when this database does not have them yet. */
+    public static function ensureSchema(): void
+    {
+        if (self::$schemaChecked) {
+            return;
+        }
+        self::$schemaChecked = true;
+
+        $db = Database::connection();
+        $ready = (bool) $db->query(
+            "SELECT to_regclass('public.invoices') IS NOT NULL
+                AND to_regclass('public.receipts') IS NOT NULL
+                AND to_regclass('public.document_counters') IS NOT NULL
+                AND to_regclass('public.finance_settings') IS NOT NULL
+                AND EXISTS (SELECT 1 FROM information_schema.columns
+                             WHERE table_schema = current_schema() AND table_name = 'invoices' AND column_name = 'order_id')
+                AND EXISTS (SELECT 1 FROM information_schema.columns
+                             WHERE table_schema = current_schema() AND table_name = 'invoice_items' AND column_name = 'product_id')"
+        )->fetchColumn();
+        if ($ready || $db->inTransaction()) {
+            return;
+        }
+
+        $applied = [];
+        foreach (['005_create_invoices.sql', '016_add_invoice_details_and_items.sql',
+                  '018_reconcile_invoice_items_print_columns.sql', '022_invoice_create_flow_and_receipts.sql'] as $file) {
+            $path = APP_ROOT . '/database/migrations/' . $file;
+            if (is_file($path)) {
+                $db->exec((string) file_get_contents($path));
+                $applied[] = $file;
+            }
+        }
+        FlowLog::write('invoice.schema_created', ['migrations' => $applied]);
     }
 
     /** Orders that were cancelled: remove their invoices that have no payments yet. */

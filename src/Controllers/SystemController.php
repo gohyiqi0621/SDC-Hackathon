@@ -133,6 +133,7 @@ final class SystemController
             $oc = $row['payload']['overrideConfig'];
             $row = [
                 'chatflow'  => basename((string) ($row['url'] ?? '')),
+                'from'      => $row['chatflow_var'] ?? null,
                 'question'  => $row['payload']['question'] ?? '',
                 'session'   => $oc['sessionId'] ?? '',
                 'model'     => $oc['modelName'] ?? '',

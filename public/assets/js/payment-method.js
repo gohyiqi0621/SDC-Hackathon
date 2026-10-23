@@ -1,7 +1,7 @@
 /**
  * payment-method.js - Customer Assistant > Setup > Payment Method.
  *
- * Saves bank / e-wallet, account no., holder name, notes and the optional QR
+ * Saves bank / e-wallet, account no., holder name, notes and the payment QR (required)
  * to POST ai_settings/payment_method_save (multipart) and shows the result.
  */
 (function () {
@@ -31,7 +31,7 @@
         qrImg.hidden = !url;
         qrEmpty.hidden = !!url;
         if (url) { qrImg.src = url; }
-        qrRemove.hidden = !url;
+        qrRemove.hidden = true;   // the QR is required: replace it, do not remove it
         qrLabel.textContent = url ? 'Replace QR' : 'Upload QR';
     }
     function errors(map) {
@@ -66,6 +66,7 @@
         if (!form.payment_bank.value) { local.payment_bank = 'Choose the bank or e-wallet customers pay to.'; }
         if (!form.payment_account_no.value.trim()) { local.payment_account_no = 'Enter the account number customers transfer to.'; }
         if (!form.payment_account_name.value.trim()) { local.payment_account_name = 'Enter the account holder name as it appears at the bank.'; }
+        if (qrImg.hidden && !(qrInput.files && qrInput.files.length)) { local.payment_qr = 'Upload your payment QR code (DuitNow / bank QR).'; }
         errors(local);
         if (Object.keys(local).length) { toast('Please fix the highlighted fields.', 'error'); return; }
 

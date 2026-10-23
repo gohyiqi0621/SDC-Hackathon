@@ -52,11 +52,17 @@ final class FlowiseService
      */
     public function ask(array $config, string $systemMessage, string $question, string $sessionId, array $context = []): array
     {
-        // A caller may pick its own chatflow (the staff assistant: FLOWISE_STAFF_CHATFLOW_ID...).
-        $chatflow = trim((string) ($context['_chatflow'] ?? '')) ?: self::chatflowFor($config['provider']);
+        // The chatflow for this audience (customer / staff) AND this AI model's provider.
+        // Never another provider's chatflow: a Claude chat must not go to the Agnes chatflow.
+        $audience = ($context['audience'] ?? '') === 'staff' ? 'staff' : 'customer';
+        [$chatflow, $chatflowVar] = self::chatflowSource($config['provider'], $audience);
         if (FLOWISE_API_URL === '' || $chatflow === '') {
-            FlowLog::write('flowise.not_configured', ['flowise_api_url' => FLOWISE_API_URL, 'chatflow_id' => $chatflow]);
-            return ['ok' => false, 'reply' => '', 'error' => 'Flowise is not configured (set FLOWISE_API_URL and FLOWISE_CHATFLOW_ID in .env).'];
+            FlowLog::write('flowise.not_configured', ['flowise_api_url' => FLOWISE_API_URL, 'audience' => $audience,
+                                                      'provider' => $config['provider'], 'missing' => $chatflowVar]);
+            return ['ok' => false, 'reply' => '', 'error' => FLOWISE_API_URL === ''
+                ? 'Flowise is not configured (set FLOWISE_API_URL).'
+                : 'Flowise is not configured for this AI model: set ' . $chatflowVar . ' (the ID of the '
+                  . $audience . ' chatflow for ' . $config['provider'] . ') in Replit Secrets / .env.'];
         }
 
         $url     = FLOWISE_API_URL . '/api/v1/prediction/' . rawurlencode($chatflow);
@@ -71,6 +77,8 @@ final class FlowiseService
         // Keys inside the payload (provider_api_key, tool_token) are masked by FlowLog.
         FlowLog::write('flowise.request', [
             'url'      => $url,
+            'chatflow_var' => $chatflowVar,
+            'provider' => $config['provider'],
             'has_auth' => FLOWISE_API_KEY !== '',
             'timeout'  => FLOWISE_TIMEOUT,
             'payload'  => $payload,
@@ -244,29 +252,48 @@ final class FlowiseService
     }
 
     /**
-     * Which chatflow answers. Each provider can have its own chatflow (a Claude
-     * chatflow uses a ChatAnthropic node, the others ChatOpenAI):
+     * Which chatflow answers. Each provider has its own chatflow (a Claude
+     * chatflow uses a ChatAnthropic node, Agnes a ChatOpenAI node), and staff
+     * and customers have separate chatflows (different tools):
      *
-     *   customer  FLOWISE_CHATFLOW_ID_<PROVIDER>        -> FLOWISE_CHATFLOW_ID
-     *   staff     FLOWISE_STAFF_CHATFLOW_ID_<PROVIDER>  -> FLOWISE_STAFF_CHATFLOW_ID
-     *             (empty: the customer chatflow for that provider)
+     *                customer                        staff
+     *   Claude       FLOWISE_CHATFLOW_ID_ANTHROPIC   FLOWISE_STAFF_CHATFLOW_ID_ANTHROPIC
+     *   Agnes        FLOWISE_CHATFLOW_ID_AGNES       FLOWISE_STAFF_CHATFLOW_ID_AGNES
+     *                -> FLOWISE_CHATFLOW_ID          -> FLOWISE_STAFF_CHATFLOW_ID
      *
-     * <PROVIDER> = ANTHROPIC, AGNES, OPENAI or DEEPSEEK (from the AI model chosen).
+     * The plain FLOWISE_CHATFLOW_ID / FLOWISE_STAFF_CHATFLOW_ID belong to the
+     * default provider (Agnes; FLOWISE_DEFAULT_PROVIDER changes it). Another
+     * provider never falls back to them, and staff never fall back to the
+     * customer chatflow: a missing ID is reported instead of answering with
+     * the wrong model or the wrong tools.
      */
     public static function chatflowFor(?string $provider, string $audience = 'customer'): string
     {
-        $suffix = $provider !== null ? strtoupper((string) preg_replace('/[^A-Za-z]/', '', $provider)) : '';
-        $names  = $audience === 'staff'
-            ? ['FLOWISE_STAFF_CHATFLOW_ID_' . $suffix, 'FLOWISE_STAFF_CHATFLOW_ID']
-            : [];
-        $names[] = 'FLOWISE_CHATFLOW_ID_' . $suffix;
+        return self::chatflowSource($provider, $audience)[0];
+    }
+
+    /** @return array{0: string, 1: string} [chatflow id or '', the variable it came from / should be set] */
+    public static function chatflowSource(?string $provider, string $audience = 'customer'): array
+    {
+        $suffix  = strtoupper((string) preg_replace('/[^A-Za-z]/', '', (string) $provider));
+        $default = strtoupper((string) preg_replace('/[^A-Za-z]/', '', (string) env('FLOWISE_DEFAULT_PROVIDER', 'Agnes')));
+        $plain   = $audience === 'staff' ? 'FLOWISE_STAFF_CHATFLOW_ID' : 'FLOWISE_CHATFLOW_ID';
+
+        $names = [];
+        if ($suffix !== '') {
+            $names[] = $plain . '_' . $suffix;
+        }
+        if ($suffix === '' || $suffix === $default) {
+            $names[] = $plain;
+        }
 
         foreach ($names as $name) {
-            if (!str_ends_with($name, '_') && ($id = trim((string) env($name, ''))) !== '') {
-                return $id;
+            $id = trim((string) env($name, ''));
+            if ($id !== '') {
+                return [$id, $name];
             }
         }
-        return FLOWISE_CHATFLOW_ID;
+        return ['', $names[0] ?? $plain];
     }
 
     /** The override name of the chat model's API key for this provider. */

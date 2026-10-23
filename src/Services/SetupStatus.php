@@ -79,9 +79,11 @@ final class SetupStatus
                 $assistant !== [] && !empty($assistant['api_key_encrypted']),
                 false, $setup . '#assistant', 'Set up'),
             self::step('instructions', 'Instructions (SOPs) written', 'How the assistant answers, sells and handles problems. "Generate with AI" can write them for you.',
-                trim((string) ($assistant['system_instructions'] ?? '')) !== '', true, $setup . '#assistant', 'Write'),
-            self::step('payment', 'Payment method set', $payment !== '' ? $payment : 'The bank account (or e-wallet) customers pay to, and an optional payment QR.',
-                $payment !== '' || !empty($company['payment_qr_url']), false, $setup . '#payment', 'Set up'),
+                trim((string) ($assistant['system_instructions'] ?? '')) !== '', false, $setup . '#assistant', 'Write'),
+            self::step('payment', 'Payment method set', $payment !== '' && !empty($company['payment_qr_url'])
+                    ? $payment
+                    : ($payment === '' ? 'The bank account (or e-wallet) customers pay to, and its payment QR code.' : 'Upload the payment QR code to finish.'),
+                $payment !== '' && !empty($company['payment_qr_url']), false, $setup . '#payment', 'Set up'),
             self::step('products', 'Products & services added', $products > 0 ? $products . ' item' . ($products === 1 ? '' : 's') . ' the assistant can sell and answer about.' : 'Add what you sell, with prices, so the assistant can answer and take orders.',
                 $products > 0, false, url('products'), 'Add'),
             self::step('telegram', 'Telegram bot connected', 'Customers chat with your assistant on Telegram.',
@@ -97,9 +99,6 @@ final class SetupStatus
         $telegram  = self::row(new TelegramIntegration(), $userId);
         $setup     = url('staff', ['action' => 'settings']);
         $connect   = url('staff', ['action' => 'connections']);
-        $functions = array_key_exists('functions', $assistant)
-            ? array_values(array_filter(explode(',', (string) $assistant['functions']))) : [];
-        $wantsMail = in_array('check_email', $functions, true);
 
         try {
             $gmail = (new GmailConnection())->find($userId);
@@ -112,10 +111,8 @@ final class SetupStatus
             self::step('assistant', 'AI model and key saved', 'Choose the AI model and paste its secret key.',
                 $assistant !== [] && !empty($assistant['api_key_encrypted']),
                 false, $setup . '#assistant', 'Set up'),
-            self::step('functions', 'Functions chosen', $functions !== [] ? count($functions) . ' function' . (count($functions) === 1 ? '' : 's') . ' enabled for the staff assistant.' : 'Select the functions the staff assistant may use (email, invoices, claims, orders).',
-                $functions !== [], false, $setup . '#assistant', 'Choose'),
-            self::step('gmail', 'Gmail connected', $wantsMail ? 'Needed for "Check email".' : 'Only needed if you switch on "Check email".',
-                $gmail !== null, !$wantsMail, $connect . '#gmail', 'Connect'),
+            self::step('gmail', 'Gmail connected', 'Needed to check, read and reply to email from the staff assistant.',
+                $gmail !== null, true, $connect . '#gmail', 'Connect'),
             self::step('alerts', 'Telegram staff alerts', ($telegram['connection_status'] ?? '') === 'connected'
                     ? 'Get "new receipt to review" messages in your own Telegram.'
                     : 'Connect the customer Telegram bot first, then link your own Telegram.',

@@ -46,7 +46,7 @@ final class AssistantErrorAdvice
                 'Enter the AI secret key again in the assistant\'s Setup page (AI Assistant Settings) and Save.'],
             ['not configured', 'Flowise is not set up on this server',
                 'FLOWISE_API_URL or the chatflow ID is missing.',
-                'Add FLOWISE_API_URL and FLOWISE_CHATFLOW_ID (staff: FLOWISE_STAFF_CHATFLOW_ID) to Replit Secrets / .env, then restart.'],
+                'Add the chatflow ID named in the technical detail to Replit Secrets / .env (Claude: FLOWISE_CHATFLOW_ID_ANTHROPIC, staff: FLOWISE_STAFF_CHATFLOW_ID_ANTHROPIC; Agnes: FLOWISE_CHATFLOW_ID / FLOWISE_STAFF_CHATFLOW_ID), then restart or redeploy.'],
             ['invalid chatflow', 'Wrong chatflow ID',
                 'Flowise does not know the chatflow ID the app sent.',
                 'Copy only the chatflow ID from Flowise (no https://… and no spaces) into FLOWISE_CHATFLOW_ID / FLOWISE_STAFF_CHATFLOW_ID.'],

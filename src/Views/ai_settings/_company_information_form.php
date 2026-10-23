@@ -89,36 +89,34 @@ $logoMaxMb = 2;
                         <p class="field-error" id="err-company_background" data-error-for="company_background"></p>
                     </div>
 
-                    <div class="receipt-details">
-                        <p class="receipt-details__title"><i class="fa-solid fa-address-card" aria-hidden="true"></i> Address &amp; contact</p>
-                        <p class="field-hint">Printed on your official receipts. Recommended so customers know who issued the receipt.</p>
-                        <div class="field">
-                            <label for="company_address">Company address</label>
-                            <textarea id="company_address" name="company_address" rows="3" maxlength="500" autocomplete="street-address"
-                                      placeholder="e.g. 12, Jalan Ampang,&#10;50450 Kuala Lumpur" aria-describedby="err-company_address"></textarea>
-                            <p class="field-error" id="err-company_address" data-error-for="company_address"></p>
-                        </div>
+                    <div class="field">
+                        <label for="company_address">Company address *</label>
+                        <textarea id="company_address" name="company_address" rows="3" maxlength="500" autocomplete="street-address" required
+                                  placeholder="e.g. 12, Jalan Ampang,&#10;50450 Kuala Lumpur" aria-describedby="hint-company_address err-company_address"></textarea>
+                        <p class="field-hint" id="hint-company_address">Printed on your official receipts.</p>
+                        <p class="field-error" id="err-company_address" data-error-for="company_address"></p>
+                    </div>
 
-                        <div class="form-row">
-                            <div class="field">
-                                <label for="registration_no">Registration no. (SSM) <span class="field-optional">(optional)</span></label>
-                                <input id="registration_no" name="registration_no" type="text" maxlength="60" placeholder="e.g. 202301012345 (1501234-A)"
-                                       aria-describedby="err-registration_no">
-                                <p class="field-error" id="err-registration_no" data-error-for="registration_no"></p>
-                            </div>
-                            <div class="field">
-                                <label for="company_phone">Phone <span class="field-optional">(optional)</span></label>
-                                <input id="company_phone" name="company_phone" type="tel" maxlength="40" autocomplete="tel" placeholder="e.g. 03-1234 5678"
-                                       aria-describedby="err-company_phone">
-                                <p class="field-error" id="err-company_phone" data-error-for="company_phone"></p>
-                            </div>
+                    <div class="form-row">
+                        <div class="field">
+                            <label for="registration_no">Registration no. (SSM) *</label>
+                            <input id="registration_no" name="registration_no" type="text" maxlength="60" required placeholder="e.g. 202301012345 (1501234-A)"
+                                   aria-describedby="err-registration_no">
+                            <p class="field-error" id="err-registration_no" data-error-for="registration_no"></p>
                         </div>
                         <div class="field">
-                            <label for="company_email">Email <span class="field-optional">(optional)</span></label>
-                            <input id="company_email" name="company_email" type="email" maxlength="150" autocomplete="email" placeholder="e.g. hello@yourshop.my"
-                                   aria-describedby="err-company_email">
-                            <p class="field-error" id="err-company_email" data-error-for="company_email"></p>
+                            <label for="company_phone">Phone *</label>
+                            <input id="company_phone" name="company_phone" type="tel" maxlength="40" autocomplete="tel" required placeholder="e.g. 03-1234 5678"
+                                   aria-describedby="err-company_phone">
+                            <p class="field-error" id="err-company_phone" data-error-for="company_phone"></p>
                         </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="company_email">Email *</label>
+                        <input id="company_email" name="company_email" type="email" maxlength="150" autocomplete="email" required placeholder="e.g. hello@yourshop.my"
+                               aria-describedby="err-company_email">
+                        <p class="field-error" id="err-company_email" data-error-for="company_email"></p>
                     </div>
 
                 </div>

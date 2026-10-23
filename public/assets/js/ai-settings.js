@@ -621,10 +621,10 @@
                 company_name: [Rules.required('Company name'), Rules.minLength(2, 'Company name'), Rules.maxLength(150, 'Company name')],
                 business_category: [Rules.required('Business category'), Rules.oneOf(selectOptions(category), 'Choose a category from the list.')],
                 company_background: [Rules.required('Company background'), Rules.minLength(20, 'Company background'), Rules.maxLength(3000, 'Company background')],
-                registration_no: [Rules.maxLength(60, 'Registration no.')],
-                company_phone: [Rules.maxLength(40, 'Phone')],
-                company_email: [Rules.maxLength(150, 'Email')],
-                company_address: [Rules.maxLength(500, 'Address')]
+                registration_no: [Rules.required('Registration no. (SSM)'), Rules.maxLength(60, 'Registration no.')],
+                company_phone: [Rules.required('Phone'), Rules.maxLength(40, 'Phone')],
+                company_email: [Rules.required('Email'), Rules.maxLength(150, 'Email')],
+                company_address: [Rules.required('Company address'), Rules.maxLength(500, 'Address')]
             };
         }
 

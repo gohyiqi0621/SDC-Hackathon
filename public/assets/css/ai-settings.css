@@ -1166,3 +1166,18 @@
 .pay-method__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line, #f0f1fa); }
 .pay-method__preview { flex: 1 1 280px; margin: 0; color: var(--muted); font-size: 12.5px; }
 @media (max-width: 560px) { .pay-qr { flex-direction: column; } }
+
+/* Staff Assistant Setup: what the staff assistant can do (read-only list) */
+.function-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.function-list li {
+    display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px;
+    border: 1px solid var(--border); border-radius: 14px; background: #fff;
+}
+.function-list .function-icon {
+    display: grid; flex: 0 0 auto; place-items: center; width: 38px; height: 38px;
+    border-radius: 11px; background: var(--primary-light); color: var(--primary);
+}
+.function-list .function-text { display: grid; gap: 3px; }
+.function-list strong { color: var(--text); font-size: 14px; }
+.function-list small { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+@media (max-width: 720px) { .function-list { grid-template-columns: 1fr; } }

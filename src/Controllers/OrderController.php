@@ -6,13 +6,17 @@
  * the customer's payment receipt and approve or reject it; the customer is
  * told on Telegram either way (OrderService).
  *
- *   GET  orders               list (filter by status, date, product, search; sort)
+ *   GET  orders               list: summary cards, status filter + search, table, Details popups
  *   GET  orders/receipt       the receipt file (only the owner's orders)
  *   POST orders/approve       -> paid ("Payment successful"), Telegram "Payment verified"
  *                                only after the customer sent a receipt
  *   POST orders/ship          -> shipped, Telegram "Your order has been shipped"
  *   POST orders/reject        -> payment_rejected, Telegram asks for a new receipt
  *   POST orders/cancel        -> cancelled
+ *   POST orders/delete        delete the ticked orders (ids[]); unpaid invoices go too,
+ *                             paid invoices stay in Financial > Invoice
+ *   POST orders/send_invoice  the order's invoice PDF to the customer on Telegram
+ *   POST orders/send_receipt  the official receipt PDF to the customer on Telegram
  */
 declare(strict_types=1);
 
@@ -28,6 +32,15 @@ use Src\Services\PrivateFiles;
 final class OrderController
 {
     private const PER_PAGE = 15;
+
+    /** The status filter on the Orders page: value => label ('' = all). */
+    public const FILTERS = [
+        ''                  => 'All',
+        'awaiting'          => 'Awaiting payment',
+        'payment_submitted' => 'Verify payment',
+        'paid'              => 'Payment successful',
+        'shipped'           => 'Shipped',
+    ];
 
     /** Date filter choices on the Orders page. */
     public const RANGES = [
@@ -57,14 +70,14 @@ final class OrderController
             $orders   = $model->search($userId, $f, self::PER_PAGE, ($page - 1) * self::PER_PAGE);
             $counts   = $model->countsByStatus($userId, $f);
             $overview = $model->overview($userId);
-            $products = $model->productNames($userId);
             $items    = $model->itemsFor(array_map(static fn (array $o): int => (int) $o['id'], $orders));
+            $invoices = $this->invoicesFor($userId, $orders);
             $missingTable = false;
         } catch (PDOException $e) {
             if (!in_array((string) $e->getCode(), ['42P01', '42703'], true)) {
                 throw $e;
             }
-            [$total, $pages, $orders, $items, $products, $missingTable] = [0, 1, [], [], [], true];
+            [$total, $pages, $orders, $items, $invoices, $missingTable] = [0, 1, [], [], [], true];
             $summary  = ['count' => 0, 'sum' => '0', 'currency' => 'MYR'];
             $counts   = array_fill_keys(array_keys(Order::STATUSES), 0);
             $overview = ['review' => 0, 'waiting' => 0, 'to_ship' => 0, 'today' => 0, 'sales_today' => format_money(0)];
@@ -77,7 +90,7 @@ final class OrderController
             'counts'       => $counts,
             'overview'     => $overview,
             'summary'      => $summary,
-            'products'     => $products,
+            'invoices'     => $invoices,
             'f'            => $f,
             'status'       => $f['status'],
             'q'            => $f['q'],
@@ -97,35 +110,36 @@ final class OrderController
     private function filtersFromQuery(): array
     {
         $status = (string) ($_GET['status'] ?? '');
-        $range  = (string) ($_GET['range'] ?? '');
-        $sort   = (string) ($_GET['sort'] ?? 'review');
-        $date   = static fn (string $key): ?string => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($_GET[$key] ?? ''))
-            && strtotime((string) $_GET[$key]) !== false ? (string) $_GET[$key] : null;
-
-        $range = isset(self::RANGES[$range]) ? $range : '';
-        $today = date('Y-m-d');
-        [$from, $to] = match ($range) {
-            'today'     => [$today, $today],
-            'yesterday' => [date('Y-m-d', strtotime('-1 day')), date('Y-m-d', strtotime('-1 day'))],
-            '7d'        => [date('Y-m-d', strtotime('-6 days')), $today],
-            '30d'       => [date('Y-m-d', strtotime('-29 days')), $today],
-            'month'     => [date('Y-m-01'), $today],
-            'custom'    => [$date('from'), $date('to')],
-            default     => [null, null],
-        };
-        if ($from !== null && $to !== null && $from > $to) {
-            [$from, $to] = [$to, $from];
+        if ($status === 'pending_payment' || $status === 'payment_rejected') {
+            $status = 'awaiting';   // old links
         }
-
         return [
-            'status'  => isset(Order::STATUSES[$status]) ? $status : '',
+            'status'  => isset(self::FILTERS[$status]) ? $status : '',
             'q'       => mb_substr(trim((string) ($_GET['q'] ?? '')), 0, 100),
-            'range'   => $range,
-            'from'    => $from,
-            'to'      => $to,
-            'product' => mb_substr(trim((string) ($_GET['product'] ?? '')), 0, 200),
-            'sort'    => isset(Order::SORTS[$sort]) ? $sort : 'review',
+            'range'   => '',
+            'from'    => null,
+            'to'      => null,
+            'product' => '',
+            'sort'    => 'newest',
         ];
+    }
+
+    /** order id => its invoice (made when the order was placed), when there is one. */
+    private function invoicesFor(int $userId, array $orders): array
+    {
+        $out = [];
+        try {
+            $model = new \Src\Models\Invoice();
+            foreach ($orders as $order) {
+                $invoice = $model->findByOrder($userId, (int) $order['id']);
+                if ($invoice !== null) {
+                    $out[(int) $order['id']] = $invoice;
+                }
+            }
+        } catch (\Throwable $e) {
+            // invoices table not there yet (migration 022): the Details popup says "not created"
+        }
+        return $out;
     }
 
     /** GET orders/receipt?id= - the bank reference (transfer slip) the customer sent. */
@@ -196,6 +210,55 @@ final class OrderController
             } else {
                 flash('error', 'Telegram did not accept the file. Check the Telegram connection, or download the receipt and send it yourself.', 'Receipt not sent');
             }
+        });
+    }
+
+    /** POST orders/delete  (ids[]) - delete one or more orders. The customer is not messaged. */
+    public function delete(): never
+    {
+        $user   = require_login();
+        $userId = (int) $user['id'];
+        $ids    = array_slice((array) ($_POST['ids'] ?? []), 0, 200);
+
+        try {
+            // Unpaid invoices of these orders are removed; paid ones are kept (accounting).
+            $orders = new Order();
+            $nos    = [];
+            foreach ($ids as $id) {
+                $order = $orders->find($userId, (int) $id);
+                if ($order !== null) {
+                    $nos[] = (string) $order['order_no'];
+                }
+            }
+            (new \Src\Services\OrderInvoiceService())->removeFor($userId, $nos);
+
+            $deleted = $orders->deleteMany($userId, $ids);
+            $files   = new PrivateFiles('receipts');
+            foreach ($deleted as $row) {
+                $files->delete($userId, $row['receipt_path'] ?? null);   // the customer's bank reference
+            }
+            \Src\Support\FlowLog::write('order.deleted', ['orders' => array_column($deleted, 'order_no')]);
+
+            $n = count($deleted);
+            if ($n === 0) {
+                flash('error', 'Tick at least one order to delete.', 'Nothing deleted');
+            } else {
+                flash('success', $n === 1 ? 'Order ' . $deleted[0]['order_no'] . ' was deleted.' : $n . ' orders were deleted.', 'Deleted');
+            }
+        } catch (\Throwable $e) {
+            error_log('[orders] delete: ' . $e->getMessage());
+            flash('error', 'The orders could not be deleted. Please try again.', 'Not deleted');
+        }
+
+        redirect($this->backUrl());
+    }
+
+    /** POST orders/send_invoice - the order's invoice PDF to the customer on Telegram. */
+    public function sendInvoice(): void
+    {
+        $this->change(function (int $userId, array $order): void {
+            $invoice = (new OrderService())->sendInvoice($userId, $order);
+            flash('success', 'Invoice ' . $invoice . ' (PDF) was sent to the customer on Telegram.', 'Invoice sent');
         });
     }
 
