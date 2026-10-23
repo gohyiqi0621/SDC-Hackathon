@@ -455,11 +455,11 @@ function nav_items(): array
             'match'    => ['customer', 'products', 'categories'],
             'dot'      => $status['customer_todo'] ? 'Setup not finished' : null,
             'children' => [
-                ['key' => 'customer/chat',        'label' => 'Chats',                'icon' => 'fa-regular fa-comments',   'url' => url('customer', ['action' => 'chat'])],
-                ['key' => 'products',             'label' => 'Products & Services',  'icon' => 'fa-solid fa-box-open',     'url' => url('products'), 'match' => ['products', 'categories']],
                 ['key' => 'customer/settings',    'label' => 'Setup',                'icon' => 'fa-solid fa-list-check',   'url' => url('customer', ['action' => 'settings']),
                  'dot' => $status['customer_todo'] ? 'Setup not finished' : null],
                 ['key' => 'customer/connections', 'label' => 'Connections',          'icon' => 'fa-solid fa-plug',         'url' => url('customer', ['action' => 'connections'])],
+                ['key' => 'products',             'label' => 'Products & Services',  'icon' => 'fa-solid fa-box-open',     'url' => url('products'), 'match' => ['products', 'categories']],
+                ['key' => 'customer/chat',        'label' => 'Chats',                'icon' => 'fa-regular fa-comments',   'url' => url('customer', ['action' => 'chat'])],
             ],
         ],
         [
@@ -471,10 +471,10 @@ function nav_items(): array
             'match'    => ['staff'],
             'dot'      => $status['staff_todo'] ? 'Setup not finished' : null,
             'children' => [
-                ['key' => 'staff/chat',        'label' => 'Chat',        'icon' => 'fa-regular fa-comments',  'url' => url('staff', ['action' => 'chat'])],
                 ['key' => 'staff/settings',    'label' => 'Setup',       'icon' => 'fa-solid fa-list-check',  'url' => url('staff', ['action' => 'settings']),
                  'dot' => $status['staff_todo'] ? 'Setup not finished' : null],
                 ['key' => 'staff/connections', 'label' => 'Connections', 'icon' => 'fa-solid fa-plug',        'url' => url('staff', ['action' => 'connections'])],
+                ['key' => 'staff/chat',        'label' => 'Chat',        'icon' => 'fa-regular fa-comments',  'url' => url('staff', ['action' => 'chat'])],
             ],
         ],
         [

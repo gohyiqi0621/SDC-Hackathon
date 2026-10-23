@@ -75,8 +75,8 @@ final class SetupStatus
 
         return [
             self::companyStep($userId),
-            self::step('assistant', 'AI model and key saved', 'Choose the AI model, paste its secret key and switch the assistant on.',
-                $assistant !== [] && !empty($assistant['api_key_encrypted']) && self::on($assistant['is_enabled'] ?? true),
+            self::step('assistant', 'AI model and key saved', 'Choose the AI model and paste its secret key.',
+                $assistant !== [] && !empty($assistant['api_key_encrypted']),
                 false, $setup . '#assistant', 'Set up'),
             self::step('instructions', 'Instructions (SOPs) written', 'How the assistant answers, sells and handles problems. "Generate with AI" can write them for you.',
                 trim((string) ($assistant['system_instructions'] ?? '')) !== '', true, $setup . '#assistant', 'Write'),
@@ -109,10 +109,10 @@ final class SetupStatus
 
         return [
             self::companyStep($userId),
-            self::step('assistant', 'AI model and key saved', 'Choose the AI model, paste its secret key and switch the assistant on.',
-                $assistant !== [] && !empty($assistant['api_key_encrypted']) && self::on($assistant['is_enabled'] ?? true),
+            self::step('assistant', 'AI model and key saved', 'Choose the AI model and paste its secret key.',
+                $assistant !== [] && !empty($assistant['api_key_encrypted']),
                 false, $setup . '#assistant', 'Set up'),
-            self::step('functions', 'Functions chosen', $functions !== [] ? count($functions) . ' on: what the staff assistant may look up.' : 'Tick what the staff assistant may look up (email, invoices, claims, orders).',
+            self::step('functions', 'Functions chosen', $functions !== [] ? count($functions) . ' function' . (count($functions) === 1 ? '' : 's') . ' enabled for the staff assistant.' : 'Select the functions the staff assistant may use (email, invoices, claims, orders).',
                 $functions !== [], false, $setup . '#assistant', 'Choose'),
             self::step('gmail', 'Gmail connected', $wantsMail ? 'Needed for "Check email".' : 'Only needed if you switch on "Check email".',
                 $gmail !== null, !$wantsMail, $connect . '#gmail', 'Connect'),
@@ -127,7 +127,8 @@ final class SetupStatus
     {
         $company = self::row(new CompanyProfile(), $userId);
         return self::step('company', 'Company profile saved', 'Your business name, category and background. Both assistants use it.',
-            trim((string) ($company['company_name'] ?? '')) !== '', false, url('company'), 'Fill in');
+            trim((string) ($company['company_name'] ?? '')) !== '' && trim((string) ($company['company_background'] ?? '')) !== '',
+            false, url('company'), 'Fill in');
     }
 
     private static function step(string $key, string $label, string $hint, bool $done, bool $optional, string $fixUrl, string $fixLabel): array

@@ -71,7 +71,7 @@ final class ProductImportService
 
     /** Order shown to the user (same as the add form). */
     public const DISPLAY_ORDER = [
-        'name', 'sku', 'category', 'description', 'characteristics', 'status', 'currency', 'price', 'promotion_price',
+        'name', 'sku', 'category', 'description', 'characteristics', 'status', 'currency', 'price',
     ];
 
     private const CURRENCY_ALIASES = [
@@ -283,11 +283,11 @@ final class ProductImportService
     {
         return [
             ['Product / service name', 'SKU / product code', 'Category', 'Description', 'Characteristics',
-             'Status', 'Currency', 'Selling price', 'Promotional price'],
+             'Status', 'Currency', 'Selling price'],
             ['Iced Latte', 'DRK-001', 'Drinks', 'Double shot espresso with cold milk.', 'Size: 16oz; Sugar: adjustable',
-             'Active', 'MYR', '12.90', '10.90'],
+             'Active', 'MYR', '12.90'],
             ['Basic Haircut', 'SRV-010', 'Services', '30-minute cut and style.', 'Duration: 30 min',
-             'Active', 'MYR', '35.00', ''],
+             'Active', 'MYR', '35.00'],
         ];
     }
 
@@ -378,10 +378,9 @@ final class ProductImportService
 
         $currency = $this->currency($get('currency'));
         [$price, $priceCurrency] = $this->money($get('price'));
-        [$promo, $promoCurrency] = $this->money($get('promotion_price'));
 
         if ($currency === '') {
-            $currency = $priceCurrency ?: $promoCurrency ?: 'MYR';
+            $currency = $priceCurrency ?: 'MYR';
         }
 
         return [
@@ -391,7 +390,7 @@ final class ProductImportService
             'description'     => $get('description'),
             'characteristics' => $get('characteristics'),
             'price'           => $price,
-            'promotion_price' => $promo,
+            'promotion_price' => '',   // promotional prices are not imported; set them per product
             'currency'        => $currency,
             'status'          => $this->status($get('status')),
         ];

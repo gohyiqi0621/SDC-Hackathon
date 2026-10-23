@@ -143,7 +143,11 @@ final class AiSettingsController
                 $errors['business_category'] = $input['business_category'] === '' ? 'Business category is required.' : 'Choose a category from the list.';
             }
 
-            if (mb_strlen($input['company_background']) > 3000) {
+            if ($input['company_background'] === '') {
+                $errors['company_background'] = 'Company background is required. Describe what the business does, so both assistants can answer correctly.';
+            } elseif (mb_strlen($input['company_background']) < 20) {
+                $errors['company_background'] = 'Company background must be at least 20 characters.';
+            } elseif (mb_strlen($input['company_background']) > 3000) {
                 $errors['company_background'] = 'Company background must be 3000 characters or fewer.';
             }
 
@@ -343,7 +347,7 @@ final class AiSettingsController
                 'personality'         => $input['personality'],
                 'tone_description'    => $input['tone_description'] !== '' ? $input['tone_description'] : null,
                 'system_instructions' => trim($instructions) !== '' ? $instructions : null,
-                'is_enabled'          => $this->bool($_POST['is_enabled'] ?? '0'),
+                'is_enabled'          => true,   // always on: there is no on/off switch any more
                 'ai_model'            => $aiModel,
                 'temperature'         => number_format((float) $temperatureRaw, 2, '.', ''),
                 'reply_language'      => $replyLanguage,
@@ -367,7 +371,7 @@ final class AiSettingsController
     /**
      * POST ai_settings/generate_sops
      *
-     * Agnes AI reads the saved company information (and the active products)
+     * The AI reads the saved company information (and the active products)
      * and writes three SOPs for this business, five short steps each. One
      * goes into each SOP box (customer service / booking-or-order process /
      * sales); the titles are chosen for the business. Nothing is saved here:
@@ -406,6 +410,7 @@ final class AiSettingsController
             $assistant = $model->find($userId);
             $result = (new SopGeneratorService())->generate($company, SopGeneratorService::productsFor($userId), $assistant);
 
+            unset($result['model']);   // the page does not show which model wrote them
             json_response(true, $result, 'Instructions generated. Review them, then save.');
         });
     }

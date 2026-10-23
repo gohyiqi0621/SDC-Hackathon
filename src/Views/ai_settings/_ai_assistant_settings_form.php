@@ -3,13 +3,13 @@
  * ai_settings/_ai_assistant_settings_form.php - AIAssistantSettingsForm.
  *
  * Table: ai_assistant_settings (assistant_name, personality, tone_description,
- * system_instructions, is_enabled, ai_model, api_key_encrypted, temperature).
+ * system_instructions, ai_model, api_key_encrypted, temperature).
  *
  * The three SOP sections are edited separately but saved together in the
  * single `system_instructions` field, each under a "### <Section>" heading.
  * ai-settings.js splits the stored text back into the boxes when it loads.
  *
- * "Generate instruction with AI" asks Agnes AI (POST ai_settings/generate_sops) for
+ * "Generate instruction with AI" asks the AI (POST ai_settings/generate_sops) for
  * three SOPs written from the saved company information, five steps each,
  * and fills the three boxes. Nothing is saved until the owner clicks Save.
  *
@@ -55,11 +55,6 @@ $sections = [
                             <h2>Assistant</h2>
                             <p>Its name and personality, as <?= $audience === 'staff' ? 'your team' : 'customers' ?> will experience it.</p>
                         </div>
-                        <label class="switch">
-                            <input type="checkbox" role="switch" id="is_enabled" name="is_enabled" value="1">
-                            <span class="switch-track" aria-hidden="true"></span>
-                            <span class="switch-label" data-switch-label>Enabled</span>
-                        </label>
                     </div>
                     <div class="panel-body">
                         <div class="field">
@@ -199,7 +194,7 @@ $sections = [
                     <div class="panel-body">
                         <div class="sop-ai-note" data-sop-ai-note>
                             <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-                            <p>Agnes AI reads your saved <strong>Company Information</strong> and products, picks the three SOPs your
+                            <p>The AI reads your saved <strong>Company Information</strong> and products, picks the three SOPs your
                                 business needs most and writes 5 simple steps for each. Review and edit them, then click Save.</p>
                         </div>
                         <div class="sop-ai-result" data-sop-ai-result hidden aria-live="polite"></div>
