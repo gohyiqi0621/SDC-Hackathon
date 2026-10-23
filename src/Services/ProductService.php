@@ -159,6 +159,7 @@ final class ProductService
             error_log('[products] could not move upload to ' . $relative);
             return null;
         }
+        \Src\Support\FileBackup::save('public', $relative, $mime);   // survives a redeploy
 
         return $relative;
     }
@@ -177,6 +178,7 @@ final class ProductService
         if (is_file($path)) {
             @unlink($path);
         }
+        \Src\Support\FileBackup::forget('public', $relative);
     }
 
     /* ---------------------------------------------------------- categories --- */

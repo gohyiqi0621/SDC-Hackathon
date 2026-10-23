@@ -273,6 +273,9 @@ $router->post(
     $router->get('system/settings', [SystemController::class, 'settings'], $auth);
     // Flow log: signed-in owner, or ?key=<LOG_VIEW_KEY> (checked in SystemController).
     $router->get('system/logs', [SystemController::class, 'logs']);
+
+    // An uploaded image missing on disk (fresh deployment): written back from the database copy.
+    $router->get('files/public', static fn () => \Src\Support\FileBackup::servePublic((string) ($_GET['path'] ?? '')));
     $router->get('system/logs_feed', [SystemController::class, 'logsFeed']);
     $router->post('profile/update', [ProfileController::class, 'update'], $auth);
     $router->post('profile/password', [ProfileController::class, 'password'], $auth);

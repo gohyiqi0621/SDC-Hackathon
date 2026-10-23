@@ -367,7 +367,7 @@ function company(): array
     $logo = (string) ($profile['company_logo_url'] ?? '');
     if ($logo !== '' && !str_contains($logo, '..') && !preg_match('#^https?://#i', $logo)) {
         $path = PUBLIC_ROOT . '/' . ltrim($logo, '/');
-        if (is_file($path)) {
+        if (is_file($path) || \Src\Support\FileBackup::restore('public', $logo)) {
             $company['logo_path'] = $path;
         }
     }

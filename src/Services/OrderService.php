@@ -162,6 +162,9 @@ final class OrderService
     {
         $relative = (string) ($company['payment_qr_url'] ?? '');
         $path     = $relative !== '' && !str_contains($relative, '..') ? PUBLIC_ROOT . '/' . $relative : '';
+        if ($path !== '') {
+            \Src\Support\FileBackup::restore('public', $relative);   // missing after a redeploy
+        }
         if ($order['channel'] !== 'telegram' || $path === '' || !is_file($path)) {
             return false;
         }

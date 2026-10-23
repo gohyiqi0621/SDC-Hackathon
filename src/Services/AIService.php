@@ -5,80 +5,16 @@ declare(strict_types=1);
 namespace Src\Services;
 
 use RuntimeException;
-use Src\Support\HttpClient;
 
 final class AIService
 {
+    /** RunPod first, then Claude, then Agnes (see TextAiService). */
     private function askAgnes(
         string $systemPrompt,
         string $userPrompt,
         bool $jsonMode = false
     ): string {
-        $apiKey = trim((string) (
-            $_ENV['AGNES_API_KEY']
-            ?? getenv('AGNES_API_KEY')
-            ?: ''
-        ));
-
-        $apiUrl = trim((string) (
-            $_ENV['AGNES_API_URL']
-            ?? getenv('AGNES_API_URL')
-            ?: ''
-        ));
-
-        $model = trim((string) (
-            $_ENV['AGNES_MODEL']
-            ?? getenv('AGNES_MODEL')
-            ?: ''
-        ));
-
-        if ($apiKey === '' || $apiUrl === '' || $model === '') {
-            throw new RuntimeException(
-                'The AI service is not configured.'
-            );
-        }
-
-        $payload = [
-            'model' => $model,
-            'messages' => [
-                [
-                    'role' => 'system',
-                    'content' => $systemPrompt
-                ],
-                [
-                    'role' => 'user',
-                    'content' => $userPrompt
-                ]
-            ],
-            'temperature' => 0.4
-        ];
-
-        $response = HttpClient::postJson(
-            $apiUrl,
-            $payload,
-            [
-                'Authorization: Bearer ' . $apiKey
-            ]
-        );
-
-        $status = (int) ($response['status'] ?? 0);
-
-        if ($status < 200 || $status >= 300) {
-            throw new RuntimeException(
-                'The AI service request failed (HTTP ' . $status . ').'
-            );
-        }
-
-        $content = $response['body']['choices'][0]['message']['content']
-            ?? null;
-
-        if (!is_string($content) || trim($content) === '') {
-            throw new RuntimeException(
-                'The AI service returned an empty response.'
-            );
-        }
-
-        return trim($content);
+        return (new TextAiService())->complete($systemPrompt, $userPrompt, 1200, 0.4)['text'];
     }
 
     public function summarize(

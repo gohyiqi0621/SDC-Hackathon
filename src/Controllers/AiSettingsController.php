@@ -1105,6 +1105,7 @@ final class AiSettingsController
         if (!move_uploaded_file((string) $file['tmp_name'], PUBLIC_ROOT . '/' . $relative)) {
             throw new RuntimeException('Could not save the logo on the server.');
         }
+        \Src\Support\FileBackup::save('public', $relative, $mime);   // survives a redeploy
 
         return $relative;
     }
@@ -1120,6 +1121,7 @@ final class AiSettingsController
         if (is_file($path)) {
             @unlink($path);
         }
+        \Src\Support\FileBackup::forget('public', $relative);
     }
 
     /* ---- telegram -------------------------------------------------------- */

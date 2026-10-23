@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 namespace Src\Services;
 
+use Src\Support\FileBackup;
+
 final class PrivateFiles
 {
     public const MAX_BYTES = 10 * 1024 * 1024;
@@ -86,6 +88,7 @@ final class PrivateFiles
             error_log('[' . $this->folder . '] could not move upload to ' . $relative);
             return null;
         }
+        FileBackup::save('private', $relative, $mime);   // survives a redeploy
 
         return [
             'file_path' => $relative,
@@ -125,6 +128,7 @@ final class PrivateFiles
             error_log('[' . $this->folder . '] could not write ' . $relative);
             return null;
         }
+        FileBackup::save('private', $relative, $mime);
 
         return [
             'file_path' => $relative,
@@ -146,7 +150,8 @@ final class PrivateFiles
 
         $path = $this->root() . '/' . $relative;
 
-        return is_file($path) ? $path : null;
+        // Missing after a redeploy: written back from the database copy.
+        return is_file($path) || FileBackup::restore('private', $relative) ? $path : null;
     }
 
     /** Remove a file stored for this user. Anything else is left alone. */
@@ -155,6 +160,7 @@ final class PrivateFiles
         $path = $this->pathFor($userId, $relative);
         if ($path !== null) {
             @unlink($path);
+            FileBackup::forget('private', (string) $relative);
         }
     }
 

@@ -278,7 +278,7 @@ final class ToolController
                 : ($hasQr ? 'Scan the payment QR code.' : 'No payment details are set up. Tell the customer our staff will send the payment details shortly.'),
             'payment_qr'           => $qrSent || ($duplicate && $hasQr && $order['channel'] === 'telegram')
                 ? 'The payment QR code image has already been sent to the customer in this chat. Tell them to scan it to pay.'
-                : ($hasQr ? 'payment_qr_url: ' . asset((string) $company['payment_qr_url']) : 'none'),
+                : ($hasQr ? 'The QR code image could not be sent right now. Give the bank details only. Do not show any link or image.' : 'none'),
             'next_step'            => 'Tell the customer the order number, the items and the total, give the payment instructions, '
                                     . 'and ask them to send a photo or PDF of their bank reference (transfer slip) in this chat. '
                                     . 'Do not say the order is paid or confirmed: staff verify the bank reference first, then the '
