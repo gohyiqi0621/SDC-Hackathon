@@ -404,15 +404,19 @@ function fmt_datetime(?string $value, string $format = 'j M Y, H:i'): string
  * The sidebar navigation. Also drives the page-title lookup, so the two can
  * never drift apart. Icons are Font Awesome classes, matching the dashboard.
  *
- * Financial and the two AI assistants are collapsible groups; Company Profile,
- * My Profile and Logout live in
- * the account section. There is no admin portal anywhere in this app.
+ * AI Assistant (Customer + Staff, as sub-headings) and Sales are collapsible
+ * groups; Claims sits beside them. Company Profile is under Settings, and
+ * My Profile and Logout under Account. There is no admin portal anywhere in this app.
  *
  * @return array<int, array<string, mixed>>
  */
 function nav_items(): array
 {
     $status = nav_status();
+    // Receipts waiting for review (on Order, and on Sales while it is closed).
+    $toReview      = $status['to_review'] > 0 ? (string) $status['to_review'] : null;
+    $toReviewTitle = $status['to_review'] . ' bank reference' . ($status['to_review'] === 1 ? '' : 's') . ' to review';
+    $setupTodo     = $status['customer_todo'] || $status['staff_todo'] ? 'Setup not finished' : null;
 
     return [
         [
@@ -424,58 +428,49 @@ function nav_items(): array
             'group' => 'Workspace',
         ],
         [
-            'kind'  => 'link',
-            'key'   => 'orders',
-            'label' => 'Orders',
-            'icon'  => 'fa-solid fa-bag-shopping',
-            'url'   => url('orders'),
-            'group' => 'Workspace',
-            'match' => ['orders', 'orders/receipt'],
-            // Receipts waiting for review.
-            'badge' => $status['to_review'] > 0 ? (string) $status['to_review'] : null,
-            'badge_title' => $status['to_review'] . ' bank reference' . ($status['to_review'] === 1 ? '' : 's') . ' to review',
-        ],
-        [
             'kind'     => 'group',
-            'key'      => 'financial',
-            'label'    => 'Financial',
-            'icon'     => 'fa-solid fa-wallet',
-            'group'    => 'Workspace',
-            'children' => [
-                ['key' => 'financial/invoice',    'label' => 'Invoice',        'icon' => 'fa-solid fa-file-invoice',        'url' => url('financial', ['action' => 'invoice'])],
-                ['key' => 'financial/claims',     'label' => 'Claims',         'icon' => 'fa-solid fa-receipt',             'url' => url('financial', ['action' => 'claims'])],
-            ],
-        ],
-        [
-            'kind'     => 'group',
-            'key'      => 'customer',
-            'label'    => 'Customer Assistant',
+            'key'      => 'assistant',
+            'label'    => 'AI Assistant',
             'icon'     => 'fa-solid fa-robot',
-            'group'    => 'AI Assistant',
-            'match'    => ['customer', 'products', 'categories'],
-            'dot'      => $status['customer_todo'] ? 'Setup not finished' : null,
+            'group'    => 'Workspace',
+            'match'    => ['customer', 'staff'],
+            'dot'      => $setupTodo,
             'children' => [
-                ['key' => 'customer/settings',    'label' => 'Setup',                'icon' => 'fa-solid fa-list-check',   'url' => url('customer', ['action' => 'settings']),
+                ['heading' => 'Customer Assistant'],
+                ['key' => 'customer/settings',    'label' => 'Setup',      'icon' => 'fa-solid fa-list-check',  'url' => url('customer', ['action' => 'settings']),
                  'dot' => $status['customer_todo'] ? 'Setup not finished' : null],
-                ['key' => 'customer/connections', 'label' => 'Connections',          'icon' => 'fa-solid fa-plug',         'url' => url('customer', ['action' => 'connections'])],
-                ['key' => 'products',             'label' => 'Products & Services',  'icon' => 'fa-solid fa-box-open',     'url' => url('products'), 'match' => ['products', 'categories']],
-                ['key' => 'customer/chat',        'label' => 'Chats',                'icon' => 'fa-regular fa-comments',   'url' => url('customer', ['action' => 'chat'])],
+                ['key' => 'customer/connections', 'label' => 'Connection', 'icon' => 'fa-solid fa-plug',        'url' => url('customer', ['action' => 'connections'])],
+                ['key' => 'customer/chat',        'label' => 'Chat',       'icon' => 'fa-regular fa-comments',  'url' => url('customer', ['action' => 'chat'])],
+                ['heading' => 'Staff Assistant'],
+                ['key' => 'staff/settings',       'label' => 'Setup',      'icon' => 'fa-solid fa-list-check',  'url' => url('staff', ['action' => 'settings']),
+                 'dot' => $status['staff_todo'] ? 'Setup not finished' : null],
+                ['key' => 'staff/connections',    'label' => 'Connection', 'icon' => 'fa-solid fa-plug',        'url' => url('staff', ['action' => 'connections'])],
+                ['key' => 'staff/chat',           'label' => 'Chat',       'icon' => 'fa-regular fa-comments',  'url' => url('staff', ['action' => 'chat'])],
             ],
         ],
         [
             'kind'     => 'group',
-            'key'      => 'staff',
-            'label'    => 'Staff Assistant',
-            'icon'     => 'fa-solid fa-user-tie',
-            'group'    => 'AI Assistant',
-            'match'    => ['staff'],
-            'dot'      => $status['staff_todo'] ? 'Setup not finished' : null,
+            'key'      => 'sales',
+            'label'    => 'Sales',
+            'icon'     => 'fa-solid fa-store',
+            'group'    => 'Workspace',
+            'match'    => ['products', 'categories', 'financial/invoice', 'orders'],
+            'badge'       => $toReview,
+            'badge_title' => $toReviewTitle,
             'children' => [
-                ['key' => 'staff/settings',    'label' => 'Setup',       'icon' => 'fa-solid fa-list-check',  'url' => url('staff', ['action' => 'settings']),
-                 'dot' => $status['staff_todo'] ? 'Setup not finished' : null],
-                ['key' => 'staff/connections', 'label' => 'Connections', 'icon' => 'fa-solid fa-plug',        'url' => url('staff', ['action' => 'connections'])],
-                ['key' => 'staff/chat',        'label' => 'Chat',        'icon' => 'fa-regular fa-comments',  'url' => url('staff', ['action' => 'chat'])],
+                ['key' => 'products',          'label' => 'Product & Service', 'icon' => 'fa-solid fa-box-open',      'url' => url('products'), 'match' => ['products', 'categories']],
+                ['key' => 'financial/invoice', 'label' => 'Invoice',           'icon' => 'fa-solid fa-file-invoice',  'url' => url('financial', ['action' => 'invoice'])],
+                ['key' => 'orders',            'label' => 'Order',             'icon' => 'fa-solid fa-bag-shopping',  'url' => url('orders'), 'match' => ['orders'],
+                 'badge' => $toReview, 'badge_title' => $toReviewTitle],
             ],
+        ],
+        [
+            'kind'  => 'link',
+            'key'   => 'financial/claims',
+            'label' => 'Claims',
+            'icon'  => 'fa-solid fa-receipt',
+            'url'   => url('financial', ['action' => 'claims']),
+            'group' => 'Workspace',
         ],
         [
             'kind'  => 'link',

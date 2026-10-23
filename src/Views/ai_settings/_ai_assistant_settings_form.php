@@ -18,8 +18,8 @@
  *
  * Expects: $aiModels (AiSettingsController::AI_MODELS: id => [label, provider]).
  * Optional: $audience ('customer' default, or 'staff' on Staff Setting & Integration).
- * Staff: the System instructions (SOP) panel is replaced by "Functions"
- * checkboxes (check email / invoice / claims / orders), saved as `functions`.
+ * Staff: instead of the System instructions (SOP) panel, a read-only list of
+ * what the staff assistant can do (AiSettingsController::STAFF_FUNCTIONS, always on).
  */
 $audience = ($audience ?? 'customer') === 'staff' ? 'staff' : 'customer';
 $byProvider = [];
@@ -154,30 +154,22 @@ $sections = [
                 <section class="panel">
                     <div class="panel-header">
                         <div>
-                            <h2>Functions</h2>
-                            <p>What the staff assistant is allowed to look up for your team.</p>
+                            <h2>What the staff assistant can do</h2>
+                            <p>These functions are always available to your team in Staff Chat.</p>
                         </div>
                     </div>
                     <div class="panel-body">
-                        <fieldset class="field">
-                            <legend class="sr-only">Functions</legend>
-                            <div class="function-grid">
-                                <?php foreach ($staffFunctions as $key => [$label, $icon, $hint]): ?>
-                                    <label class="function-option">
-                                        <input type="checkbox" name="fn_<?= e($key) ?>" data-function="<?= e($key) ?>">
-                                        <span class="function-card">
-                                            <span class="function-icon"><i class="<?= e($icon) ?>" aria-hidden="true"></i></span>
-                                            <span class="function-text">
-                                                <strong><?= e($label) ?></strong>
-                                                <small><?= e($hint) ?></small>
-                                            </span>
-                                            <span class="function-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
-                                        </span>
-                                    </label>
-                                <?php endforeach; ?>
-                            </div>
-                            <p class="field-error" data-error-for="functions"></p>
-                        </fieldset>
+                        <ul class="function-list">
+                            <?php foreach ($staffFunctions as $key => [$label, $icon, $hint]): ?>
+                                <li>
+                                    <span class="function-icon"><i class="<?= e($icon) ?>" aria-hidden="true"></i></span>
+                                    <span class="function-text">
+                                        <strong><?= e($label) ?></strong>
+                                        <small><?= e($hint) ?></small>
+                                    </span>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
                     </div>
                 </section>
 <?php else: ?>

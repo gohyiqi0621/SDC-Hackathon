@@ -198,6 +198,8 @@ $router->post(
     $router->post('orders/reject', [OrderController::class, 'reject'], $auth);
     $router->post('orders/ship', [OrderController::class, 'ship'], $auth);
     $router->post('orders/send_receipt', [OrderController::class, 'sendReceipt'], $auth);
+    $router->post('orders/send_invoice', [OrderController::class, 'sendInvoice'], $auth);
+    $router->post('orders/delete', [OrderController::class, 'delete'], $auth);
     $router->post('orders/cancel', [OrderController::class, 'cancel'], $auth);
 
     $router->get('categories', [CategoryController::class, 'index'], $auth);

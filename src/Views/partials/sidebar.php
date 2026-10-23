@@ -2,9 +2,9 @@
 /**
  * partials/sidebar.php - the left navigation, built from nav_items().
  *
- * Expects: $user. Groups (Financial, Customer Assistant, Staff Assistant) open
- * automatically when one of their pages is active. Orders shows how many
- * receipts wait for review; an orange dot marks an unfinished assistant setup. Logout is a POST form so a link cannot sign out.
+ * Expects: $user. Groups (AI Assistant, Sales) open automatically when one of
+ * their pages is active. Order shows how many receipts wait for review (Sales
+ * too, while it is closed); an orange dot marks an unfinished assistant setup. Logout is a POST form so a link cannot sign out.
  */
 $current = page_key();
 $prevSection = null;
@@ -55,6 +55,9 @@ $prevSection = null;
                         <i class="<?= e($item['icon']) ?>"></i>
                         <span><?= e($item['label']) ?></span>
                         <?php if (!empty($item['dot'])): ?><b class="nav-dot" title="<?= e($item['dot']) ?>"></b><?php endif; ?>
+                        <?php if (!empty($item['badge'])): ?>
+                            <b class="nav-badge nav-badge--group" title="<?= e($item['badge_title'] ?? '') ?>"><?= e($item['badge']) ?></b>
+                        <?php endif; ?>
                         <i class="fa-solid fa-chevron-down nav-caret"></i>
                     </button>
                     <div class="nav-sub">
@@ -69,6 +72,9 @@ $prevSection = null;
                                 <i class="<?= e($child['icon']) ?>"></i>
                                 <span><?= e($child['label']) ?></span>
                                 <?php if (!empty($child['dot'])): ?><b class="nav-dot" title="<?= e($child['dot']) ?>"></b><?php endif; ?>
+                                <?php if (!empty($child['badge'])): ?>
+                                    <b class="nav-badge" title="<?= e($child['badge_title'] ?? '') ?>"><?= e($child['badge']) ?></b>
+                                <?php endif; ?>
                             </a>
                         <?php endforeach; ?>
                     </div>

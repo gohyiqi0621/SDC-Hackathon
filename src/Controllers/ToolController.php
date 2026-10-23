@@ -148,13 +148,15 @@ final class ToolController
         $items    = [];
         $problems = [];
         $currency = null;
+        // Words the customer used ("Primary School - English") help pick between products with the same name.
+        $hint     = trim((string) ($input['note'] ?? '') . ' ' . (string) ($input['items'] ?? ''));
 
         foreach ($wanted as [$name, $qty]) {
             if ($qty < 1 || $qty > 999) {
                 $problems[] = '"' . $name . '": quantity must be 1 to 999.';
                 continue;
             }
-            [$product, $note] = $this->matchProduct($userId, $name);
+            [$product, $note] = $this->matchProduct($userId, $name, $hint);
             if ($product === null) {
                 $problems[] = $note;
                 continue;
@@ -174,7 +176,9 @@ final class ToolController
         }
 
         if ($problems !== []) {
-            $this->fail('The order was NOT created. ' . implode(' ', $problems) . ' Ask the customer to confirm, then call buy_product again.');
+            $this->fail('The order was NOT created. ' . implode(' ', $problems)
+                . ' If the customer has ALREADY said which product they want (e.g. primary or secondary), do NOT ask them to confirm again:'
+                . ' call buy_product again right now with that SKU in items. Ask the customer only if it is really unclear, and ask only once.');
         }
 
         $phone = mb_substr(trim((string) ($input['phone'] ?? $input['customer_phone'] ?? '')), 0, 30);
@@ -1195,16 +1199,7 @@ final class ToolController
             $this->json(403, ['success' => false, 'error' => 'This tool is only for the staff assistant.']);
         }
 
-        try {
-            $row = (new StaffAiAssistantSetting())->find($auth['user_id']) ?? [];
-        } catch (Throwable $e) {
-            $row = [];
-        }
-        $enabled = array_key_exists('functions', $row) ? explode(',', (string) $row['functions']) : [$function];
-        if (!in_array($function, $enabled, true)) {
-            $this->json(200, ['success' => false, 'message' => 'This function is switched off in Staff Assistant > Setup. '
-                . 'Tell the staff member it is not enabled.']);
-        }
+        // Every staff function is always on: nothing to check here any more.
 
         return $auth['user_id'];
     }
@@ -1516,10 +1511,10 @@ final class ToolController
      *
      * @return array{0: ?array, 1: string} [product row or null, problem message]
      */
-    private function matchProduct(int $userId, string $name): array
+    private function matchProduct(int $userId, string $name, string $hint = ''): array
     {
         $db   = Database::connection();
-        $base = "SELECT p.id, p.name, p.sku, p.price, p.currency, c.name AS category
+        $base = "SELECT p.id, p.name, p.sku, p.price, p.currency, p.description, c.name AS category
                    FROM products p LEFT JOIN product_categories c ON c.id = p.category_id
                   WHERE p.user_id = ? AND p.status = 'active'";
 
@@ -1544,7 +1539,8 @@ final class ToolController
             return [$exact[0], ''];
         }
         if (count($exact) > 1) {
-            return [null, $this->ambiguous($name, $exact)];
+            $pick = $this->pickByHint($exact, $name . ' ' . $hint);
+            return $pick !== null ? [$pick, ''] : [null, $this->ambiguous($name, $exact)];
         }
 
         // 3. Part of a name, without anything in brackets ("Nasi Lemak (special)").
@@ -1566,7 +1562,49 @@ final class ToolController
             return [null, 'No active product matches "' . $name . '" (use check_product to see what is available).'];
         }
 
-        return [null, $this->ambiguous($name, $found)];
+        $pick = $this->pickByHint($found, $name . ' ' . $hint);
+        return $pick !== null ? [$pick, ''] : [null, $this->ambiguous($name, $found)];
+    }
+
+    /**
+     * Several products share a name: pick the one the customer's own words
+     * point to. A word counts only when it fits some of the candidates but not
+     * all ("primary" -> the "Primary Tuition" one). Null when still unclear.
+     */
+    private function pickByHint(array $candidates, string $hint): ?array
+    {
+        $words = array_unique(array_filter(
+            preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($hint)) ?: [],
+            static fn (string $w): bool => mb_strlen($w) >= 3
+        ));
+        if ($words === [] || count($candidates) < 2) {
+            return null;
+        }
+
+        $texts = array_map(static fn (array $p): string => mb_strtolower(implode(' ', [
+            $p['name'] ?? '', $p['category'] ?? '', $p['sku'] ?? '', $p['description'] ?? '',
+        ])), $candidates);
+
+        $scores = array_fill(0, count($candidates), 0);
+        foreach ($words as $word) {
+            $hits = [];
+            foreach ($texts as $i => $text) {
+                if (preg_match('/(?<![\p{L}\p{N}])' . preg_quote($word, '/') . '/u', $text)) {
+                    $hits[] = $i;
+                }
+            }
+            if ($hits !== [] && count($hits) < count($candidates)) {
+                foreach ($hits as $i) {
+                    $scores[$i]++;
+                }
+            }
+        }
+
+        $best = max($scores);
+        if ($best === 0 || count(array_keys($scores, $best, true)) !== 1) {
+            return null;
+        }
+        return $candidates[(int) array_search($best, $scores, true)];
     }
 
     /** Several products fit: list them with SKU, category and price so the AI can ask and then order by SKU. */
