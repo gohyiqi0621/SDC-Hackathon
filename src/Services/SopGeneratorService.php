@@ -1,6 +1,6 @@
 <?php
 /**
- * SopGeneratorService.php - Agnes AI writes three SOPs for one business.
+ * SopGeneratorService.php - AI writes three SOPs for one business.
  *
  * Input: the saved company profile (name, category, background, description)
  * and up to 20 active products. Output: three SOPs, five short steps each,
@@ -11,21 +11,14 @@
  *            no appointments gets e.g. "Order & Delivery SOP" instead)
  *   sales    how to recommend, upsell and close
  *
- * Which AI writes them (fastest first):
- *   1. Claude Haiku 4.5, with the business's own saved Claude key (or
- *      ANTHROPIC_API_KEY in .env) - usually 5-10 seconds.
- *   2. Agnes (OpenAI-style API, AGNES_API_KEY or a saved Agnes key) - slower.
- * Keys are never logged or returned.
+ * Which AI writes them: TextAiService (RunPod, then Claude, then Agnes).
  */
 declare(strict_types=1);
 
 namespace Src\Services;
 
 use RuntimeException;
-use Src\Controllers\AiSettingsController;
-use Src\Support\Crypto;
 use Src\Support\Database;
-use Src\Support\Http;
 use Throwable;
 
 final class SopGeneratorService
@@ -47,63 +40,18 @@ final class SopGeneratorService
      */
     public function generate(array $company, array $products, ?array $assistant): array
     {
-        $claudeKey = $this->claudeKey($assistant);
-        if ($claudeKey !== null) {
-            return $this->generateWithClaude($claudeKey, $company, $products);
-        }
-
-        $apiKey = $this->apiKey($assistant);
-        $model  = (string) (env('AGNES_SOP_MODEL', '') ?: 'agnes-2.5-flash');
-        $url    = rtrim((string) (env('AGNES_API_URL', '') ?: 'https://apihub.agnes-ai.com/v1'), '/') . '/chat/completions';
-
-        $payload = [
-            'model'       => $model,
-            'temperature' => 0.4,
-            'max_tokens'  => 4000,   // room for models that think before answering
-            'messages'    => [
-                ['role' => 'system', 'content' => $this->instructions()],
-                ['role' => 'user',   'content' => $this->companyBrief($company, $products)],
-            ],
-        ];
+        // RunPod first, then Claude, then Agnes (see TextAiService).
+        $answer = (new TextAiService())->complete($this->instructions(), $this->companyBrief($company, $products), 1500, 0.4, $assistant);
 
         try {
-            $response = Http::request('POST', $url, [
-                'Authorization' => 'Bearer ' . $apiKey,
-                'Content-Type'  => 'application/json',
-            ], json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), self::TIMEOUT);
+            $sops = $this->parse($answer['text']);
         } catch (RuntimeException $e) {
-            error_log('[sop] ' . $e->getMessage());
-            throw new RuntimeException('Could not reach the AI service. Check the internet connection and try again.');
-        }
-
-        if ($response['status'] === 401 || $response['status'] === 403) {
-            throw new RuntimeException('The AI service rejected the API key. Check the key in the server settings.');
-        }
-        if ($response['status'] === 429) {
-            throw new RuntimeException('The AI service is busy or the usage limit was reached. Try again in a minute.');
-        }
-        if ($response['status'] < 200 || $response['status'] >= 300) {
-            $detail = is_array($response['json']) ? (string) ($response['json']['error']['message'] ?? '') : '';
-            error_log('[sop] Agnes HTTP ' . $response['status'] . ($detail !== '' ? ': ' . $detail : ''));
-            throw new RuntimeException('The instructions could not be generated (HTTP ' . $response['status'] . ').' . (APP_DEBUG && $detail !== '' ? ' ' . $detail : ''));
-        }
-
-        $choice = is_array($response['json']) ? ($response['json']['choices'][0] ?? []) : [];
-        $text   = $this->contentText($choice['message']['content'] ?? ($choice['text'] ?? ''));
-
-        try {
-            $sops = $this->parse($text);
-        } catch (RuntimeException $e) {
-            // The AI's own answer (no secrets in it), so the format can be checked in Apache's error.log.
-            error_log('[sop] could not read Agnes answer (finish_reason=' . (string) ($choice['finish_reason'] ?? '?') . '): '
-                . ($text !== '' ? mb_substr($text, 0, 3000) : '(empty) raw=' . mb_substr($response['raw'], 0, 1500)));
-            if (($choice['finish_reason'] ?? '') === 'length') {
-                throw new RuntimeException('The AI stopped before finishing the instructions. Please try again.');
-            }
+            // The AI's own answer (no secrets in it), so the format can be checked in the error log.
+            error_log('[sop] could not read the ' . $answer['provider'] . ' answer: ' . mb_substr($answer['text'], 0, 3000));
             throw $e;
         }
 
-        return ['model' => $model, 'sops' => $sops];
+        return ['model' => $answer['provider'], 'sops' => $sops];
     }
 
     /** Up to 20 active products: name, category, price, so the steps can mention real items. */
@@ -126,94 +74,6 @@ final class SopGeneratorService
     }
 
     /* ---------------------------------------------------------- private ---- */
-
-    /** Claude (fast): POST https://api.anthropic.com/v1/messages */
-    private function generateWithClaude(string $key, array $company, array $products): array
-    {
-        $model   = (string) (env('SOP_CLAUDE_MODEL', '') ?: 'claude-haiku-4-5');
-        $payload = [
-            'model'       => $model,
-            'max_tokens'  => 1500,
-            'temperature' => 0.4,
-            'system'      => $this->instructions(),
-            'messages'    => [['role' => 'user', 'content' => $this->companyBrief($company, $products)]],
-        ];
-
-        try {
-            $response = Http::request('POST', 'https://api.anthropic.com/v1/messages', [
-                'x-api-key'         => $key,
-                'anthropic-version' => '2023-06-01',
-                'Content-Type'      => 'application/json',
-            ], json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 45);
-        } catch (RuntimeException $e) {
-            error_log('[sop] claude: ' . $e->getMessage());
-            throw new RuntimeException('Could not reach the AI service. Check the internet connection and try again.');
-        }
-
-        if ($response['status'] === 401 || $response['status'] === 403) {
-            throw new RuntimeException('The saved Claude key was rejected. Check the secret key in AI Assistant Settings.');
-        }
-        if ($response['status'] === 429 || $response['status'] === 529) {
-            throw new RuntimeException('The AI service is busy or the usage limit was reached. Try again in a minute.');
-        }
-        if ($response['status'] < 200 || $response['status'] >= 300) {
-            $detail = is_array($response['json']) ? (string) ($response['json']['error']['message'] ?? '') : '';
-            error_log('[sop] claude HTTP ' . $response['status'] . ($detail !== '' ? ': ' . $detail : ''));
-            throw new RuntimeException('The instructions could not be generated (HTTP ' . $response['status'] . ').' . (APP_DEBUG && $detail !== '' ? ' ' . $detail : ''));
-        }
-
-        $json = is_array($response['json']) ? $response['json'] : [];
-        $text = $this->contentText($json['content'] ?? '');
-
-        try {
-            $sops = $this->parse($text);
-        } catch (RuntimeException $e) {
-            error_log('[sop] could not read Claude answer (stop_reason=' . (string) ($json['stop_reason'] ?? '?') . '): ' . mb_substr($text, 0, 3000));
-            if (($json['stop_reason'] ?? '') === 'max_tokens') {
-                throw new RuntimeException('The AI stopped before finishing the instructions. Please try again.');
-            }
-            throw $e;
-        }
-
-        return ['model' => $model, 'sops' => $sops];
-    }
-
-    /** The business's saved Claude key (its assistant runs on Claude), else ANTHROPIC_API_KEY, else null. */
-    private function claudeKey(?array $assistant): ?string
-    {
-        $model = AiSettingsController::resolveModel($assistant['ai_model'] ?? null);
-        if (!empty($assistant['api_key_encrypted']) && (AiSettingsController::AI_MODELS[$model][1] ?? '') === 'Anthropic') {
-            try {
-                $key = trim(Crypto::decrypt((string) $assistant['api_key_encrypted']));
-                if ($key !== '') {
-                    return $key;
-                }
-            } catch (RuntimeException $e) {
-                // fall back to .env / Agnes
-            }
-        }
-        $env = trim((string) env('ANTHROPIC_API_KEY', ''));
-        return $env !== '' ? $env : null;
-    }
-
-    private function apiKey(?array $assistant): string
-    {
-        $key = trim((string) env('AGNES_API_KEY', ''));
-        if ($key !== '') {
-            return $key;
-        }
-
-        $model = AiSettingsController::resolveModel($assistant['ai_model'] ?? null);
-        if (!empty($assistant['api_key_encrypted']) && (AiSettingsController::AI_MODELS[$model][1] ?? '') === 'Agnes') {
-            try {
-                return Crypto::decrypt((string) $assistant['api_key_encrypted']);
-            } catch (RuntimeException $e) {
-                // fall through to the message below
-            }
-        }
-
-        throw new RuntimeException('Generate with AI is not set up on this server yet (no AI key). Write the instructions yourself, or ask the administrator to add the key.');
-    }
 
     private function instructions(): string
     {

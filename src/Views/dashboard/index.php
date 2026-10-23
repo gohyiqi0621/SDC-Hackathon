@@ -986,8 +986,8 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
   
-const ROBOT_MODEL_URL =
-  "/SDC-Hackathon/public/assets/roboter_cute.glb";
+// asset(): the right address on XAMPP (/SDC-Hackathon/public/...) and on Replit (/assets/...).
+const ROBOT_MODEL_URL = <?= json_encode(asset('assets/roboter_cute.glb'), JSON_UNESCAPED_SLASHES) ?>;
 
 
 
