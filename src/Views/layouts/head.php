@@ -15,7 +15,7 @@ $styles    = $styles ?? [];
     <title><?= e($pageTitle) ?> | <?= e(APP_NAME) ?></title>
     <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
     <meta name="description" content="<?= e(APP_NAME) ?> - finance and AI assistant portal.">
-    <link rel="icon" href="<?= e(asset('favicon.ico')) ?>" sizes="any">
+    <link rel="icon" type="image/svg+xml" href="<?= e(asset_versioned('assets/favicon.svg')) ?>" sizes="any">
 
     <!-- Restore a collapsed sidebar before first paint, so it never flickers open. -->
     <script>try { if (localStorage.getItem('sidebar') === 'collapsed') { document.documentElement.classList.add('sidebar-collapsed'); } } catch (e) {}</script>
