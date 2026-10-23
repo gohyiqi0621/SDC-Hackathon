@@ -80,7 +80,13 @@ final class ProductController
             return;
         }
 
-        $data['image_url'] = isset($_FILES['image']) ? $service->storeImage($userId, $_FILES['image']) : null;
+        $imageFile   = $_FILES['image'] ?? null;
+        $hasImage    = $imageFile !== null && ($imageFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+        $data['image_url'] = $hasImage ? $service->storeImage($userId, $imageFile) : null;
+        if ($hasImage && $data['image_url'] === null) {
+            $this->fail($user, null, $_POST, ['image' => 'Image storage is temporarily unavailable. Please try again later.']);
+            return;
+        }
 
         try {
             (new Product())->create($userId, $data);
@@ -122,7 +128,15 @@ final class ProductController
         }
 
         $oldImage = $product['image_url'];
-        $newImage = isset($_FILES['image']) ? $service->storeImage($userId, $_FILES['image']) : null;
+        $imageFile = $_FILES['image'] ?? null;
+        $hasImage  = $imageFile !== null && ($imageFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+        $newImage  = $hasImage ? $service->storeImage($userId, $imageFile) : null;
+        if ($hasImage && $newImage === null) {
+            $this->fail($user, $product, $_POST + ['image_url' => $product['image_url']], [
+                'image' => 'Image storage is temporarily unavailable. Please try again later.',
+            ]);
+            return;
+        }
         $remove   = !empty($_POST['remove_image']);
 
         $data['image_url'] = $newImage ?? ($remove ? null : $oldImage);

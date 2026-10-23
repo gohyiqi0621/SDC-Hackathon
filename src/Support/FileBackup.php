@@ -13,8 +13,9 @@
  *   public   files under public/            (uploads/company/..., uploads/products/...)
  *   private  files under storage/uploads/   (invoices, claims, order receipts)
  *
- * Best effort: a backup problem is logged and never stops the upload itself.
- * The table creates itself (migration 023 does the same).
+ * A backup problem is logged and reported to the upload caller so files are
+ * never reported as saved when only an instance-local copy exists. The table
+ * is created by migration 023 and applied to production through Publish.
  */
 declare(strict_types=1);
 
@@ -26,7 +27,6 @@ use Throwable;
 final class FileBackup
 {
     private const MAX_BYTES = 12 * 1024 * 1024;
-    private static bool $ready = false;
 
     /** Absolute path of a file in an area. */
     public static function absolute(string $area, string $relative): string
@@ -36,18 +36,24 @@ final class FileBackup
     }
 
     /** Save (or replace) the copy of a file that was just written to disk. */
-    public static function save(string $area, string $relative, ?string $mime = null): void
+    public static function save(string $area, string $relative, ?string $mime = null): bool
     {
         $relative = ltrim($relative, '/');
         $path     = self::absolute($area, $relative);
-        if (!self::safe($relative) || !is_file($path) || filesize($path) > self::MAX_BYTES) {
-            return;
+        $size     = is_file($path) ? filesize($path) : false;
+        if (!in_array($area, ['public', 'private'], true) || !self::safe($relative)
+            || $size === false || $size > self::MAX_BYTES) {
+            error_log('[file-backup] refused to save an invalid or oversized file');
+            return false;
         }
 
         try {
-            self::ensureTable();
             $mime = $mime ?: (string) (new \finfo(FILEINFO_MIME_TYPE))->file($path);
-            $data = (string) file_get_contents($path);
+            $data = file_get_contents($path);
+            if ($data === false) {
+                error_log('[file-backup] could not read ' . $relative);
+                return false;
+            }
             $stmt = Database::connection()->prepare(
                 'INSERT INTO file_backups (area, path, mime, data) VALUES (?, ?, ?, ?)
                  ON CONFLICT (area, path) DO UPDATE SET mime = EXCLUDED.mime, data = EXCLUDED.data, created_at = CURRENT_TIMESTAMP'
@@ -56,9 +62,14 @@ final class FileBackup
             $stmt->bindValue(2, $relative);
             $stmt->bindValue(3, $mime);
             $stmt->bindValue(4, $data, PDO::PARAM_LOB);
-            $stmt->execute();
+            if (!$stmt->execute()) {
+                error_log('[file-backup] database refused to save ' . $relative);
+                return false;
+            }
+            return true;
         } catch (Throwable $e) {
             error_log('[file-backup] save ' . $relative . ': ' . $e->getMessage());
+            return false;
         }
     }
 
@@ -78,7 +89,6 @@ final class FileBackup
         }
 
         try {
-            self::ensureTable();
             $stmt = Database::connection()->prepare('SELECT data FROM file_backups WHERE area = ? AND path = ?');
             $stmt->execute([$area, $relative]);
             $data = $stmt->fetchColumn();
@@ -102,7 +112,6 @@ final class FileBackup
     public static function mime(string $area, string $relative): ?string
     {
         try {
-            self::ensureTable();
             $stmt = Database::connection()->prepare('SELECT mime FROM file_backups WHERE area = ? AND path = ?');
             $stmt->execute([$area, ltrim($relative, '/')]);
             $mime = $stmt->fetchColumn();
@@ -116,7 +125,6 @@ final class FileBackup
     public static function forget(string $area, string $relative): void
     {
         try {
-            self::ensureTable();
             Database::connection()->prepare('DELETE FROM file_backups WHERE area = ? AND path = ?')
                 ->execute([$area, ltrim($relative, '/')]);
         } catch (Throwable $e) {
@@ -158,21 +166,4 @@ final class FileBackup
             && preg_match('#^[A-Za-z0-9_./-]+$#', $relative) === 1;
     }
 
-    private static function ensureTable(): void
-    {
-        if (self::$ready) {
-            return;
-        }
-        Database::connection()->exec(
-            'CREATE TABLE IF NOT EXISTS file_backups (
-                area        VARCHAR(10)  NOT NULL,
-                path        VARCHAR(255) NOT NULL,
-                mime        VARCHAR(100) NULL,
-                data        BYTEA        NOT NULL,
-                created_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (area, path)
-            )'
-        );
-        self::$ready = true;
-    }
 }
