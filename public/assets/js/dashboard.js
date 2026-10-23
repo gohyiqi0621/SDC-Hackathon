@@ -1858,16 +1858,6 @@ function removeEmailFromView(email) {
         generateReply
     );
 
-    $("adjustReplyBtn")?.addEventListener(
-        "click",
-        () => {
-            replyDraft?.focus();
-            notify(
-                "You can edit the draft before sending."
-            );
-        }
-    );
-
     $("replyTone")?.addEventListener(
         "change",
         () => {
@@ -2686,7 +2676,7 @@ function removeEmailFromView(email) {
         toolbar.innerHTML = `
             <div>
                 <h2>Customize Your Dashboard</h2>
-                <p>Drag the handle to rearrange your dashboard cards.</p>
+                <p>Drag a card by its handle in any direction to rearrange your dashboard.</p>
             </div>
 
             <button type="button" id="resetDashboardLayout">
@@ -2724,8 +2714,7 @@ function removeEmailFromView(email) {
             const handle = document.createElement("button");
             handle.type = "button";
             handle.className = "dashboard-drag-handle";
-            handle.draggable = true;
-            handle.style.cursor = "grab";
+            handle.draggable = false;
 
             handle.innerHTML = `
                 <i class="fa-solid fa-grip-vertical"></i>
@@ -2734,7 +2723,7 @@ function removeEmailFromView(email) {
 
             handle.setAttribute(
                 "aria-label",
-                "Drag to move " + config.title
+                "Drag to move " + config.title + " (or use the arrow keys)"
             );
 
             header.append(title, handle);
@@ -2788,94 +2777,366 @@ function removeEmailFromView(email) {
             });
         }
 
-        let draggedCard = null;
+        /* ----------------------------------------------------------
+           Pointer drag (mouse, touch and pen)
 
-        grid.addEventListener("dragstart", event => {
-            const handle = event.target.closest(
-                ".dashboard-drag-handle"
+           The card is lifted out of the grid and follows the pointer
+           freely - up, down, left and right - kept inside the grid.
+           A placeholder holds its slot; the other cards slide out of
+           the way (FLIP animation) as the placeholder moves. On drop
+           the card glides into the placeholder's slot.
+
+           Only the "Drag to move" handle starts a drag, so buttons,
+           inputs and links inside the cards keep working.
+        ---------------------------------------------------------- */
+
+        const DRAG_THRESHOLD = 4;      // px before a press becomes a drag
+        // Auto-scroll: dragging toward the bottom of the screen scrolls the
+        // page down, toward the top scrolls it up. The closer to the edge,
+        // the faster it scrolls.
+        const EDGE_SCROLL_RATIO = 0.22;   // top / bottom share of the viewport that scrolls
+        const EDGE_SCROLL_MIN_ZONE = 90;  // px, at least this tall on small screens
+        const EDGE_SCROLL_MAX = 26;       // px per frame at the very edge
+        const prefersReducedMotion = window.matchMedia &&
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        let drag = null;
+
+        grid.style.position = "relative";
+
+        /** Slide cards from their old positions to their new ones. */
+        function animateReflow(before) {
+            if (prefersReducedMotion) return;
+
+            before.forEach((rect, card) => {
+                const after = card.getBoundingClientRect();
+                const dx = rect.left - after.left;
+                const dy = rect.top - after.top;
+
+                if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+
+                card.animate(
+                    [
+                        { transform: `translate(${dx}px, ${dy}px)` },
+                        { transform: "translate(0, 0)" }
+                    ],
+                    { duration: 220, easing: "cubic-bezier(.2, .8, .2, 1)" }
+                );
+            });
+        }
+
+        /** Move the placeholder (and slide the other cards) without jumps. */
+        function movePlaceholder(insert) {
+            const others = getCards().filter(card => card !== drag.card);
+            const before = new Map(
+                others.map(card => [card, card.getBoundingClientRect()])
             );
 
-            if (!handle) {
+            insert();
+            animateReflow(before);
+        }
+
+        function startDrag(event, handle, pressX, pressY) {
+            const card = handle.closest(".dashboard-draggable-card");
+            if (!card) return;
+
+            const rect = card.getBoundingClientRect();
+
+            const placeholder = document.createElement("div");
+            placeholder.className = "dashboard-drag-placeholder";
+            if (card.classList.contains("full-width")) {
+                placeholder.classList.add("full-width");
+            }
+            placeholder.style.height = rect.height + "px";
+
+            drag = {
+                card,
+                handle,
+                placeholder,
+                pointerId: event.pointerId,
+                // Keep the exact point that was pressed under the pointer.
+                offsetX: pressX - rect.left,
+                offsetY: pressY - rect.top,
+                width: rect.width,
+                height: rect.height,
+                x: event.clientX,
+                y: event.clientY,
+                lockTarget: null,
+                frame: 0
+            };
+
+            card.before(placeholder);
+
+            card.style.width = rect.width + "px";
+            card.style.height = rect.height + "px";
+            card.classList.add("is-lifted");
+            grid.classList.add("is-sorting");
+            document.body.classList.add("dashboard-is-dragging");
+            // Stop the browser scrolling the page by itself when cards reflow.
+            document.documentElement.style.overflowAnchor = "none";
+
+            positionCard();
+            drag.frame = requestAnimationFrame(tick);
+        }
+
+        /** Put the card under the pointer, clamped to the grid. */
+        function positionCard() {
+            const gridRect = grid.getBoundingClientRect();
+
+            let left = drag.x - drag.offsetX - gridRect.left;
+            let top = drag.y - drag.offsetY - gridRect.top;
+
+            const maxLeft = Math.max(0, grid.clientWidth - drag.width);
+            const maxTop = Math.max(0, grid.scrollHeight - drag.height);
+
+            left = Math.min(Math.max(left, 0), maxLeft);
+            top = Math.min(Math.max(top, 0), maxTop);
+
+            drag.card.style.transform =
+                `translate3d(${left}px, ${top}px, 0)`;
+        }
+
+        /** Which card (if any) the pointer is over, and where the placeholder should go. */
+        function updateOrder() {
+            const others = getCards().filter(card => card !== drag.card);
+            const x = drag.x;
+            const y = drag.y;
+
+            const target = others.find(card => {
+                const r = card.getBoundingClientRect();
+                return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+            });
+
+            // After a swap, wait until the pointer leaves that card before
+            // swapping with it again (stops cards of different sizes flickering).
+            if (drag.lockTarget && drag.lockTarget !== target) {
+                drag.lockTarget = null;
+            }
+
+            if (target && target !== drag.lockTarget) {
+                const slots = Array.from(grid.children).filter(
+                    el => el !== drag.card
+                );
+                const placeholderIndex = slots.indexOf(drag.placeholder);
+                const targetIndex = slots.indexOf(target);
+
+                movePlaceholder(() => {
+                    if (placeholderIndex < targetIndex) {
+                        target.after(drag.placeholder);
+                    } else {
+                        target.before(drag.placeholder);
+                    }
+                });
+
+                drag.lockTarget = target;
+                return;
+            }
+
+            // Below every card: the end of the grid.
+            if (!target && others.length) {
+                const last = others[others.length - 1];
+                const lastRect = last.getBoundingClientRect();
+
+                if (
+                    y > lastRect.bottom &&
+                    grid.lastElementChild !== drag.placeholder &&
+                    !(grid.lastElementChild === drag.card &&
+                      drag.card.previousElementSibling === drag.placeholder)
+                ) {
+                    movePlaceholder(() => grid.appendChild(drag.placeholder));
+                }
+            }
+        }
+
+        /** Scroll the page while the pointer is in the top or bottom part of the screen. */
+        function edgeScroll() {
+            const h = window.innerHeight;
+            const zone = Math.max(EDGE_SCROLL_MIN_ZONE, h * EDGE_SCROLL_RATIO);
+            let speed = 0;
+
+            if (drag.y < zone) {
+                speed = -EDGE_SCROLL_MAX * Math.min(1, (zone - drag.y) / zone);
+            } else if (drag.y > h - zone) {
+                speed = EDGE_SCROLL_MAX * Math.min(1, (drag.y - (h - zone)) / zone);
+            }
+
+            // Ease in so the scroll starts gently instead of lurching.
+            speed = Math.sign(speed) * Math.pow(Math.abs(speed) / EDGE_SCROLL_MAX, 1.5) * EDGE_SCROLL_MAX;
+
+            if (Math.abs(speed) >= 0.5) {
+                const before = window.scrollY;
+                window.scrollBy(0, speed);
+                // The card is positioned from the pointer every frame, so it
+                // stays under the finger/cursor while the page moves.
+                return window.scrollY !== before;
+            }
+
+            return false;
+        }
+
+        function tick() {
+            if (!drag) return;
+
+            edgeScroll();
+            positionCard();
+            updateOrder();
+
+            drag.frame = requestAnimationFrame(tick);
+        }
+
+        function endDrag(cancelled) {
+            if (!drag) return;
+
+            const { card, placeholder, handle, pointerId } = drag;
+            cancelAnimationFrame(drag.frame);
+            drag = null;
+
+            if (handle.hasPointerCapture && handle.hasPointerCapture(pointerId)) {
+                handle.releasePointerCapture(pointerId);
+            }
+
+            const finish = () => {
+                placeholder.replaceWith(card);
+                card.classList.remove("is-lifted", "is-settling");
+                card.style.transform = "";
+                card.style.width = "";
+                card.style.height = "";
+                grid.classList.remove("is-sorting");
+                document.body.classList.remove("dashboard-is-dragging");
+                document.documentElement.style.overflowAnchor = "";
+
+                if (!cancelled) saveLayout();
+            };
+
+            if (prefersReducedMotion) {
+                finish();
+                return;
+            }
+
+            // Glide into the slot, then drop back into the normal flow.
+            const gridRect = grid.getBoundingClientRect();
+            const slot = placeholder.getBoundingClientRect();
+            const left = slot.left - gridRect.left;
+            const top = slot.top - gridRect.top;
+
+            card.classList.add("is-settling");
+            card.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+
+            let done = false;
+            const once = () => {
+                if (done) return;
+                done = true;
+                finish();
+            };
+
+            card.addEventListener("transitionend", once, { once: true });
+            setTimeout(once, 260);
+        }
+
+        let pending = null;
+
+        grid.addEventListener("pointerdown", event => {
+            const handle = event.target.closest(".dashboard-drag-handle");
+            if (!handle || !grid.contains(handle) || drag) return;
+            if (event.pointerType === "mouse" && event.button !== 0) return;
+
+            pending = {
+                handle,
+                pointerId: event.pointerId,
+                x: event.clientX,
+                y: event.clientY
+            };
+
+            handle.setPointerCapture(event.pointerId);
+            event.preventDefault();   // no text selection / native image drag
+        });
+
+        grid.addEventListener("pointermove", event => {
+            if (drag && event.pointerId === drag.pointerId) {
+                drag.x = event.clientX;
+                drag.y = event.clientY;
                 event.preventDefault();
                 return;
             }
 
-            draggedCard = handle.closest(
-                ".dashboard-draggable-card"
+            if (!pending || event.pointerId !== pending.pointerId) return;
+
+            const moved = Math.hypot(
+                event.clientX - pending.x,
+                event.clientY - pending.y
             );
 
-            if (!draggedCard) return;
-
-            event.dataTransfer.effectAllowed = "move";
-
-            event.dataTransfer.setData(
-                "text/plain",
-                draggedCard.dataset.cardId
-            );
-
-            draggedCard.classList.add("is-dragging");
+            if (moved >= DRAG_THRESHOLD) {
+                const { handle, x, y } = pending;
+                pending = null;
+                startDrag(event, handle, x, y);
+                drag.x = event.clientX;
+                drag.y = event.clientY;
+            }
         });
 
-        grid.addEventListener("dragover", event => {
-            if (!draggedCard) return;
+        const stop = event => {
+            if (pending && event.pointerId === pending.pointerId) {
+                pending = null;
+            }
+            if (drag && event.pointerId === drag.pointerId) {
+                endDrag(event.type === "pointercancel");
+            }
+        };
 
-            event.preventDefault();
+        grid.addEventListener("pointerup", stop);
+        grid.addEventListener("pointercancel", stop);
+        grid.addEventListener("lostpointercapture", stop);
 
-            if (event.dataTransfer) {
-                event.dataTransfer.dropEffect = "move";
+        // Escape puts the card back where the drag started.
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape" && drag) {
+                drag.lockTarget = null;
+                movePlaceholder(() => drag.card.before(drag.placeholder));
+                endDrag(true);
+            }
+        });
+
+        // Keyboard: focus the handle and use the arrow keys to move the card.
+        grid.addEventListener("keydown", event => {
+            const handle = event.target.closest(".dashboard-drag-handle");
+            if (!handle || drag) return;
+
+            const card = handle.closest(".dashboard-draggable-card");
+            const list = getCards();
+            const index = list.indexOf(card);
+            let target = null;
+
+            if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+                target = list[index - 1];
+                if (target) {
+                    event.preventDefault();
+                    const before = new Map(list.map(c => [c, c.getBoundingClientRect()]));
+                    target.before(card);
+                    animateReflow(before);
+                }
+            } else if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+                target = list[index + 1];
+                if (target) {
+                    event.preventDefault();
+                    const before = new Map(list.map(c => [c, c.getBoundingClientRect()]));
+                    target.after(card);
+                    animateReflow(before);
+                }
             }
 
-            const target = event.target.closest(
-                ".dashboard-draggable-card"
-            );
-
-            getCards().forEach(card => {
-                card.classList.toggle(
-                    "drag-over",
-                    card === target && card !== draggedCard
-                );
-            });
-        });
-
-        grid.addEventListener("drop", event => {
-            if (!draggedCard) return;
-
-            event.preventDefault();
-
-            const target = event.target.closest(
-                ".dashboard-draggable-card"
-            );
-
-            if (target && target !== draggedCard) {
-                const elements = getCards();
-
-                const fromIndex = elements.indexOf(draggedCard);
-                const toIndex = elements.indexOf(target);
-
-                if (fromIndex < toIndex) {
-                    target.after(draggedCard);
-                } else {
-                    target.before(draggedCard);
-                }
-
+            if (target) {
+                handle.focus();
                 saveLayout();
             }
-
-            cleanupDrag();
         });
 
-        function cleanupDrag() {
-            getCards().forEach(card => {
-                card.classList.remove(
-                    "is-dragging",
-                    "drag-over"
-                );
-            });
-
-            draggedCard = null;
-        }
-
-        grid.addEventListener("dragend", cleanupDrag);
+        // The old HTML5 drag events are not used any more.
+        grid.addEventListener("dragstart", event => {
+            if (event.target.closest(".dashboard-drag-handle")) {
+                event.preventDefault();
+            }
+        });
 
         $("resetDashboardLayout")?.addEventListener(
             "click",
@@ -2896,6 +3157,58 @@ function removeEmailFromView(email) {
         );
 
         restoreLayout();
+        matchInboxHeight();
+    }
+
+    /* ----------------------------------------------------------
+       Inbox height = Email Details & AI Assistant height
+       The details card keeps its natural height; on desktop the
+       Inbox card is given the same height (its list scrolls
+       inside). Updates whenever the details card changes size.
+    ---------------------------------------------------------- */
+
+    function matchInboxHeight() {
+        const inboxCard = document.querySelector(
+            '#customDashboardGrid > [data-card-id="inbox"]'
+        );
+        const detailCard = document.querySelector(
+            '#customDashboardGrid > [data-card-id="email-details"]'
+        );
+
+        if (!inboxCard || !detailCard) return;
+
+        const desktop = window.matchMedia("(min-width: 901px)");
+
+        function sync() {
+            if (!desktop.matches) {
+                inboxCard.classList.remove("is-height-matched");
+                inboxCard.style.removeProperty("--inbox-match-height");
+                return;
+            }
+
+            const height = detailCard.getBoundingClientRect().height;
+
+            if (height > 0) {
+                inboxCard.style.setProperty(
+                    "--inbox-match-height",
+                    height + "px"
+                );
+                inboxCard.classList.add("is-height-matched");
+            }
+        }
+
+        if ("ResizeObserver" in window) {
+            new ResizeObserver(sync).observe(detailCard);
+        }
+
+        if (desktop.addEventListener) {
+            desktop.addEventListener("change", sync);
+        } else if (desktop.addListener) {
+            desktop.addListener(sync);
+        }
+
+        window.addEventListener("resize", sync);
+        sync();
     }
 
     /* ========================================================

@@ -5,7 +5,6 @@
  * The inbox shows the user's real Gmail when connected (loaded as JSON from
  * /gmail/inbox by assets/js/dashboard.js), otherwise demo emails. The AI
  * summary, reply draft and suggested follow-up are generated in the browser.
- * The Brevo strip sends a test message through the password-reset mailer.
  */
 $firstName = trim(explode(' ', trim((string) $user['name']))[0] ?? '') ?: (string) $user['name'];
 $hour      = (int) date('G');
@@ -503,15 +502,6 @@ function render() {
     })();
     </script>
 
-    <?php if ($brevoReady): ?>
-    <form method="post" action="<?= e(url('dashboard', ['action' => 'test_email'])) ?>">
-        <?= csrf_field() ?>
-        <button class="primary-btn" type="submit">
-            <i class="fa-regular fa-envelope"></i>
-            Send test email
-        </button>
-    </form>
-<?php endif; ?>
 
 
 
@@ -877,13 +867,6 @@ function render() {
                 id="regenerateReplyBtn">
             <i class="fa-solid fa-rotate"></i>
             Regenerate
-        </button>
-
-        <button type="button"
-                class="secondary-btn"
-                id="adjustReplyBtn">
-            <i class="fa-solid fa-sliders"></i>
-            Adjust
         </button>
     </div>
 

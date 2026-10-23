@@ -4341,3 +4341,131 @@
 #welcomeBanner #aiBot3D {
     cursor: default;
 }
+
+
+/* ==========================================================
+   DASHBOARD CARDS — FREE 2D DRAGGING
+   The handle lifts the card; it follows the pointer in any
+   direction inside the grid while a placeholder keeps its slot.
+   ========================================================== */
+
+#customDashboardGrid {
+    position: relative;
+}
+
+#customDashboardGrid .dashboard-drag-handle {
+    touch-action: none;            /* touch drags move the card, not the page */
+    -webkit-touch-callout: none;
+}
+
+#customDashboardGrid .dashboard-drag-handle:focus-visible {
+    outline: 2px solid #7966dc;
+    outline-offset: 2px;
+    border-radius: 8px;
+}
+
+/* The lifted card: out of the grid flow, above everything else. */
+#customDashboardGrid .dashboard-draggable-card.is-lifted {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 60;
+    margin: 0;
+    opacity: 1;
+    box-shadow: 0 22px 50px rgba(54, 44, 140, 0.22), 0 4px 12px rgba(54, 44, 140, 0.12);
+    will-change: transform;
+    transition: box-shadow 0.15s ease;
+}
+
+#customDashboardGrid .dashboard-draggable-card.is-lifted .dashboard-drag-handle {
+    cursor: grabbing !important;
+}
+
+/* Gliding into its new slot on release. */
+#customDashboardGrid .dashboard-draggable-card.is-settling {
+    transition: transform 0.2s cubic-bezier(.2, .8, .2, 1), box-shadow 0.2s ease;
+    box-shadow: 0 8px 25px rgba(49, 60, 123, 0.08);
+}
+
+/* The slot the card will drop into. */
+#customDashboardGrid .dashboard-drag-placeholder {
+    min-width: 0;
+    border: 2px dashed #b8acf6;
+    border-radius: 16px;
+    background: rgba(121, 102, 220, 0.06);
+    box-sizing: border-box;
+}
+
+#customDashboardGrid .dashboard-drag-placeholder.full-width {
+    grid-column: 1 / -1;
+}
+
+body.dashboard-is-dragging {
+    overflow-anchor: none;
+}
+
+body.dashboard-is-dragging,
+body.dashboard-is-dragging * {
+    cursor: grabbing !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #customDashboardGrid .dashboard-draggable-card.is-settling {
+        transition: none;
+    }
+}
+
+
+/* ==========================================================
+   INBOX MATCHES EMAIL DETAILS & AI ASSISTANT
+   Email Details & AI Assistant keeps its natural height. On
+   desktop, dashboard.js copies that height onto the Inbox card
+   (--inbox-match-height), so both line up top and bottom; the
+   email list scrolls inside the Inbox when it has more emails.
+   ========================================================== */
+
+@media (min-width: 901px) {
+    #customDashboardGrid > .dashboard-draggable-card.is-height-matched {
+        height: var(--inbox-match-height) !important;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #customDashboardGrid > .dashboard-draggable-card.is-height-matched > .dashboard-drag-header {
+        flex: 0 0 auto;
+    }
+
+    /* Header, search and tabs stay put; only the list scrolls. */
+    #customDashboardGrid .dashboard-draggable-card.is-height-matched > .inbox-panel {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    #customDashboardGrid .dashboard-draggable-card.is-height-matched > .inbox-panel > * {
+        flex: 0 0 auto;
+    }
+
+    #customDashboardGrid .dashboard-draggable-card.is-height-matched > .inbox-panel > .email-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: none;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+}
+
+/* Tablets and phones: one column, natural heights; the inbox list is capped
+   so it never pushes the email details far down. */
+@media (max-width: 900px) {
+    #customDashboardGrid .dashboard-draggable-card > .inbox-panel > .email-list {
+        max-height: min(60vh, 520px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+}
