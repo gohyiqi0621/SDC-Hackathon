@@ -23,6 +23,7 @@ $tabs    = [
         <?php endforeach; ?>
     </nav>
 
+    <?php if ($current === 'financial/claims'): ?>
     <form class="role-switch" method="post" action="<?= e(url('financial', ['action' => 'role'])) ?>" aria-label="Viewing as">
         <?= csrf_field() ?>
         <input type="hidden" name="return" value="<?= e(url('financial', ['action' => $current === 'financial/claims' ? 'claims' : 'invoice'])) ?>">
@@ -34,4 +35,5 @@ $tabs    = [
             <i class="fa-solid fa-user-shield"></i> Supervisor
         </button>
     </form>
+    <?php endif; ?>
 </div>

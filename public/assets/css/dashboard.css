@@ -46,6 +46,30 @@
 .inbox-actions {
     display: flex;
     gap: 12px;
+    flex-wrap: wrap;
+}
+
+.inbox-panel .panel-header {
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.inbox-select {
+    display: grid;
+    gap: 4px;
+    color: #505a84;
+    font-size: 12px;
+}
+
+.inbox-select select {
+    max-width: 100%;
+    padding: 7px 9px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
 }
 
 .inbox-actions button {
@@ -3768,10 +3792,10 @@
 
 #welcomeBanner.welcome-banner {
   box-sizing: border-box !important;
-  width: 100% !important;
+  width: calc(100% - 64px) !important;
   height: 340px !important;
   min-height: 340px !important;
-  margin: 0 0 18px !important;
+  margin: 0 32px 18px !important;
   padding: 38px !important;
   border: 1px solid #dcd7ff !important;
   border-radius: 28px !important;
@@ -4306,6 +4330,14 @@
 }
 
 /* The welcome robot is decorative. */
+/* Match the page-body gutters used by the Gmail inbox on small screens. */
+@media (max-width: 650px) {
+    #welcomeBanner.welcome-banner {
+        width: calc(100% - 32px) !important;
+        margin-inline: 16px !important;
+    }
+}
+
 #welcomeBanner #aiBot3D {
     cursor: default;
 }

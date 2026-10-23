@@ -107,7 +107,6 @@ final class StaffAssistantService
             'audience'         => 'staff',
             'staff_name'       => $staffName,
             'functions'        => implode(',', $config['functions']),
-            '_chatflow'        => self::chatflowId($config['provider']),
         ];
 
         // Flowise memory keeps only the text, not tool results: tell the AI which
@@ -355,9 +354,7 @@ final class StaffAssistantService
      */
     public static function chatflowId(?string $provider = null): string
     {
-        $suffix = strtoupper((string) preg_replace('/[^A-Za-z]/', '', (string) $provider));
-        $id = $suffix !== '' ? trim((string) env('FLOWISE_STAFF_CHATFLOW_ID_' . $suffix, '')) : '';
-        return $id !== '' ? $id : trim((string) env('FLOWISE_STAFF_CHATFLOW_ID', ''));
+        return FlowiseService::chatflowFor($provider, 'staff');
     }
 
     private function log(ChatMessage $messages, int $userId, string $chatId, string $role, string $content, string $status, ?string $name = null): void

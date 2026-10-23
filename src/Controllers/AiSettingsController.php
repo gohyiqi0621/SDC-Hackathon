@@ -129,6 +129,13 @@ final class AiSettingsController
                     $errors[$key] = $what . ' must be ' . $max . ' characters or fewer.';
                 }
             }
+            // Printed on the official receipt: all required.
+            foreach (['company_address' => 'Company address is required.', 'registration_no' => 'Registration no. (SSM) is required.',
+                      'company_phone' => 'Phone is required.', 'company_email' => 'Email is required.'] as $key => $message) {
+                if ($input[$key] === '') {
+                    $errors[$key] = $message;
+                }
+            }
             if ($input['company_email'] !== '' && !filter_var($input['company_email'], FILTER_VALIDATE_EMAIL)) {
                 $errors['company_email'] = 'Enter a valid email address, e.g. hello@yourshop.my.';
             }
@@ -171,9 +178,17 @@ final class AiSettingsController
             $model    = new CompanyProfile();
             $existing = $model->find($userId);
             $oldLogo  = $existing['company_logo_url'] ?? null;
-            $newLogo  = $this->hasUpload($file) ? $this->storeLogo($userId, $file) : null;
             $oldQr    = $existing['payment_qr_url'] ?? null;
-            $newQr    = $this->hasUpload($qrFile) ? $this->storeLogo($userId, $qrFile) : null;
+            $newLogo  = null;
+            $newQr    = null;
+            try {
+                $newLogo = $this->hasUpload($file) ? $this->storeLogo($userId, $file) : null;
+                $newQr   = $this->hasUpload($qrFile) ? $this->storeLogo($userId, $qrFile) : null;
+            } catch (RuntimeException $e) {
+                $this->deleteLogo($userId, $newLogo);
+                $this->deleteLogo($userId, $newQr);
+                throw $e;
+            }
             $qr       = !empty($_POST['remove_payment_qr']) ? null : $oldQr;
             if ($newQr !== null) {
                 $qr = $newQr;
@@ -251,12 +266,12 @@ final class AiSettingsController
         $this->assistantSaveFor(new StaffAiAssistantSetting());
     }
 
-    /** Staff assistant functions (checkboxes on Staff Assistant Setup): key => [label, icon, hint]. */
+    /** What the staff assistant can do (listed on Staff Assistant Setup; always on): key => [label, icon, description]. */
     public const STAFF_FUNCTIONS = [
-        'check_email'   => ['Check email',    'fa-regular fa-envelope',       'List, summarise and reply to emails in the Gmail connected on the Dashboard.'],
-        'check_invoice' => ['Check invoice',  'fa-solid fa-file-invoice',     'Look up invoices, amounts and payment status.'],
-        'check_claims'  => ['Check claims',   'fa-solid fa-receipt',          'Look up expense claims and their approval status.'],
-        'check_orders'  => ['Check orders',   'fa-solid fa-bag-shopping',     'Look up customer orders, receipts and shipping.'],
+        'check_email'   => ['Email',           'fa-regular fa-envelope',   'Checks new email in your connected Gmail, summarises messages and drafts replies. Nothing is sent until you confirm.'],
+        'check_invoice' => ['Invoices',        'fa-solid fa-file-invoice', 'Finds invoices and reports amounts, due dates and payment status.'],
+        'check_claims'  => ['Expense claims',  'fa-solid fa-receipt',      'Finds expense claims and reports their amounts and approval status.'],
+        'check_orders'  => ['Customer orders', 'fa-solid fa-bag-shopping', 'Finds customer orders, shows bank references for you to approve or reject, and reports shipping status.'],
     ];
 
     private function assistantSaveFor(UserSettingsRow $model): void
@@ -356,9 +371,8 @@ final class AiSettingsController
                 $values['api_key_encrypted'] = Crypto::encrypt($apiKey);   // otherwise the saved key is kept
             }
             if ($isStaff) {
-                // Keep the checkbox order; the free-text instructions are not used for staff.
-                $values['functions'] = implode(',', array_values(array_filter(array_keys(self::STAFF_FUNCTIONS),
-                    static fn (string $k): bool => isset($functions[$k]))));
+                // Every staff function is always on (they cannot be switched off any more).
+                $values['functions'] = implode(',', array_keys(self::STAFF_FUNCTIONS));
                 unset($values['system_instructions']);
             }
 
@@ -678,6 +692,9 @@ final class AiSettingsController
             }
 
             $oldQr = $existing['payment_qr_url'] ?? null;
+            if (!$this->hasUpload($qrFile) && (empty($oldQr) || !empty($_POST['remove_payment_qr']))) {
+                $this->invalid(['payment_qr' => 'Upload your payment QR code (DuitNow / bank QR).']);
+            }
             $newQr = $this->hasUpload($qrFile) ? $this->storeLogo($userId, $qrFile) : null;
             $qr    = !empty($_POST['remove_payment_qr']) ? null : $oldQr;
             if ($newQr !== null) {
@@ -1105,7 +1122,10 @@ final class AiSettingsController
         if (!move_uploaded_file((string) $file['tmp_name'], PUBLIC_ROOT . '/' . $relative)) {
             throw new RuntimeException('Could not save the logo on the server.');
         }
-        \Src\Support\FileBackup::save('public', $relative, $mime);   // survives a redeploy
+        if (!\Src\Support\FileBackup::save('public', $relative, $mime)) {
+            @unlink(PUBLIC_ROOT . '/' . $relative);
+            throw new RuntimeException('Image storage is temporarily unavailable. Please try again later.');
+        }
 
         return $relative;
     }

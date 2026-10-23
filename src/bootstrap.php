@@ -194,14 +194,18 @@ if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_NONE) {
     ini_set('session.use_only_cookies', '1');
     ini_set('session.cookie_httponly', '1');
     ini_set('session.cookie_samesite', 'Lax');
-    // PHP's own clean-up must not delete a session before our timeouts end
-    // (its default is 24 minutes); AuthService enforces the idle limit.
+    // Keep sessions as long as the app's own limit (PHP's default deletes them after 24 minutes).
     ini_set('session.gc_maxlifetime', (string) (SESSION_LIFETIME_MINUTES * 60));
-    ini_set('session.gc_probability', '1');
-    ini_set('session.gc_divisor', '100');
 
-    // Sessions live in PostgreSQL, so a restart or redeploy (Replit) does not sign everyone out.
-    session_set_save_handler(new \Src\Support\DatabaseSessionHandler(SESSION_LIFETIME_MINUTES * 60), true);
+    // Sessions in PostgreSQL, so a Replit redeploy / another machine does not sign users out.
+    // SESSION_STORE=files keeps PHP's normal file sessions.
+    if (strtolower((string) env('SESSION_STORE', 'database')) !== 'files') {
+        try {
+            session_set_save_handler(new \Src\Support\DbSessionHandler(SESSION_LIFETIME_MINUTES * 60), true);
+        } catch (\Throwable $e) {
+            error_log('[session] database sessions unavailable, using files: ' . $e->getMessage());
+        }
+    }
 
     session_name(SESSION_NAME);
     session_set_cookie_params([

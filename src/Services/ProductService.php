@@ -159,7 +159,11 @@ final class ProductService
             error_log('[products] could not move upload to ' . $relative);
             return null;
         }
-        \Src\Support\FileBackup::save('public', $relative, $mime);   // survives a redeploy
+        if (!\Src\Support\FileBackup::save('public', $relative, $mime)) {
+            @unlink(PUBLIC_ROOT . '/' . $relative);
+            error_log('[products] durable image backup failed');
+            return null;
+        }
 
         return $relative;
     }
