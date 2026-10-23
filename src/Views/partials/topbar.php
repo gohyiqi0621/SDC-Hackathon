@@ -37,13 +37,11 @@
         <!-- ========== AI CHATBOT ========== -->
         <div class="header-chatbot" id="headerChatbot">
 
-            <button
-                type="button"
+            <a
+                href="<?= e(url('staff', ['action' => 'chat'])) ?>"
                 class="header-chatbot-trigger"
                 id="headerChatbotBtn"
-                aria-label="Open AI Assistant"
-                aria-expanded="false"
-                aria-controls="headerChatbotPanel"
+                aria-label="Open Staff Assistant Chat"
             >
                 <span class="header-chatbot-icon">
                     <i class="fa-solid fa-robot"></i>
@@ -53,7 +51,7 @@
                     <strong>AI Assistant</strong>
                     <small>Hey! Need help with your emails?</small>
                 </span>
-            </button>
+            </a>
 
             <!-- CHATBOT POPUP -->
             <div class="header-chatbot-panel" id="headerChatbotPanel" hidden>

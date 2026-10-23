@@ -11,7 +11,7 @@ require __DIR__ . '/head.php';
     <div class="auth-wrap">
 
         <a class="brand" href="<?= e(url('auth', ['action' => 'login'])) ?>" title="<?= e(APP_NAME) ?>">
-            <img class="brand__logo" src="<?= e(asset(brand_logo())) ?>" alt="<?= e(APP_NAME) ?>" width="34" height="34">
+            <span class="auth-brand-mark"><img class="brand__logo" src="<?= e(asset(brand_logo())) ?>" alt="<?= e(APP_NAME) ?>" width="80" height="80"></span>
             <?= brand_wordmark() ?>
         </a>
 

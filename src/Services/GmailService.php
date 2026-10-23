@@ -114,11 +114,13 @@ final class GmailService
     /**
      * Get latest inbox and spam emails.
      *
-     * Only metadata and snippets are loaded here.
+     * Full MIME payloads are inspected for keyword and calendar classification.
+     * Only summaries and classification flags are returned to the browser.
      */
     public function inbox(
         int $userId,
-        int $max = GMAIL_MAX_RESULTS
+        int $max = GMAIL_MAX_RESULTS,
+        string $pageToken = ''
     ): array {
         $token = $this->accessToken($userId);
 
@@ -136,6 +138,7 @@ final class GmailService
                 'maxResults' => $max,
                 'labelIds' => 'INBOX',
                 'includeSpamTrash' => 'false',
+                'pageToken' => $pageToken,
             ]),
             $this->auth($token)
         );
@@ -174,10 +177,7 @@ final class GmailService
             ) {
                 $urls[$id] =
                     self::API_URL . '/messages/' . $id .
-                    '?format=metadata' .
-                    '&metadataHeaders=From' .
-                    '&metadataHeaders=Subject' .
-                    '&metadataHeaders=Date';
+                    '?format=full';
             }
         }
 
@@ -204,7 +204,8 @@ final class GmailService
 
         return [
             'ok' => true,
-            'emails' => $emails
+            'emails' => $emails,
+            'nextPageToken' => $list['body']['nextPageToken'] ?? null
         ];
     }
 
@@ -1391,8 +1392,20 @@ public function thread(int $userId, string $threadId): array
     }
 
     /**
-     * Convert Gmail metadata into dashboard email format.
+     * Detect calendar invitations, including nested MIME attachments.
      */
+    private function hasCalendarPart(array $payload): bool
+    {
+        if (strtolower((string) ($payload['mimeType'] ?? '')) === 'text/calendar'
+            || preg_match('/\.ics$/i', (string) ($payload['filename'] ?? ''))) {
+            return true;
+        }
+        foreach ($payload['parts'] ?? [] as $part) {
+            if (is_array($part) && $this->hasCalendarPart($part)) return true;
+        }
+        return false;
+    }
+
     private function toEmail(
         string $id,
         array $message
@@ -1414,12 +1427,18 @@ public function thread(int $userId, string $threadId): array
 
         $labels = $message['labelIds'] ?? [];
 
+        $payload = $message['payload'] ?? [];
+        $classificationText = ($headers['subject'] ?? '') . ' '
+            . $this->extractBody($payload) . ' ' . ($message['snippet'] ?? '');
+
         $millis = (int) (
             $message['internalDate'] ?? 0
         );
 
         return [
             'id'        => $id,
+            'meeting' => $this->hasCalendarPart($payload)
+                || (bool) preg_match('/\b(?:meeting invitation|meeting request|schedule a meeting)\b/i', $classificationText),
             'sender'    => $headers['from'] ?? '',
             'subject'   => $headers['subject'] ?? '',
             'preview'   => html_entity_decode(
