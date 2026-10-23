@@ -173,7 +173,7 @@ define('FLOWISE_TIMEOUT', max(5, min(300, (int) env('FLOWISE_TIMEOUT', '90'))));
 
 /* -------------------------------------------------------------- session --- */
 define('SESSION_NAME', (string) env('SESSION_NAME', 'sme_session'));
-define('SESSION_IDLE_MINUTES', max(1, (int) env('SESSION_IDLE_MINUTES', '30')));
+define('SESSION_IDLE_MINUTES', max(1, (int) env('SESSION_IDLE_MINUTES', '60')));
 define('SESSION_LIFETIME_MINUTES', max(1, (int) env('SESSION_LIFETIME_MINUTES', '480')));
 define('PASSWORD_MIN_LENGTH', max(8, min(72, (int) env('PASSWORD_MIN_LENGTH', '8'))));
 

@@ -49,6 +49,19 @@ view('layouts/header', [
 <div class="page-body">
     <?php view('partials/setup_checklist', ['steps' => $steps, 'tryUrl' => $chatUrl, 'tryLabel' => 'Open chats']); ?>
 
+    <div class="ai-settings staff-ai-settings" id="assistant"
+         data-ai-settings
+         data-user-id="<?= (int) $userId ?>"
+         data-endpoints="<?= e(json_encode($endpoints, JSON_UNESCAPED_SLASHES)) ?>">
+        <div class="staff-ai-heading">
+            <h2><i class="fa-solid fa-robot" aria-hidden="true"></i> AI Assistant Settings</h2>
+            <p>How the customer assistant talks, which AI model it uses, and the instructions (SOPs) it follows.</p>
+        </div>
+        <section class="ai-panel" data-panel="assistant">
+            <?php view('ai_settings/_ai_assistant_settings_form', ['aiModels' => $aiModels]); ?>
+        </section>
+    </div>
+
     <section class="panel pay-method" id="payment" data-payment-method data-save-url="<?= e($paymentSaveUrl) ?>">
         <div class="panel-header">
             <div>
@@ -126,18 +139,5 @@ view('layouts/header', [
             </form>
         </div>
     </section>
-
-    <div class="ai-settings staff-ai-settings" id="assistant"
-         data-ai-settings
-         data-user-id="<?= (int) $userId ?>"
-         data-endpoints="<?= e(json_encode($endpoints, JSON_UNESCAPED_SLASHES)) ?>">
-        <div class="staff-ai-heading">
-            <h2><i class="fa-solid fa-robot" aria-hidden="true"></i> AI Assistant Settings</h2>
-            <p>How the customer assistant talks, which AI model it uses, and the instructions (SOPs) it follows.</p>
-        </div>
-        <section class="ai-panel" data-panel="assistant">
-            <?php view('ai_settings/_ai_assistant_settings_form', ['aiModels' => $aiModels]); ?>
-        </section>
-    </div>
 </div>
-<?php view('layouts/footer', ['scripts' => ['assets/js/ai-settings-api.js', 'assets/js/ai-settings.js', 'assets/js/payment-method.js']]); ?>
+<?php view('layouts/footer', ['scripts' => ['assets/js/ai-settings-api.js', 'assets/js/ai-settings.js', 'assets/js/payment-method.js', 'assets/js/setup-checklist.js']]); ?>

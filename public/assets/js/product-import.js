@@ -242,7 +242,7 @@
             var isNew = state.new_categories.some(function (c) { return c.toLowerCase() === String(row.category).trim().replace(/\s+/g, ' ').toLowerCase(); });
             cat.appendChild(el('span', 'badge' + (isNew ? ' badge--info' : ''), row.category + (isNew ? ' (new)' : '')));
             tr.appendChild(cat);
-            var price = row.currency + ' ' + row.price + (row.promotion_price ? ' → ' + row.promotion_price : '');
+            var price = row.currency + ' ' + row.price;
             tr.appendChild(el('td', 'num', price));
             tr.appendChild(el('td', '', row.status === 'active' ? 'Active' : 'Inactive'));
             tbody.appendChild(tr);

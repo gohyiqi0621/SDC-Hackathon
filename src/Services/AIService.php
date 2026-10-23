@@ -34,7 +34,7 @@ final class AIService
 
         if ($apiKey === '' || $apiUrl === '' || $model === '') {
             throw new RuntimeException(
-                'Agnes API configuration is missing.'
+                'The AI service is not configured.'
             );
         }
 
@@ -65,7 +65,7 @@ final class AIService
 
         if ($status < 200 || $status >= 300) {
             throw new RuntimeException(
-                'Agnes API request failed (HTTP ' . $status . ').'
+                'The AI service request failed (HTTP ' . $status . ').'
             );
         }
 
@@ -74,7 +74,7 @@ final class AIService
 
         if (!is_string($content) || trim($content) === '') {
             throw new RuntimeException(
-                'Agnes returned an empty response.'
+                'The AI service returned an empty response.'
             );
         }
 
@@ -141,7 +141,7 @@ PROMPT;
 
         if (!is_array($data)) {
             throw new RuntimeException(
-                'Agnes returned invalid summary JSON.'
+                'The AI service returned an invalid summary.'
             );
         }
 

@@ -620,7 +620,7 @@
             return {
                 company_name: [Rules.required('Company name'), Rules.minLength(2, 'Company name'), Rules.maxLength(150, 'Company name')],
                 business_category: [Rules.required('Business category'), Rules.oneOf(selectOptions(category), 'Choose a category from the list.')],
-                company_background: [Rules.maxLength(3000, 'Company background')],
+                company_background: [Rules.required('Company background'), Rules.minLength(20, 'Company background'), Rules.maxLength(3000, 'Company background')],
                 registration_no: [Rules.maxLength(60, 'Registration no.')],
                 company_phone: [Rules.maxLength(40, 'Phone')],
                 company_email: [Rules.maxLength(150, 'Email')],
@@ -702,8 +702,6 @@
         var combined = $('[data-sop-combined]', form);
         var count = $('[data-sop-count]', form);
         var toneRequired = $('[data-tone-required]', form);
-        var switchInput = $('#is_enabled', form);
-        var switchLabel = $('[data-switch-label]', form);
         var modelSelect = $('#ai_model', form);
         var apiKey = $('#api_key', form);
         var apiKeyProvider = $('[data-api-key-provider]', form);
@@ -794,7 +792,7 @@
             editors[s.key].addEventListener('input', syncInstructions);
         });
 
-        /* ---- Generate instruction with AI (Agnes) ------------------------------- */
+        /* ---- Generate instruction with AI ------------------------------------- */
 
         var generateBtn = $('[data-sop-generate]', form);
         var aiResult = $('[data-sop-ai-result]', form);
@@ -804,7 +802,7 @@
             var head = document.createElement('p');
             head.className = 'sop-ai-result-head';
             head.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> ';
-            head.appendChild(document.createTextNode('Recommended for your business' + (data.model ? ' (' + data.model + ')' : '') + ':'));
+            head.appendChild(document.createTextNode('Recommended for your business:'));
             aiResult.appendChild(head);
             var list = document.createElement('ul');
             data.sops.forEach(function (sop) {
@@ -833,7 +831,7 @@
         function generateSops() {
             setBusy(generateBtn, true, 'Generating…');
             Api.assistant.generateSops().then(function (data) {
-                if (!data || !data.sops || !data.sops.length) { throw new Error('Agnes AI returned no SOPs. Please try again.'); }
+                if (!data || !data.sops || !data.sops.length) { throw new Error('No instructions came back. Please try again.'); }
                 applySops(data.sops);
                 showAiResult(data);
                 toast('Instructions generated. Review them, then click Save.', 'success');
@@ -853,7 +851,7 @@
                 if (!hasText) { generateSops(); return; }
                 confirmAction({
                     title: 'Replace your instructions?',
-                    message: 'Agnes AI will write new instructions and replace the text in all three sections. You can still reset before saving.',
+                    message: 'AI will write new instructions and replace the text in all three sections. You can still reset before saving.',
                     confirmLabel: 'Generate'
                 }).then(function (ok) { if (ok) { generateSops(); } });
             });
@@ -867,10 +865,6 @@
             var custom = (ctrl.values().personality === 'custom');
             toneRequired.hidden = !custom;
             $('#tone_description', form).required = custom;
-        }
-
-        function updateSwitchLabel() {
-            switchLabel.textContent = switchInput.checked ? 'Enabled' : 'Disabled';
         }
 
         function providerOf(modelId) {
@@ -912,7 +906,6 @@
             },
             onChange: function () {
                 updateToneRequirement();
-                updateSwitchLabel();
                 updateModelFields();
             }
         });
@@ -974,7 +967,6 @@
                 assistant_name: s.assistant_name || '',
                 personality: PERSONALITIES.indexOf(s.personality) === -1 ? 'friendly' : s.personality,
                 tone_description: s.tone_description || '',
-                is_enabled: s.is_enabled === undefined || s.is_enabled === null ? true : s.is_enabled,
                 system_instructions: hasSop ? output.value : '',
                 ai_model: model,
                 temperature: String(Math.round(temp * 10) / 10),
@@ -983,7 +975,6 @@
             }));
             ctrl.setSavedMeta(savedMetaText(s.updated_at, demo));
             updateToneRequirement();
-            updateSwitchLabel();
             updateModelFields();
         }
 
@@ -1014,7 +1005,7 @@
                 personality: values.personality,
                 tone_description: trimmed(values.tone_description),
                 system_instructions: values.system_instructions,
-                is_enabled: !!values.is_enabled,
+                is_enabled: true,   // the assistant is always on
                 ai_model: values.ai_model,
                 temperature: values.temperature,
                 reply_language: values.reply_language || 'auto'
@@ -1030,6 +1021,7 @@
                 ctrl.busy = false;
                 fill(data.ai_settings, !!data.demo);
                 toast('AI assistant settings saved.', 'success');
+                if (window.refreshSetupChecklist) { window.refreshSetupChecklist(); }
             }).catch(function (error) {
                 ctrl.saveFailed(error);
             }).then(function () {
