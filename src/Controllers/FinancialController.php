@@ -317,7 +317,7 @@ final class FinancialController
             json_response(false, null, $e->getMessage(), 422);
         }
 
-        json_response(true, $result, 'Filled by ' . $result['model'] . '. Please check every field.');
+        json_response(true, $result, 'Filled by AI. Please check every field.');
     }
 
     /* ---------------------------------------- old addresses (redirect) ---- */

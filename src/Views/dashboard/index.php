@@ -36,49 +36,49 @@ view('layouts/header', [
         <!-- EMAIL STATISTICS -->
         <section class="stats-grid" aria-label="Email statistics">
 
-            <div class="stat-card purlpe">
+            <a class="stat-card purlpe" href="#inbox" data-inbox-shortcut="all">
                 <div class="stat-icon">
                     <i class="fa-solid fa-envelope"></i>
                 </div>
                 <div class="stat-details">
-                    <h2 id="newEmailCount">24</h2>
+                    <h2 id="newEmailCount">—</h2>
                     <p>New emails</p>
                 </div>
                 <span class="stat-trend positive">↑ 28%</span>
-            </div>
+            </a>
 
-            <div class="stat-card blue">
+            <a class="stat-card blue" href="#inbox" data-inbox-shortcut="unread">
                 <div class="stat-icon">
                     <i class="fa-solid fa-star"></i>
                 </div>
                 <div class="stat-details">
-                    <h2 id="replyCount">5</h2>
+                    <h2 id="replyCount">—</h2>
                     <p>Need your reply</p>
                 </div>
                 <span class="stat-trend negative">↑ 2</span>
-            </div>
+            </a>
 
-            <div class="stat-card teal">
+            <a class="stat-card teal" href="#inbox" data-inbox-shortcut="meeting">
                 <div class="stat-icon">
                     <i class="fa-solid fa-calendar-days"></i>
                 </div>
                 <div class="stat-details">
-                    <h2 id="meetingCount">3</h2>
+                    <h2 id="meetingCount">—</h2>
                     <p>Meeting requests</p>
                 </div>
                 <span class="stat-trend positive">↑ 1</span>
-            </div>
+            </a>
 
-            <div class="stat-card yellow">
+            <a class="stat-card yellow" href="#inbox" data-inbox-shortcut="important">
                 <div class="stat-icon">
                     <i class="fa-solid fa-flag"></i>
                 </div>
                 <div class="stat-details">
-                    <h2 id="importantCount">7</h2>
+                    <h2 id="importantCount">—</h2>
                     <p>Important updates</p>
                 </div>
                 <span class="stat-trend warning">↑ 3</span>
-            </div>
+            </a>
 
         </section>
     </div>
@@ -121,17 +121,9 @@ view('layouts/header', [
 <div
     class="ai-bot-3d"
     id="aiBot3D"
-    data-chatbot-url="<?= e(url('chatbot')) ?>"
 >
     <div id="aiBotCanvas"></div>
 
-    <a
-        class="ai-bot-open"
-        id="aiBotOpen"
-        href="<?= e(url('chatbot')) ?>"
-        aria-label="Go to AI Assistant"
-        title="Chat with AI Assistant">
-    </a>
 </div>
 
 <div class="page-body" id="dashboardRoot"
@@ -528,7 +520,7 @@ function render() {
 
 
         <!-- ========== LEFT: INBOX ========== -->
-        <section class="inbox-panel">
+        <section class="inbox-panel" id="inbox" tabindex="-1">
 
             <div class="panel-header">
 
@@ -893,30 +885,6 @@ function render() {
                 <button type="button" class="secondary-btn" id="wpCreateFromEmail"><i class="fa-solid fa-list-check"></i> Add Email to Team To-Do</button>
             </div>
 
-            <!-- ========== SUGGESTED FOLLOW-UP (HUMAN APPROVAL) ========== -->
-            <section class="compact-followup">
-                <div class="followup-heading">
-                    <h3><i class="fa-solid fa-list-check"></i> Suggested Follow-up</h3>
-                    <button id="historyBtn" type="button">
-                        <i class="fa-solid fa-clock-rotate-left"></i> History
-                    </button>
-                </div>
-
-                <p id="suggestedAction">Select an email to view the suggested action.</p>
-
-                <div class="followup-footer">
-                    <span class="badge" id="approvalStatus">Pending Approval</span>
-
-                    <div class="workflow-buttons">
-                        <button class="primary-btn" id="approveTaskBtn" type="button">
-                            <i class="fa-solid fa-check"></i> Approve
-                        </button>
-                        <button class="secondary-btn" id="rejectTaskBtn" type="button">
-                            Dismiss
-                        </button>
-                    </div>
-                </div>
-            </section>
 
         </section>
 
@@ -1187,10 +1155,6 @@ space.addEventListener("pointerleave", () => {
     hover = false;
   });
 
-  bot.addEventListener("click", () => {
-    const url = bot.dataset.chatbotUrl;
-    if (url) window.location.href = url;
-  });
 
   function resize() {
     const width = Math.max(host.clientWidth, 1);

@@ -64,13 +64,13 @@ final class GmailController
     public function inbox(): void
     {
         $user   = require_login();
-        $result = (new GmailService())->inbox((int) $user['id']);
+        $result = (new GmailService())->inbox((int) $user['id'], GMAIL_MAX_RESULTS, (string) ($_GET['pageToken'] ?? ''));
 
         if (!$result['ok']) {
             json_response(false, ['reconnect' => $result['reconnect'] ?? false], $result['error'] ?? 'Gmail failed.', 502);
         }
 
-        json_response(true, ['emails' => $result['emails']], count($result['emails']) . ' emails loaded.');
+        json_response(true, ['emails' => $result['emails'], 'nextPageToken' => $result['nextPageToken'] ?? null], count($result['emails']) . ' emails loaded.');
     }
 
     /**

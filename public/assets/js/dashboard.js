@@ -319,6 +319,12 @@ document.addEventListener("DOMContentLoaded", () => {
        6. GMAIL DATA MAPPING
     ======================================================== */
 
+    let meetingOnly = false;
+    const meetingKeywords = /\b(?:meeting invitation|meeting request|schedule a meeting)\b/i;
+    const isImportant = email => Boolean(email.starred);
+    const receivedToday = email => email.timestamp > 0 &&
+        new Date(email.timestamp * 1000).toDateString() === new Date().toDateString();
+
     function categorise(text, isSpam = false) {
         if (isSpam) return "Spam";
 
@@ -408,7 +414,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 /\?/.test(text) &&
                 !mail.isSpam,
 
-            meeting: category === "Meeting",
+            meeting: Boolean(mail.meeting) || meetingKeywords.test(text),
             sent: Boolean(mail.sent),
 
             summaryLoaded: Boolean(mail.sent),
@@ -455,7 +461,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ).length,
 
             important: emails.filter(
-                email => email.important || email.starred
+                email => isImportant(email)
             ).length,
 
             sent: sentEmails.length,
@@ -469,13 +475,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const importantCount = $("importantCount");
 
         if (newCount) {
-            newCount.textContent = counts.unread;
+            newCount.textContent = emails.filter(receivedToday).length;
         }
 
         if (replyCount) {
             replyCount.textContent =
                 emails.filter(
-                    email => email.needsReply
+                    email => email.unread
                 ).length;
         }
 
@@ -537,12 +543,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 return false;
             }
 
+            if (meetingOnly && !email.meeting) return false;
+
             if (activeFilter === "unread") {
                 return email.unread;
             }
 
             if (activeFilter === "important") {
-                return email.important || email.starred;
+                return isImportant(email);
             }
 
             return true;
@@ -550,15 +558,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         filtered = [...filtered];
 
-        if (filtered.every(email => email.timestamp)) {
-            filtered.sort((a, b) =>
-                newestFirst
-                    ? b.timestamp - a.timestamp
-                    : a.timestamp - b.timestamp
-            );
-        } else if (!newestFirst) {
-            filtered.reverse();
-        }
+        filtered.sort((a, b) => newestFirst
+            ? (b.timestamp || 0) - (a.timestamp || 0)
+            : (a.timestamp || 0) - (b.timestamp || 0));
 
         if (filtered.length === 0) {
             emailList.innerHTML = `
@@ -754,8 +756,7 @@ document.addEventListener("DOMContentLoaded", () => {
             email.needsReply =
                 Boolean(data.needsReply);
 
-            email.meeting =
-                email.category === "Meeting";
+            // Keep deterministic meeting detection independent of the AI category.
 
             email.summaryMode =
                 data.mode || "placeholder";
@@ -958,7 +959,7 @@ document.addEventListener("DOMContentLoaded", () => {
        11. SHOW SELECTED EMAIL
     ======================================================== */
 
-    function showEmail(id) {
+    function showEmail(id, markRead = true) {
         const email = [...emails, ...sentEmails, ...spamEmails, ...trashEmails].find(
             item => item.id === id
         );
@@ -1012,7 +1013,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Update Gmail unread status through the backend.
         // Errors are handled by markEmailAsRead().
-        if (!sentView && email.unread) {
+        if (markRead && !sentView && email.unread) {
             void markEmailAsRead(email);
         }
 
@@ -1108,17 +1109,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         emails = Array.isArray(list) ? list : [];
 
-        activeFilter = "all";
-
-        document.querySelectorAll(".tab").forEach(tab => {
-            tab.classList.toggle(
-                "active",
-                tab.dataset.filter === "all"
-            );
-        });
+        // Preserve a shortcut/filter chosen while Gmail is loading.
 
         if (emails.length > 0) {
-            showEmail(emails[0].id);
+            showEmail(emails[0].id, false);
         } else {
             selectedEmailId = null;
 
@@ -1299,9 +1293,20 @@ function clearSelectedEmail() {
         }
 
         try {
-            const data = await requestJSON(
-                gmailInboxUrl
-            );
+            const data = { emails: [] };
+            let pageToken = "";
+            const seenTokens = new Set();
+            do {
+                const pageUrl = new URL(gmailInboxUrl, window.location.href);
+                if (pageToken) pageUrl.searchParams.set("pageToken", pageToken);
+                const page = await requestJSON(pageUrl.href);
+                data.emails.push(...(page.emails || []));
+                pageToken = page.nextPageToken || "";
+                if (pageToken && seenTokens.has(pageToken)) throw new Error("Gmail pagination repeated. Please sync again.");
+                seenTokens.add(pageToken);
+            } while (pageToken);
+            data.emails = [...new Map(data.emails.map(mail => [mail.id, mail])).values()];
+            data.emails.sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
 
             const incomingIds = (data.emails || [])
                 .map(mail => String(mail.id || ""))
@@ -1399,8 +1404,9 @@ function clearSelectedEmail() {
         }
     );
 
-    function activateFilter(filter) {
+    function activateFilter(filter, meetings = false) {
         activeFilter = filter;
+        meetingOnly = meetings;
 
         document.querySelectorAll(".tab").forEach(tab => {
             tab.classList.toggle(
@@ -1421,6 +1427,19 @@ function clearSelectedEmail() {
     document.querySelectorAll(".tab").forEach(tab => {
         tab.addEventListener("click", () => {
             activateFilter(tab.dataset.filter);
+        });
+    });
+
+    document.querySelectorAll("[data-inbox-shortcut]").forEach(card => {
+        card.addEventListener("click", event => {
+            event.preventDefault();
+            const filter = card.dataset.inboxShortcut;
+            searchQuery = "";
+            if ($("searchInput")) $("searchInput").value = "";
+            newestFirst = true;
+            activateFilter(filter === "meeting" ? "all" : filter, filter === "meeting");
+            $("inbox")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            $("inbox")?.focus({ preventScroll: true });
         });
     });
 

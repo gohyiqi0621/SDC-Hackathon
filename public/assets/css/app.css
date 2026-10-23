@@ -2316,7 +2316,28 @@ code {
 
 .auth-wrap .brand {
     justify-content: center;
-    padding-bottom: 22px;
+    gap: 12px;
+    padding: 4px 0 22px;
+    font-size: 22px;
+    line-height: 1.2;
+}
+
+.auth-brand-mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    overflow: hidden;
+}
+
+.auth-wrap .brand img {
+    width: 80px;
+    height: 80px;
+    max-width: none;
+    flex-shrink: 0;
+    border-radius: 0;
 }
 
 .auth-card {
