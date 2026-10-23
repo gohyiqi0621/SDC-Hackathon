@@ -85,6 +85,36 @@ final class Product
         return $stmt->fetch() ?: null;
     }
 
+    /**
+     * Active products and services for the invoice item picker, by category
+     * then name. With $ids, only those (used to price an invoice on the server).
+     *
+     * @param list<int>|null $ids
+     * @return array<int, array{id: int, name: string, sku: ?string, price: string, currency: string, category_name: string}>
+     */
+    public function forInvoicing(int $userId, ?array $ids = null): array
+    {
+        $sql    = "SELECT p.id, p.name, p.sku, p.price, p.currency, c.name AS category_name
+                     FROM products p
+                     JOIN product_categories c ON c.id = p.category_id AND c.user_id = p.user_id
+                    WHERE p.user_id = ? AND p.status = 'active'";
+        $params = [$userId];
+
+        if ($ids !== null) {
+            $ids = array_values(array_unique(array_map('intval', $ids)));
+            if ($ids === []) {
+                return [];
+            }
+            $sql   .= ' AND p.id IN (' . implode(', ', array_fill(0, count($ids), '?')) . ')';
+            $params = array_merge($params, $ids);
+        }
+
+        $stmt = Database::connection()->prepare($sql . ' ORDER BY LOWER(c.name), LOWER(p.name), p.id');
+        $stmt->execute($params);
+
+        return $stmt->fetchAll();
+    }
+
     public function skuExists(int $userId, string $sku, ?int $exceptId = null): bool
     {
         $sql    = 'SELECT 1 FROM products WHERE user_id = ? AND sku = ?';

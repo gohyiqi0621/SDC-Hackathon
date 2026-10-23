@@ -79,13 +79,13 @@ $logoMaxMb = 2;
 
                     <div class="field">
                         <div class="field-label-row">
-                            <label for="company_background">Company background</label>
+                            <label for="company_background">Company background *</label>
                             <span class="char-count" data-counter-for="company_background" aria-hidden="true"></span>
                         </div>
-                        <textarea id="company_background" name="company_background" rows="5" maxlength="3000"
-                                  placeholder="Optional: history, founding year, number of outlets, certifications, opening hours, service areas..."
+                        <textarea id="company_background" name="company_background" rows="5" maxlength="3000" required
+                                  placeholder="What the business does, history, founding year, number of outlets, certifications, opening hours, service areas..."
                                   aria-describedby="hint-company_background err-company_background"></textarea>
-                        <p class="field-hint" id="hint-company_background">Background facts the assistant can draw on when customers ask.</p>
+                        <p class="field-hint" id="hint-company_background">What your business does and background facts. Both assistants rely on it, and "Generate with AI" writes the instructions from it.</p>
                         <p class="field-error" id="err-company_background" data-error-for="company_background"></p>
                     </div>
 

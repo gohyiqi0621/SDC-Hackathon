@@ -1535,6 +1535,301 @@ code {
     grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
 }
 
+/* ---------- Create invoice popup: customer (left) + product picker (right) ---------- */
+
+.modal-body--invoice {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+}
+
+.modal-pane--side {
+    background: #fafaff;
+    border-right: 1px solid var(--line);
+}
+
+.modal-pane-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0 12px;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.modal-pane-title i {
+    color: var(--primary);
+}
+
+.modal-pane--side .modal-pane-title:not(:first-child) {
+    margin-top: 18px;
+}
+
+.modal-pane--items {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.picker-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.picker-head .modal-pane-title {
+    margin: 0;
+}
+
+.picker-filters {
+    display: flex;
+    flex: 1;
+    justify-content: flex-end;
+    gap: 8px;
+    min-width: 0;
+}
+
+.picker-category {
+    height: 36px;
+    max-width: 180px;
+    padding: 0 30px 0 12px;
+    border: 1px solid #e3e4f7;
+    border-radius: 10px;
+    background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23737b9b' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E") no-repeat right 11px center;
+    appearance: none;
+    font-size: 12px;
+    outline: none;
+}
+
+.picker-category:focus {
+    border-color: #9186ff;
+}
+
+.picker-search {
+    flex: 0 1 240px;
+}
+
+.picker-search input {
+    height: 36px;
+}
+
+.picker-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.picker-row {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) auto 78px 96px;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s;
+}
+
+.picker-row[hidden] {
+    display: none;
+}
+
+.picker-row:hover {
+    border-color: #d8d1ff;
+}
+
+.picker-row.is-picked {
+    border-color: #c9c2ff;
+    background: #f8f7ff;
+}
+
+.picker-row.is-disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.picker-check {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+}
+
+.picker-name strong {
+    display: block;
+    font-size: 13px;
+}
+
+.picker-name small {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.picker-currency-note {
+    color: var(--danger) !important;
+}
+
+.picker-name small[hidden] {
+    display: none;
+}
+
+.field .terms-custom {
+    margin-top: 8px;
+}
+
+.field .terms-custom[hidden] {
+    display: none;
+}
+
+.picker-price {
+    color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.picker-qty input {
+    width: 100%;
+    height: 34px;
+    padding: 0 8px;
+    border: 1px solid #e3e4f7;
+    border-radius: 8px;
+    background: white;
+    text-align: center;
+    outline: none;
+}
+
+.picker-qty input:disabled {
+    background: #f4f4fa;
+    color: #b3b6c9;
+}
+
+.picker-qty input:focus {
+    border-color: #9186ff;
+}
+
+.picker-total {
+    font-weight: 700;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.picker-empty {
+    padding: 30px 10px;
+}
+
+.picker-totals {
+    margin-top: auto;
+    padding-top: 12px;
+}
+
+.picker-totals dt small {
+    font-weight: 500;
+}
+
+.picker-totals .items-grand dd {
+    font-size: 16px;
+    font-weight: 800;
+    color: #4c43b8;
+}
+
+/* ---------- Payments popup ---------- */
+
+.modal--narrow {
+    width: min(760px, calc(100vw - 32px));
+    height: auto;
+    max-height: calc(100vh - 48px);
+}
+
+.modal-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 18px 26px 22px;
+}
+
+.pay-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.pay-summary > div {
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fafaff;
+}
+
+.pay-summary span {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.pay-summary strong {
+    font-size: 16px;
+}
+
+.pay-paid {
+    color: var(--success);
+}
+
+.pay-due {
+    color: #b3263f;
+}
+
+.pay-form {
+    margin-top: 4px;
+}
+
+.modal-scroll .modal-pane-title:not(:first-child) {
+    margin-top: 20px;
+}
+
+/* ---------- SST setting dialog ---------- */
+
+.confirm-icon--primary {
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+.sst-dialog {
+    width: min(440px, calc(100vw - 32px));
+    text-align: left;
+}
+
+.sst-dialog h3,
+.sst-dialog > form > p,
+.sst-dialog .confirm-icon {
+    text-align: center;
+}
+
+.sst-check {
+    margin: 4px 0 14px;
+    font-weight: 600;
+}
+
+@media (max-width: 860px) {
+    .modal-pane--side {
+        border-right: none;
+    }
+
+    .picker-row {
+        grid-template-columns: 22px minmax(0, 1fr) 64px;
+    }
+
+    .picker-price,
+    .picker-total {
+        grid-column: 2 / -1;
+    }
+
+    .pay-summary {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* ---------- AI auto-fill status (inside the popup) ---------- */
 
 .ai-fill {

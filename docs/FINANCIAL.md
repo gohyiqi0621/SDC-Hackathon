@@ -1,16 +1,43 @@
 # Financial module (Invoice & Claims)
 
-Read this before changing anything under Financial. It explains what exists,
-where it lives, and how the **printable invoice template** should plug in.
+Read this before changing anything under Financial. It explains the flow,
+what exists, and where it lives.
 
-## What exists
+The app is multi-company: every account is its own business with its own
+Company Profile, Products & Services, invoices and claims (everything is
+scoped by `user_id`).
+
+## The invoice flow
+
+```
+Setup (once)       Company Profile (name, SSM no., address, phone, email, bank)
+                   Products & Services (what the business sells, with prices)
+                   SST setting (Invoice page, Supervisor): registered? rate?
+
+Create invoice     popup: customer (suggested from earlier invoices)
+                   + tick products, set quantities (prices come from the catalog)
+                   "Save as draft"  -> status draft, no number, still editable
+                   "Create invoice" -> status unpaid, numbered INV-2026-0001
+
+Get paid           Supervisor records each payment (partial allowed)
+                   -> receipt RCPT-2026-0001, status partial -> paid
+
+Print              invoice PDF (any non-draft) and receipt PDF (each payment)
+```
+
+Invoices are **not uploaded** any more (that was the old flow). Older uploaded
+invoices still display, keep their file link, and cannot be edited.
+
+## Pages
 
 | Page | URL | What it does |
 |---|---|---|
-| Invoice | `?page=financial&action=invoice` | List (search, filter by type/status, sort, paginate) + **Upload invoice** popup |
-| Claims | `?page=financial&action=claims` | List + **New claim** popup, approve / reject / reimburse |
+| Invoice | `?page=financial&action=invoice` | List + **Create invoice** popup + **Payments** popup + SST setting |
+| Claims | `?page=financial&action=claims` | Staff expense claims: **New claim** popup (AI reads the receipt), approve / reject / reimburse |
 
-The old *Upload Invoice* and *Settlement* pages were removed; their URLs redirect.
+Popup URLs: `&new=1`, `&edit=N` (draft, or unpaid for a Supervisor),
+`&from_order=N` (filled from an order; the Orders page has an "Invoice" button),
+`&payments=N`.
 
 ### Roles (Financial pages only)
 
@@ -20,49 +47,56 @@ in `src/Support/helpers.php`.
 
 | | User | Supervisor |
 |---|---|---|
-| View lists, open files | yes | yes |
-| Upload invoice / submit claim | yes (confirm popup; cannot change it afterwards) | yes |
-| Edit, delete, mark paid, approve / reject / reimburse | no (server returns 403) | yes |
-| **Print invoice** | **yes** | **yes** |
+| Create invoices, save / edit drafts | yes (confirm popup before "Create") | yes |
+| Print invoices and receipts, view payments | yes | yes |
+| Record payments (receipts) | no | yes |
+| Edit an unpaid invoice with no payments | no | yes |
+| Delete a draft / an unpaid invoice with no payments | no | yes |
+| Delete anything that has payments | no | **no** (money history is kept) |
+| SST setting | no | yes |
+| Claims: submit | yes | yes |
+| Claims: edit, approve / reject / reimburse, delete | no | yes |
 
 ## Data model (PostgreSQL)
 
-Migrations: `database/migrations/005_create_invoices.sql`, `006_create_claims.sql`,
-`016_add_invoice_details_and_items.sql`, `018_reconcile_invoice_items_print_columns.sql`
-(all also in `database/all_migrations.sql`).
-After pulling, run: `C:\xampp\php\php.exe bin\migrate.php`
+Migrations: `005_create_invoices`, `006_create_claims`, `016_add_invoice_details_and_items`,
+`018_reconcile_invoice_items_print_columns`, `022_invoice_create_flow_and_receipts`
+(also in `database/all_migrations.sql`). After pulling run:
+`C:\xampp\php\php.exe bin\migrate.php`
 
-### `invoices` (one row per invoice, owned by `user_id`)
+### `invoices`
 
 | Column | Notes |
 |---|---|
-| `type` | `purchase` (a supplier billed us) or `sales` (we billed a customer) |
-| `invoice_number` | unique per user, case-insensitive |
-| `party_name`, `party_address`, `party_phone` | the supplier (purchase) or customer (sales) |
-| `payment_terms` | e.g. "Net 45 days" |
-| `reference_no` | PO / GRN number |
-| `issue_date`, `due_date` | |
-| `subtotal` | sum of item amounts; **NULL when the invoice has no items** (total only) |
-| `discount_amount`, `sst_rate` (%), `sst_amount` | invoice-level |
-| `amount` | **grand total** = subtotal - discount_amount + sst_amount |
-| `currency` | MYR, SGD, USD, ... |
-| `status` | `unpaid` / `partial` / `paid` |
-| `notes` | |
-| `file_path`, `file_name`, `file_mime`, `file_size` | the uploaded original (PDF / image), stored privately in `storage/uploads/invoices/<user>/` |
+| `status` | `draft` / `unpaid` / `partial` / `paid` |
+| `invoice_number` | NULL for drafts; `INV-<year>-<0001>` per company when created |
+| `type` | `sales` for everything created now (`purchase` only on old uploads) |
+| `party_name`, `party_address`, `party_phone` | the customer |
+| `payment_terms`, `reference_no`, `issue_date`, `due_date`, `notes` | |
+| `subtotal`, `sst_rate`, `sst_amount`, `amount` | `amount` = subtotal + SST (grand total); SST rate copied from the setting when saved |
+| `amount_paid` | sum of its receipts |
+| `order_id` | the order it was made from (one invoice per order) |
+| `issued_at` | when it was created (left draft) |
 
-### `invoice_items` (the lines; `ON DELETE CASCADE` with the invoice)
+### `invoice_items`
 
-`position`, `sku`, `description`, `uom`, `quantity`, `unit_price`, `discount`, `amount`
-(`amount` = quantity x unit_price - discount). Ordered by `position`.
+`product_id`, `sku`, `description`, `quantity`, `unit_price`, `amount`
+(+ `uom`, `discount`, unused now). Name, SKU and price are **copied** from the
+product, so later price changes never alter a sent invoice.
 
-All totals are recalculated on the server (`InvoiceService::validate`); never
-trust totals sent from the browser.
+### `receipts`
 
-### Our own company (template header)
+One row per payment: `receipt_number` (`RCPT-<year>-<0001>`), `amount`,
+`payment_date`, `method` (cash / bank_transfer / duitnow / card / cheque / other),
+`reference`, `notes`. Never edited or deleted. `invoices.id` is `ON DELETE RESTRICT`.
 
-`company_profiles` currently has `company_name`, `company_logo_url`,
-`company_description` only. **Address, SSM registration no., phone, email and
-website are not stored yet** - add them there if the template needs them.
+### `document_counters`, `finance_settings`
+
+Running numbers per company / kind / year (one atomic UPSERT), and the
+company's SST setting (`sst_registered`, `sst_rate`).
+
+All totals are calculated on the server (`InvoiceService::validate`): the
+browser sends only `lines[<product id>] = quantity`.
 
 ## Where the code is
 
@@ -71,61 +105,31 @@ website are not stored yet** - add them there if the template needs them.
 | Routes | `src/routes.php` (section "financial") |
 | Invoice controller | `src/Controllers/FinancialController.php` |
 | Claims controller | `src/Controllers/ClaimController.php` |
-| Queries | `src/Models/Invoice.php`, `src/Models/InvoiceItem.php`, `src/Models/Claim.php` |
+| Models | `Invoice`, `InvoiceItem`, `Receipt`, `DocumentCounter`, `FinanceSetting`, `Claim` (`src/Models/`) |
 | Validation + totals | `src/Services/InvoiceService.php`, `src/Services/ClaimService.php` |
-| Private file storage | `src/Services/PrivateFiles.php` |
+| Invoice PDF | `src/Services/InvoicePdfService.php` (template owner) |
+| Receipt PDF | `src/Services/InvoiceReceiptPdf.php` (tFPDF, same look as the orders' official receipt) |
+| Company details for PDFs | `company()` in `src/Support/helpers.php` = the user's Company Profile, `src/company.php` fills gaps |
 | Invoice list | `src/Views/financial/invoice.php` |
-| Upload popup | `src/Views/financial/_invoice_modal.php` + `_invoice_items.php` |
+| Create popup | `src/Views/financial/_invoice_modal.php` |
+| Payments popup | `src/Views/financial/_payments_modal.php` |
 | Claims list / popup | `src/Views/financial/claims.php`, `_claim_modal.php` |
-| JS (popups, items, money format) | `public/assets/js/app.js` sections 15-18 |
+| JS | `public/assets/js/app.js`: 15 popups, 16 file preview, 17 submit confirm + intent buttons, 18 product picker + customer suggestions, 19 AI receipt reading |
 
-## Printing an invoice (to be built)
+## AI auto-fill (Claims only)
 
-Decision: **browser print**, no PDF library. An HTML page styled with the
-company template; it opens in a new tab and calls `window.print()`, and the
-user chooses **Save as PDF**. Nothing is stored: the page is rebuilt from the
-database every time, so it is always up to date.
+Choosing a receipt in the New claim popup reads it with AI and fills the form
+(title, date, amount, currency, category). Fields the user already typed are
+kept; "Read again" overwrites. Nothing is saved until the user submits.
 
-Suggested wiring (both roles may print):
-
-1. **Route** in `src/routes.php`:
-   `$router->get('financial/print', [FinancialController::class, 'print'], $auth);`
-2. **Controller method** `print()` in `FinancialController`:
-   ```php
-   $user    = require_login();
-   $invoice = $this->ownedOr404($user, (int) ($_GET['id'] ?? 0));   // ownership check
-   $items   = (new InvoiceItem())->forInvoice((int) $invoice['id']);
-   // + the company profile for the header
-   view('financial/print', ['invoice' => $invoice, 'items' => $items, /* company */]);
-   ```
-   Do **not** use `require_supervisor()` here - users can print too.
-3. **View** `src/Views/financial/print.php`: a standalone page (do not use
-   `layouts/header`), A4 `@media print` CSS, title "PURCHASE INVOICE" or
-   "INVOICE" from `$invoice['type']`, items table, totals, amount in words.
-   Escape every value with `e()`.
-4. **Button**: in `src/Views/financial/invoice.php` there is a comment
-   `PRINT BUTTON (template owner)` inside the actions cell - put the button
-   there (before the Supervisor-only buttons).
-
-Invoices saved without items (total only) have `subtotal = NULL` and no rows
-in `invoice_items`; the template should still print (show the total only).
-
-## AI auto-fill
-
-Choosing a file in the invoice or claim popup reads it with AI and fills the
-form (header, items, totals / claim title, date, amount, category). Fields the
-user already typed are kept; "Read again" overwrites. Nothing is saved until
-the user submits, and the server still validates and recalculates everything.
-
-- Browser (`app.js` section 19): PDF pages are rendered to images with pdf.js
-  (cdnjs, loaded only when needed, max 4 pages); photos are shrunk to 1600px.
+- Browser (`app.js` section 19): PDF pages rendered to images with pdf.js
+  (cdnjs, max 4 pages); photos shrunk to 1600px.
 - Server: `POST ?page=financial&action=extract` -> `src/Services/DocumentExtractService.php`.
-- Which AI: the model + key saved in **AI Settings (Staff assistant first,
-  then Customer assistant)**; otherwise `AGNES_API_KEY` from `.env` (testing).
-  Claude Haiku 5.5 uses structured JSON output at low effort; Agnes / GPT use
-  the OpenAI-style chat API. DeepSeek cannot read images.
+- Which AI: the model + key saved in AI Settings (Staff first, then Customer);
+  otherwise `ANTHROPIC_API_KEY` (Claude Haiku 5.5) or `AGNES_API_KEY` from `.env`.
 - Limit: 40 reads per hour per session.
 
 ## Planned next
 
 - Optional: printable "claim voucher" for reimbursed claims.
+- Optional (not decided): editable prices / custom items on an invoice.

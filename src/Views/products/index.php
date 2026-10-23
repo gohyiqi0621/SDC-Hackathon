@@ -236,7 +236,8 @@ $to        = min($total, $page * $perPage);
         <p class="field-error" data-import-error></p>
 
         <div class="import-template" style="margin-top:8px;font-size:12px">
-            <a href="<?= e(url('products', ['action' => 'import_template'])) ?>"><i class="fa-solid fa-download"></i> Download a template</a>
+            <a href="<?= e(url('products', ['action' => 'import_template'])) ?>"><i class="fa-solid fa-download"></i> Download the CSV template</a>
+            <span class="muted"> &middot; Promotional prices are not imported; add them to each product after importing.</span>
         </div>
     </section>
 

@@ -68,19 +68,19 @@ final class SopGeneratorService
             ], json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), self::TIMEOUT);
         } catch (RuntimeException $e) {
             error_log('[sop] ' . $e->getMessage());
-            throw new RuntimeException('Could not reach Agnes AI. Check the internet connection and try again.');
+            throw new RuntimeException('Could not reach the AI service. Check the internet connection and try again.');
         }
 
         if ($response['status'] === 401 || $response['status'] === 403) {
-            throw new RuntimeException('Agnes AI rejected the API key. Check AGNES_API_KEY in .env (or the saved Agnes key).');
+            throw new RuntimeException('The AI service rejected the API key. Check the key in the server settings.');
         }
         if ($response['status'] === 429) {
-            throw new RuntimeException('Agnes AI is busy or the usage limit was reached. Try again in a minute.');
+            throw new RuntimeException('The AI service is busy or the usage limit was reached. Try again in a minute.');
         }
         if ($response['status'] < 200 || $response['status'] >= 300) {
             $detail = is_array($response['json']) ? (string) ($response['json']['error']['message'] ?? '') : '';
             error_log('[sop] Agnes HTTP ' . $response['status'] . ($detail !== '' ? ': ' . $detail : ''));
-            throw new RuntimeException('Agnes AI could not generate the SOPs (HTTP ' . $response['status'] . ').' . (APP_DEBUG && $detail !== '' ? ' ' . $detail : ''));
+            throw new RuntimeException('The instructions could not be generated (HTTP ' . $response['status'] . ').' . (APP_DEBUG && $detail !== '' ? ' ' . $detail : ''));
         }
 
         $choice = is_array($response['json']) ? ($response['json']['choices'][0] ?? []) : [];
@@ -93,7 +93,7 @@ final class SopGeneratorService
             error_log('[sop] could not read Agnes answer (finish_reason=' . (string) ($choice['finish_reason'] ?? '?') . '): '
                 . ($text !== '' ? mb_substr($text, 0, 3000) : '(empty) raw=' . mb_substr($response['raw'], 0, 1500)));
             if (($choice['finish_reason'] ?? '') === 'length') {
-                throw new RuntimeException('Agnes AI stopped before finishing the SOPs. Please try again.');
+                throw new RuntimeException('The AI stopped before finishing the instructions. Please try again.');
             }
             throw $e;
         }
@@ -138,7 +138,7 @@ final class SopGeneratorService
             }
         }
 
-        throw new RuntimeException('No Agnes AI key. Add AGNES_API_KEY=... to .env, or choose Agnes 2.5 Flash as the AI model and save your Agnes key.');
+        throw new RuntimeException('Generate with AI is not set up on this server yet (no AI key). Write the instructions yourself, or ask the administrator to add the key.');
     }
 
     private function instructions(): string
@@ -221,7 +221,7 @@ TXT;
         $items = $this->jsonItems($text) ?? $this->textItems($text);
 
         if (!is_array($items) || $items === []) {
-            throw new RuntimeException('Agnes AI sent an answer in an unexpected format. Please try again.');
+            throw new RuntimeException('The AI sent an answer in an unexpected format. Please try again.');
         }
 
         $bySlot = [];
@@ -254,7 +254,7 @@ TXT;
                 }
             }
             if (count($steps) < self::STEPS) {
-                throw new RuntimeException('Agnes AI returned an incomplete SOP. Please try again.');
+                throw new RuntimeException('The AI returned an incomplete instruction. Please try again.');
             }
 
             $title = trim((string) preg_replace('/\s+/u', ' ', (string) ($item['title'] ?? $item['name'] ?? '')));
@@ -268,7 +268,7 @@ TXT;
         }
 
         if (count($bySlot) !== count(self::SLOTS)) {
-            throw new RuntimeException('Agnes AI did not return all three SOPs. Please try again.');
+            throw new RuntimeException('The AI did not return all three instructions. Please try again.');
         }
 
         return array_values(array_map(static fn (string $slot): array => $bySlot[$slot], array_keys(self::SLOTS)));

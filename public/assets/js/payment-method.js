@@ -93,6 +93,7 @@
                 status.textContent = p.summary ? 'Set' : 'Not set';
                 status.classList.toggle('is-set', !!p.summary);
                 toast('Payment method saved.', 'success');
+                if (window.refreshSetupChecklist) { window.refreshSetupChecklist(); }
             })
             .catch(function () { toast('Network error. Please try again.', 'error'); })
             .then(function () { save.disabled = false; });

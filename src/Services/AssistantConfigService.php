@@ -118,7 +118,7 @@ final class AssistantConfigService
 
         return [
             'user_id'            => $userId,
-            'enabled'            => !empty($assistant) && $this->isTrue($assistant['is_enabled'] ?? true),
+            'enabled'            => !empty($assistant),   // always on once saved (no on/off switch)
             'problems'           => $problems,
             'assistant_name'     => trim((string) ($assistant['assistant_name'] ?? '')) ?: 'Assistant',
             'personality'        => $personality,
