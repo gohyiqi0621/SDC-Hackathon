@@ -24,8 +24,6 @@ $today     = date('Y-m-d');
 
 <div class="page-body">
 
-    <?php require __DIR__ . '/_tabs.php'; ?>
-
     <section class="stats-grid stats-grid--3">
         <div class="stat-card blue">
             <div class="stat-icon"><i class="fa-solid fa-file-invoice"></i></div>

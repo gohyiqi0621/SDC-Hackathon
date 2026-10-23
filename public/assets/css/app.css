@@ -2220,6 +2220,8 @@ code {
     gap: 10px;
 }
 
+.page-tabs-row .role-switch { margin-left: auto; }
+
 .role-switch {
     display: inline-flex;
     align-items: center;
