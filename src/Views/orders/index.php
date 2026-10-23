@@ -284,14 +284,14 @@ $active = array_filter([
                                         <?php if ($st === 'payment_submitted' && $hasReceipt): ?>
                                             <form method="post" action="<?= e(url('orders', ['action' => 'approve'])) ?>"
                                                   data-confirm="Mark <?= e($order['order_no']) ?> as Payment successful and tell the customer &quot;Payment verified&quot; on Telegram?"
-                                                  data-confirm-title="Approve payment?" data-confirm-ok="Approve">
+                                                  data-confirm-title="Approve payment?" data-confirm-ok="Approve" data-confirm-tone="primary">
                                                 <?= csrf_field() ?>
                                                 <input type="hidden" name="id" value="<?= $id ?>">
                                                 <input type="hidden" name="return" value="<?= e($listUrl) ?>">
                                                 <button class="order-btn order-btn--approve" type="submit"><i class="fa-solid fa-check" aria-hidden="true"></i> Approve</button>
                                             </form>
                                             <details class="order-reject">
-                                                <summary class="order-btn order-btn--ghost"><i class="fa-solid fa-xmark" aria-hidden="true"></i> Reject</summary>
+                                                <summary class="order-btn order-btn--reject"><i class="fa-solid fa-xmark" aria-hidden="true"></i> Reject</summary>
                                                 <form method="post" action="<?= e(url('orders', ['action' => 'reject'])) ?>">
                                                     <?= csrf_field() ?>
                                                     <input type="hidden" name="id" value="<?= $id ?>">
@@ -304,7 +304,7 @@ $active = array_filter([
                                         <?php elseif ($st === 'paid'): ?>
                                             <form method="post" action="<?= e(url('orders', ['action' => 'ship'])) ?>"
                                                   data-confirm="Mark <?= e($order['order_no']) ?> as Shipped and tell the customer on Telegram?"
-                                                  data-confirm-title="Mark as shipped?" data-confirm-ok="Mark as shipped">
+                                                  data-confirm-title="Mark as shipped?" data-confirm-ok="Mark as shipped" data-confirm-tone="primary">
                                                 <?= csrf_field() ?>
                                                 <input type="hidden" name="id" value="<?= $id ?>">
                                                 <input type="hidden" name="return" value="<?= e($listUrl) ?>">
@@ -338,9 +338,9 @@ $active = array_filter([
                                             <span class="order-wait order-wait--done">Closed</span>
                                         <?php endif; ?>
                                         <?php if (!in_array($st, ['cancelled', 'payment_rejected'], true)): ?>
-                                            <!-- Financial > Invoice: opens the create popup filled from this order (one invoice per order). -->
+                                            <!-- Financial > Invoice: opens this order's invoice (made automatically when the order is placed). -->
                                             <a class="order-btn order-btn--doc" href="<?= e(url('financial', ['action' => 'invoice', 'from_order' => $id])) ?>"
-                                               title="Create an invoice from this order"><i class="fa-solid fa-file-invoice" aria-hidden="true"></i> Invoice</a>
+                                               title="Open the invoice of this order"><i class="fa-solid fa-file-invoice" aria-hidden="true"></i> Invoice</a>
                                         <?php endif; ?>
                                         <?php if ($canCancel): ?>
                                             <form method="post" action="<?= e(url('orders', ['action' => 'cancel'])) ?>"

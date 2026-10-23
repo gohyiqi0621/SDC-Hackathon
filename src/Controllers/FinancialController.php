@@ -317,7 +317,7 @@ final class FinancialController
             json_response(false, null, $e->getMessage(), 422);
         }
 
-        json_response(true, $result, 'Filled by ' . $result['model'] . '. Please check every field.');
+        json_response(true, $result, 'Filled by AI. Please check every field.');
     }
 
     /* ---------------------------------------- old addresses (redirect) ---- */
@@ -421,9 +421,8 @@ final class FinancialController
 
         $existing = (new Invoice())->findByOrder($userId, $orderId);
         if ($existing !== null) {
-            flash('info', 'Order ' . $order['order_no'] . ' is already invoiced as '
-                . ($existing['invoice_number'] ?: 'a draft') . '.', 'Already invoiced');
-            return null;
+            // Created automatically with the order: open it (with its payments).
+            redirect(url('financial', ['action' => 'invoice', 'payments' => (int) $existing['id']]));
         }
 
         $lines   = [];

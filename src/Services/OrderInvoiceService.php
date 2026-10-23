@@ -1,0 +1,142 @@
+<?php
+/**
+ * OrderInvoiceService.php - the invoice that goes with a customer order.
+ *
+ *   order placed (buy_product)        -> invoice created, status Unpaid
+ *   bank reference approved by staff  -> payment recorded, invoice Paid
+ *   order cancelled / replaced        -> its unpaid invoice is removed
+ *
+ * The invoice uses the order's own lines and prices (what the customer was
+ * quoted), so its total always equals the order total. No SST is added on
+ * top, because the customer pays the order total.
+ *
+ * Every method is best effort: an invoice problem is logged and never stops
+ * the order itself (the customer is already chatting about it).
+ */
+declare(strict_types=1);
+
+namespace Src\Services;
+
+use Src\Models\Invoice;
+use Src\Models\Order;
+use Src\Models\Receipt;
+use Src\Support\Database;
+use Src\Support\FlowLog;
+use Throwable;
+
+final class OrderInvoiceService
+{
+    /** Create the Unpaid invoice of an order (once). Returns the invoice, or null if it could not be made. */
+    public function createFor(int $userId, array $order): ?array
+    {
+        try {
+            $invoices = new Invoice();
+            $existing = $invoices->findByOrder($userId, (int) $order['id']);
+            if ($existing !== null) {
+                return $existing;
+            }
+
+            $items = [];
+            foreach ((new Order())->items((int) $order['id']) as $item) {
+                $items[] = [
+                    'product_id'  => $item['product_id'] !== null ? (int) $item['product_id'] : null,
+                    'sku'         => ($item['sku'] ?? '') !== '' ? (string) $item['sku'] : null,
+                    'description' => mb_substr((string) $item['product_name'], 0, 255),
+                    'uom'         => null,
+                    'quantity'    => (string) $item['quantity'],
+                    'unit_price'  => number_format((float) $item['unit_price'], 2, '.', ''),
+                    'discount'    => '0.00',
+                    'amount'      => number_format((float) $item['line_total'], 2, '.', ''),
+                ];
+            }
+            if ($items === []) {
+                return null;
+            }
+
+            $currency = strtoupper((string) ($order['currency'] ?: 'MYR'));
+            $total    = number_format((float) $order['total'], 2, '.', '');
+            $username = trim((string) ($order['customer_username'] ?? ''));
+
+            $id = $invoices->create($userId, [
+                'party_name'      => mb_substr(trim((string) ($order['customer_name'] ?? '')) ?: ($username !== '' ? '@' . $username : 'Telegram customer'), 0, 200),
+                'party_address'   => null,
+                'party_phone'     => ($order['customer_phone'] ?? '') !== '' ? mb_substr((string) $order['customer_phone'], 0, 50) : null,
+                'payment_terms'   => 'Due on receipt',
+                'reference_no'    => (string) $order['order_no'],
+                'issue_date'      => date('Y-m-d'),
+                'due_date'        => date('Y-m-d'),
+                'subtotal'        => $total,
+                'discount_amount' => '0.00',
+                'sst_rate'        => '0.00',
+                'sst_amount'      => '0.00',
+                'amount'          => $total,
+                'currency'        => in_array($currency, Invoice::CURRENCIES, true) ? $currency : 'MYR',
+                'notes'           => ($order['delivery_note'] ?? '') !== '' ? (string) $order['delivery_note'] : null,
+                'order_id'        => (int) $order['id'],
+                'items'           => $items,
+            ], true);
+
+            $invoice = $invoices->find($userId, $id);
+            FlowLog::write('invoice.from_order', ['order_no' => $order['order_no'], 'invoice' => $invoice['invoice_number'] ?? null]);
+
+            return $invoice;
+        } catch (Throwable $e) {
+            error_log('[invoice] order ' . ($order['order_no'] ?? '?') . ': ' . $e->getMessage());
+            FlowLog::write('invoice.from_order_error', ['order_no' => $order['order_no'] ?? null, 'error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
+    /** The bank reference was approved: record the payment, so the invoice becomes Paid. */
+    public function markPaid(int $userId, array $order): ?array
+    {
+        try {
+            $invoice = $this->createFor($userId, $order);
+            if ($invoice === null || !in_array($invoice['status'], ['unpaid', 'partial'], true)) {
+                return $invoice;
+            }
+
+            $balance = round((float) $invoice['amount'] - (float) $invoice['amount_paid'], 2);
+            if ($balance > 0) {
+                (new Receipt())->record($userId, (int) $invoice['id'], [
+                    'amount'       => number_format($balance, 2, '.', ''),
+                    'payment_date' => date('Y-m-d'),
+                    'method'       => 'bank_transfer',
+                    'reference'    => mb_substr((string) $order['order_no'], 0, 100),
+                    'notes'        => 'Bank reference verified for order ' . $order['order_no'] . '.',
+                ]);
+            }
+
+            $invoice = (new Invoice())->find($userId, (int) $invoice['id']);
+            FlowLog::write('invoice.paid_from_order', ['order_no' => $order['order_no'], 'invoice' => $invoice['invoice_number'] ?? null]);
+
+            return $invoice;
+        } catch (Throwable $e) {
+            error_log('[invoice] mark paid, order ' . ($order['order_no'] ?? '?') . ': ' . $e->getMessage());
+            FlowLog::write('invoice.paid_from_order_error', ['order_no' => $order['order_no'] ?? null, 'error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
+    /** Orders that were cancelled: remove their invoices that have no payments yet. */
+    public function removeFor(int $userId, array $orderNos): void
+    {
+        $orderNos = array_values(array_filter(array_map('strval', $orderNos)));
+        if ($orderNos === []) {
+            return;
+        }
+
+        try {
+            $marks = implode(',', array_fill(0, count($orderNos), '?'));
+            $stmt  = Database::connection()->prepare(
+                "DELETE FROM invoices
+                  WHERE user_id = ? AND status IN ('draft', 'unpaid') AND amount_paid = 0
+                    AND order_id IN (SELECT id FROM orders WHERE user_id = ? AND order_no IN ($marks))
+                    AND NOT EXISTS (SELECT 1 FROM receipts r WHERE r.invoice_id = invoices.id)"
+            );
+            $stmt->execute(array_merge([$userId, $userId], $orderNos));
+        } catch (Throwable $e) {
+            error_log('[invoice] remove for cancelled orders: ' . $e->getMessage());
+        }
+    }
+}

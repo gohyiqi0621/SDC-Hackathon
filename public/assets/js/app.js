@@ -1072,7 +1072,7 @@
                 if (filled === 0) {
                     status('warn', 'AI found nothing new to fill. Please type the details.');
                 } else {
-                    status('ok', 'Filled ' + filled + ' field' + (filled === 1 ? '' : 's') + ' with ' + result.data.model + '. Please check every field.');
+                    status('ok', 'Filled ' + filled + ' field' + (filled === 1 ? '' : 's') + ' with AI. Please check every field.');
                 }
             }).catch(function (err) {
                 status('error', (err && err.message ? err.message : 'AI could not read this file.') + ' You can still type the details.');

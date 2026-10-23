@@ -194,8 +194,11 @@
     white-space: nowrap; cursor: pointer; list-style: none; transition: background-color .15s, border-color .15s, color .15s;
 }
 .order-btn::-webkit-details-marker { display: none; }
-.order-btn--approve { background: var(--success); color: #fff; }
-.order-btn--approve:hover { background: #0f8d5c; }
+.order-btn--approve { background: #6255f5; color: #fff; }
+.order-btn--approve:hover { background: var(--primary-dark); }
+/* Red is only for reject / cancel / delete. */
+.order-btn--reject { border-color: #ffc4cf; background: #fff; color: var(--danger); }
+.order-btn--reject:hover { border-color: var(--danger); background: var(--danger); color: #fff; }
 .order-btn--ship { background: var(--primary); color: #fff; }
 .order-btn--ship:hover { background: var(--primary-dark); }
 .order-btn--ghost { border-color: var(--border); background: #fff; color: var(--text-soft); }
@@ -207,7 +210,7 @@
 .order-wait--done { color: #a3a8c3; }
 
 .order-reject { position: relative; }
-.order-reject[open] > summary { border-color: #ffc4cf; color: var(--danger); }
+.order-reject[open] > summary { border-color: var(--danger); background: var(--danger); color: #fff; }
 .order-reject form {
     position: absolute; top: calc(100% + 6px); right: 0; z-index: 20;
     display: grid; gap: 8px; width: 260px; padding: 14px;
