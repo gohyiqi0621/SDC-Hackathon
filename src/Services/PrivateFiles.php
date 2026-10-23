@@ -88,7 +88,10 @@ final class PrivateFiles
             error_log('[' . $this->folder . '] could not move upload to ' . $relative);
             return null;
         }
-        FileBackup::save('private', $relative, $mime);   // survives a redeploy
+        if (!FileBackup::save('private', $relative, $mime)) {
+            @unlink($this->root() . '/' . $relative);
+            return null;
+        }
 
         return [
             'file_path' => $relative,
@@ -128,7 +131,10 @@ final class PrivateFiles
             error_log('[' . $this->folder . '] could not write ' . $relative);
             return null;
         }
-        FileBackup::save('private', $relative, $mime);
+        if (!FileBackup::save('private', $relative, $mime)) {
+            @unlink($this->root() . '/' . $relative);
+            return null;
+        }
 
         return [
             'file_path' => $relative,

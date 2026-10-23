@@ -178,9 +178,17 @@ final class AiSettingsController
             $model    = new CompanyProfile();
             $existing = $model->find($userId);
             $oldLogo  = $existing['company_logo_url'] ?? null;
-            $newLogo  = $this->hasUpload($file) ? $this->storeLogo($userId, $file) : null;
             $oldQr    = $existing['payment_qr_url'] ?? null;
-            $newQr    = $this->hasUpload($qrFile) ? $this->storeLogo($userId, $qrFile) : null;
+            $newLogo  = null;
+            $newQr    = null;
+            try {
+                $newLogo = $this->hasUpload($file) ? $this->storeLogo($userId, $file) : null;
+                $newQr   = $this->hasUpload($qrFile) ? $this->storeLogo($userId, $qrFile) : null;
+            } catch (RuntimeException $e) {
+                $this->deleteLogo($userId, $newLogo);
+                $this->deleteLogo($userId, $newQr);
+                throw $e;
+            }
             $qr       = !empty($_POST['remove_payment_qr']) ? null : $oldQr;
             if ($newQr !== null) {
                 $qr = $newQr;
@@ -1114,7 +1122,10 @@ final class AiSettingsController
         if (!move_uploaded_file((string) $file['tmp_name'], PUBLIC_ROOT . '/' . $relative)) {
             throw new RuntimeException('Could not save the logo on the server.');
         }
-        \Src\Support\FileBackup::save('public', $relative, $mime);   // survives a redeploy
+        if (!\Src\Support\FileBackup::save('public', $relative, $mime)) {
+            @unlink(PUBLIC_ROOT . '/' . $relative);
+            throw new RuntimeException('Image storage is temporarily unavailable. Please try again later.');
+        }
 
         return $relative;
     }

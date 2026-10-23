@@ -589,6 +589,14 @@ CREATE TABLE IF NOT EXISTS file_backups (
 ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_status_check;
 ALTER TABLE invoices ADD CONSTRAINT invoices_status_check
     CHECK (status IN ('draft', 'unpaid', 'partial', 'paid', 'voided'));
+
+-- 024: login sessions in the database (src/Support/DbSessionHandler.php), so a restart / redeploy does not sign users out.
+CREATE TABLE IF NOT EXISTS app_sessions (
+    id          VARCHAR(128) PRIMARY KEY,
+    data        TEXT         NOT NULL DEFAULT '',
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS app_sessions_updated_idx ON app_sessions (updated_at);
 COMMIT;
 
 -- ----------------------------------------------------------------------------
@@ -597,7 +605,7 @@ COMMIT;
 --   SELECT table_name FROM information_schema.tables
 --    WHERE table_schema = 'public' ORDER BY table_name;
 --
--- Expected (22): ai_assistant_settings, bookings, chat_messages, claims,
+-- Expected (23): ai_assistant_settings, app_sessions, bookings, chat_messages, claims,
 -- company_profiles, document_counters, finance_settings, gmail_connections,
 -- file_backups, google_calendar_integrations, invoice_items, receipts,
 -- invoices, order_items, orders, password_resets, product_categories, products,
