@@ -6,7 +6,7 @@ view('layouts/header', ['title' => 'Forgot password', 'bare' => true]);
     <div class="auth-icon"><i class="fa-regular fa-envelope"></i></div>
     <h1>Forgot your password?</h1>
     <p class="auth-sub">
-        Enter the email address on your account and we will send you a reset link.
+        If the address matches an account, we will send a reset link.
         The link works once and expires in <?= (int) \Src\Models\PasswordReset::TTL_MINUTES ?> minutes.
     </p>
 

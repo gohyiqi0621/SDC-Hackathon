@@ -250,10 +250,10 @@ final class ToolController
             $this->json(500, ['success' => false, 'error' => 'The order could not be saved. Run the database migrations (009) and try again.']);
         }
 
-        // Financial > Invoice: the order's invoice (Unpaid); cancelled orders lose theirs.
+        // Financial > Invoice: the order's invoice (Unpaid); cancelled order invoices are voided, not erased.
         $invoiceService = new OrderInvoiceService();
         $invoice        = $invoiceService->createFor($userId, $order);
-        $invoiceService->removeFor($userId, $replaced);
+        $invoiceService->cancelForOrders($userId, $replaced);
 
         $company      = (new CompanyProfile())->find($userId) ?? [];
         $instructions = CompanyProfile::paymentText($company);

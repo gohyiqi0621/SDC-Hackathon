@@ -162,7 +162,7 @@ $sstLabel  = $finance['sst_registered'] ? 'SST ' . rtrim(rtrim($finance['sst_rat
                             <?php
                             [$statusLabel, $statusClass] = Invoice::STATUS_LABELS[$row['status']] ?? [ucfirst((string) $row['status']), 'badge--muted'];
                             $isDraft   = $row['status'] === 'draft';
-                            $balance   = (float) $row['amount'] - (float) $row['amount_paid'];
+                            $balance   = $row['status'] === 'voided' ? 0.0 : (float) $row['amount'] - (float) $row['amount_paid'];
                             $overdue   = in_array($row['status'], ['unpaid', 'partial'], true) && $row['due_date'] !== null && $row['due_date'] < $today;
                             $noPayment = (float) $row['amount_paid'] === 0.0;
                             $canEdit   = $isDraft || ($supervisor && $row['status'] === 'unpaid' && $noPayment

@@ -16,7 +16,7 @@ $receipts   = $pay['receipts'];
 $pv         = static fn (string $key, string $default = ''): string => (string) ($pay['values'][$key] ?? $default);
 $perr       = static fn (string $key): string => isset($pay['errors'][$key]) ? ' class="is-invalid" aria-invalid="true"' : '';
 $cur        = (string) $invoice['currency'];
-$balance    = max(0, (float) $invoice['amount'] - (float) $invoice['amount_paid']);
+$balance    = $invoice['status'] === 'voided' ? 0.0 : max(0, (float) $invoice['amount'] - (float) $invoice['amount_paid']);
 $canRecord  = is_supervisor() && in_array($invoice['status'], ['unpaid', 'partial'], true);
 [$statusLabel, $statusClass] = Invoice::STATUS_LABELS[$invoice['status']] ?? [ucfirst((string) $invoice['status']), 'badge--muted'];
 ?>
