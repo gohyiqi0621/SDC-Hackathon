@@ -1473,3 +1473,3099 @@
 .badge--success .fa-circle-check {
     color: #16A34A !important;
 }
+
+
+/* ========================================
+   HEADER AI CHATBOT
+   Beside Profile in Topbar
+======================================== */
+
+.header-chatbot {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    z-index: 110;
+}
+
+/* Chatbot button */
+.header-chatbot-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 12px;
+    border: 1px solid #e6e2ff;
+    border-radius: 12px;
+    background: #f7f5ff;
+    color: #5547c8;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.2s ease,
+                border-color 0.2s ease,
+                transform 0.2s ease;
+}
+
+.header-chatbot-trigger:hover {
+    background: #eeebff;
+    border-color: #cfc7ff;
+    transform: translateY(-1px);
+}
+
+/* Robot icon */
+.header-chatbot-icon {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #7565f4, #a08aff);
+    color: #ffffff;
+    font-size: 17px;
+    box-shadow: 0 4px 12px rgba(100, 80, 220, 0.18);
+}
+
+/* Text beside icon */
+.header-chatbot-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    text-align: left;
+}
+
+.header-chatbot-text strong {
+    color: #4536b8;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.header-chatbot-text small {
+    color: #8a85a8;
+    font-size: 10px;
+    font-weight: 400;
+    line-height: 1.3;
+}
+
+/* Hide popup when closed */
+.header-chatbot-panel[hidden] {
+    display: none !important;
+}
+
+/* Chatbot popup */
+.header-chatbot-panel {
+    position: absolute;
+    top: calc(100% + 14px);
+    right: 0;
+    width: 360px;
+    max-width: calc(100vw - 24px);
+    max-height: min(600px, calc(100vh - 100px));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #e6e2ff;
+    border-radius: 18px;
+    background: #ffffff;
+    box-shadow: 0 18px 55px rgba(45, 38, 100, 0.18);
+    z-index: 9999;
+    animation: headerChatbotAppear 0.2s ease-out;
+}
+
+/* Popup header */
+.header-chatbot-panel-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 15px 18px;
+    border-bottom: 1px solid #eeebff;
+    background: linear-gradient(135deg, #f7f5ff, #ffffff);
+}
+
+.header-chatbot-title {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: #4e40c4;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.header-chatbot-panel-top button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #77718f;
+    cursor: pointer;
+}
+
+.header-chatbot-panel-top button:hover {
+    background: #eeebff;
+}
+
+/* Reserved space for future animation */
+.header-chatbot-animation {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 115px;
+    padding: 18px;
+    background: linear-gradient(180deg, #faf9ff, #ffffff);
+    border-bottom: 1px solid #f0edff;
+    color: #958bbd;
+    font-size: 12px;
+    text-align: center;
+}
+
+/* Chat messages */
+.header-chatbot-messages {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 120px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 16px;
+    background: #ffffff;
+}
+
+.header-chatbot-bubble {
+    align-self: flex-start;
+    max-width: 88%;
+    padding: 11px 13px;
+    border-radius: 12px 12px 12px 3px;
+    background: #f1efff;
+    color: #4e477a;
+    font-size: 12px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
+.header-chatbot-bubble.is-user {
+    align-self: flex-end;
+    border-radius: 12px 12px 3px 12px;
+    background: #6d5ce7;
+    color: #ffffff;
+}
+
+/* Input area */
+.header-chatbot-form {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 13px;
+    border-top: 1px solid #eeebff;
+    background: #ffffff;
+}
+
+.header-chatbot-form input {
+    flex: 1;
+    min-width: 0;
+    padding: 11px 12px;
+    border: 1px solid #e5e1f6;
+    border-radius: 9px;
+    outline: none;
+    background: #fafaff;
+    color: #38344f;
+    font-family: inherit;
+    font-size: 12px;
+}
+
+.header-chatbot-form input:focus {
+    border-color: #9587f0;
+    box-shadow: 0 0 0 3px rgba(109, 92, 231, 0.1);
+}
+
+.header-chatbot-form button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 39px;
+    height: 39px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 9px;
+    background: #6d5ce7;
+    color: #ffffff;
+    cursor: pointer;
+}
+
+.header-chatbot-form button:hover {
+    background: #5847d1;
+}
+
+/* Open animation */
+@keyframes headerChatbotAppear {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .header-chatbot-text small {
+        display: none;
+    }
+}
+
+@media (max-width: 600px) {
+    .header-chatbot-trigger {
+        padding: 6px;
+    }
+
+    .header-chatbot-text {
+        display: none;
+    }
+
+    .header-chatbot-panel {
+        width: min(340px, calc(100vw - 24px));
+    }
+}
+
+
+/* ==========================================
+   SMART SME — PREMIUM AI COMPANION
+   WELCOME BANNER ROBOT
+   ========================================== */
+
+/* Welcome Banner */
+.welcome-banner {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    overflow: visible;
+    isolation: isolate;
+}
+
+.welcome-text {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Space reserved for robot */
+.ai-bot-space {
+    position: relative;
+    flex: 0 0 300px;
+    width: 300px;
+    height: 300px;
+    min-width: 300px;
+    pointer-events: none;
+}
+
+/* Robot container */
+.ai-bot-3d {
+    position: absolute !important;
+    width: 300px;
+    height: 300px;
+    z-index: 10;
+    overflow: visible !important;
+    background: transparent;
+    cursor: pointer;
+    transform: none !important;
+    filter: drop-shadow(
+        0 16px 20px rgba(95, 70, 180, 0.09)
+    );
+    transition: filter 0.25s ease;
+}
+
+.ai-bot-3d:hover {
+    filter: drop-shadow(
+        0 20px 26px rgba(95, 70, 180, 0.17)
+    );
+}
+
+/* Never turn into floating mini robot */
+.ai-bot-3d.is-mini {
+    position: absolute !important;
+    transform: none !important;
+    z-index: 10 !important;
+}
+
+/* Three.js canvas */
+#aiBotCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+}
+
+#aiBotCanvas canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    background: transparent;
+    pointer-events: none;
+}
+
+/* Click robot to open separate Chatbot Page */
+.ai-bot-open {
+    position: absolute;
+    inset: 8% 10%;
+    display: block;
+    z-index: 4;
+    border: 0;
+    border-radius: 24px;
+    background: transparent;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.ai-bot-open:focus-visible {
+    outline: 3px solid #8c75ff;
+    outline-offset: 3px;
+}
+
+/* ==========================================
+   ROBOT SPEECH BUBBLE
+   ========================================== */
+
+.context-bot-bubble {
+    position: absolute;
+    top: 8%;
+    right: 77%;
+    bottom: auto;
+    left: auto;
+    z-index: 5;
+
+    width: max-content;
+    max-width: min(195px, 48vw);
+    padding: 11px 14px;
+
+    border: 1px solid rgba(171,149,255,0.35);
+    border-radius: 16px;
+
+    background: rgba(255,255,255,0.96);
+    backdrop-filter: blur(12px);
+
+    box-shadow:
+        0 10px 30px rgba(88,65,160,0.13);
+
+    color: #6250a6;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: break-word;
+
+    opacity: 0;
+    pointer-events: none;
+
+    transform: translateY(8px) scale(0.96);
+
+    transition:
+        opacity 0.25s ease,
+        transform 0.25s ease;
+}
+
+.context-bot-bubble.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+/* ==========================================
+   ROBOT STATUS EFFECT
+   ========================================== */
+
+.context-bot-effect {
+    position: absolute;
+    top: 4%;
+    right: 12%;
+    z-index: 3;
+
+    font-size: 26px;
+    pointer-events: none;
+
+    filter: drop-shadow(
+        0 5px 9px rgba(138,95,255,0.2)
+    );
+
+    animation:
+        mascotEffectFloat 2s ease-in-out infinite;
+}
+
+@keyframes mascotEffectFloat {
+    0%, 100% {
+        transform: translateY(0) rotate(-7deg);
+    }
+
+    50% {
+        transform: translateY(-10px) rotate(8deg);
+    }
+}
+
+/* New Email */
+.ai-bot-3d[data-state="newEmail"]
+.context-bot-effect {
+    animation:
+        mascotMailPop 0.65s ease-in-out
+        infinite alternate;
+}
+
+@keyframes mascotMailPop {
+    from {
+        transform: scale(0.85) rotate(-12deg);
+    }
+
+    to {
+        transform: scale(1.23) rotate(12deg);
+    }
+}
+
+/* AI Thinking */
+.ai-bot-3d[data-state="thinking"]
+.context-bot-effect {
+    animation:
+        mascotThinking 2s linear infinite;
+}
+
+@keyframes mascotThinking {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Sleeping */
+.ai-bot-3d[data-state="sleeping"]
+.context-bot-effect {
+    animation:
+        mascotSleep 2.5s ease-in-out infinite;
+}
+
+@keyframes mascotSleep {
+    0%, 100% {
+        opacity: 0.4;
+        transform: translateY(4px);
+    }
+
+    50% {
+        opacity: 1;
+        transform: translateY(-16px);
+    }
+}
+
+/* Success */
+.ai-bot-3d[data-state="success"]
+.context-bot-effect {
+    animation:
+        mascotCelebrate 0.5s ease-in-out
+        infinite alternate;
+}
+
+@keyframes mascotCelebrate {
+    from {
+        transform: translateY(4px) rotate(-18deg);
+    }
+
+    to {
+        transform: translateY(-12px) rotate(18deg);
+    }
+}
+
+/* ==========================================
+   HIDE OLD ASSISTANTS
+   ========================================== */
+
+#officeGirl3D,
+#miniOffice,
+#smePetLayer,
+#smePetToggle,
+#aiBotChat {
+    display: none !important;
+}
+
+/* ==========================================
+   RESPONSIVE
+   ========================================== */
+
+@media (max-width: 768px) {
+
+    .welcome-banner {
+        gap: 10px;
+    }
+
+    .ai-bot-space {
+        flex: 0 0 165px;
+        width: 165px;
+        min-width: 165px;
+        height: 205px;
+    }
+
+    .context-bot-bubble {
+        right: 65%;
+        top: 0;
+        max-width: 140px;
+        padding: 8px 10px;
+        font-size: 11px;
+    }
+
+    .context-bot-effect {
+        font-size: 20px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .ai-bot-3d,
+    .context-bot-bubble,
+    .context-bot-effect {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+/* ==================================================
+   SMART SME — PREMIUM LAVENDER WELCOME HERO
+   Add to END of dashboard.css
+   ================================================== */
+
+.welcome-banner {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  min-height: 460px !important;
+  padding: 48px 48px !important;
+  overflow: hidden !important;
+  isolation: isolate;
+  border: 1px solid rgba(194, 174, 255, .35);
+  border-radius: 26px;
+  background:
+    radial-gradient(ellipse at 77% 70%,
+      rgba(170, 134, 255, .34), transparent 48%),
+    radial-gradient(ellipse at 94% 8%,
+      rgba(190, 205, 255, .48), transparent 48%),
+    linear-gradient(110deg,
+      #fcfcff 0%, #f4f0ff 43%,
+      #e8dfff 76%, #d9d4fb 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
+}
+
+.welcome-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(125deg,
+      transparent 28%, rgba(255,255,255,.48) 42%,
+      transparent 57%);
+}
+
+.welcome-banner::after {
+  content: "";
+  position: absolute;
+  right: -100px;
+  bottom: -240px;
+  width: 800px;
+  height: 620px;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(151,105,255,.19), transparent 68%);
+  filter: blur(24px);
+}
+
+.welcome-banner > :not(.ai-bot-space) {
+  position: relative;
+  z-index: 2;
+}
+
+.welcome-banner .welcome-text,
+.welcome-banner .welcome-content {
+  flex: 1 1 52%;
+  max-width: 57%;
+  min-width: 0;
+}
+
+.welcome-banner h1 {
+  font-size: clamp(29px, 3vw, 47px) !important;
+  line-height: 1.13 !important;
+  letter-spacing: -1.5px;
+  color: #171b47;
+}
+
+.welcome-banner p {
+  color: #72799b;
+}
+
+/* Four translucent statistic cards */
+.premium-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  width: min(100%, 680px);
+  margin-top: 30px;
+}
+
+.premium-stat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 99px;
+  padding: 15px 12px;
+  border: 1px solid rgba(255,255,255,.88);
+  border-radius: 17px;
+  background: rgba(255,255,255,.68);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 9px 26px rgba(99,76,174,.06);
+}
+
+.premium-stat-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.premium-stat-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #ede6ff;
+  color: #8057ec;
+  font-size: 15px;
+}
+
+.premium-stat:nth-child(2) .premium-stat-icon {
+  background: #e4f7ff;
+  color: #27a7e5;
+}
+
+.premium-stat:nth-child(3) .premium-stat-icon {
+  background: #fff2d7;
+  color: #e6a91e;
+}
+
+.premium-stat:nth-child(4) .premium-stat-icon {
+  background: #e4fff2;
+  color: #24b986;
+}
+
+.premium-stat-value {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -.8px;
+  color: #20234e;
+  font-variant-numeric: tabular-nums;
+}
+
+.premium-stat-label {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #7b7f9c;
+  white-space: nowrap;
+}
+
+/* Robot area */
+.welcome-banner .ai-bot-space {
+  position: relative !important;
+  flex: 0 0 43% !important;
+  width: 43% !important;
+  min-width: 0 !important;
+  height: 365px !important;
+  margin: 0 !important;
+  pointer-events: auto !important;
+  overflow: visible !important;
+  z-index: 3;
+}
+
+#aiBotSpace .ai-bot-3d {
+  position: absolute !important;
+  inset: 0 !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  transform: none !important;
+  filter: none !important;
+  overflow: visible !important;
+  cursor: pointer;
+}
+
+#aiBotCanvas,
+#aiBotCanvas canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  background: transparent !important;
+  pointer-events: none !important;
+}
+
+/* Decorative holographic platform */
+.premium-platform {
+  position: absolute;
+  left: 19%;
+  right: 15%;
+  bottom: 5%;
+  height: 54px;
+  border: 2px solid rgba(255,255,255,.75);
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse,
+      rgba(255,255,255,.94) 8%,
+      rgba(167,132,255,.47) 48%,
+      rgba(127,101,232,.10) 73%,
+      transparent 80%);
+  box-shadow:
+    0 0 35px rgba(160,112,255,.45),
+    0 14px 30px rgba(125,89,224,.16);
+  pointer-events: none;
+}
+
+.premium-platform::after {
+  content: "";
+  position: absolute;
+  inset: 9px 22px;
+  border: 2px solid rgba(255,255,255,.8);
+  border-radius: 50%;
+  box-shadow: 0 0 16px #bba0ff;
+}
+
+/* Holographic cards */
+.premium-holo {
+  position: absolute;
+  z-index: 5;
+  padding: 14px 16px;
+  border: 1px solid rgba(255,255,255,.85);
+  border-radius: 17px;
+  background: linear-gradient(130deg,
+    rgba(255,255,255,.69),
+    rgba(225,213,255,.42));
+  box-shadow:
+    0 10px 30px rgba(109,78,197,.10),
+    inset 0 1px 0 rgba(255,255,255,.9);
+  backdrop-filter: blur(13px);
+  pointer-events: none;
+  animation: premiumHoloFloat 5s ease-in-out infinite;
+}
+
+.premium-holo-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #5e49ac;
+}
+
+.premium-holo-title i {
+  color: #8563ff;
+}
+
+.premium-holo-lines {
+  display: grid;
+  gap: 6px;
+  margin-top: 11px;
+}
+
+.premium-holo-lines span {
+  display: block;
+  height: 6px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.85);
+}
+
+.premium-holo-lines span:nth-child(2) { width: 83%; }
+.premium-holo-lines span:nth-child(3) { width: 58%; }
+
+.premium-holo-mail {
+  left: 1%;
+  top: 12%;
+  display: grid;
+  place-items: center;
+  width: 90px;
+  height: 75px;
+  transform: rotate(-9deg);
+}
+
+.premium-holo-mail i {
+  font-size: 39px;
+  color: #8667ed;
+  filter: drop-shadow(0 0 10px rgba(151,105,255,.3));
+}
+
+.premium-holo-summary {
+  left: -6%;
+  bottom: 19%;
+  width: 155px;
+  animation-delay: -.9s;
+}
+
+.premium-holo-reply {
+  right: -5%;
+  top: 30%;
+  width: 168px;
+  animation-delay: -2.2s;
+}
+
+.premium-holo-speech {
+  right: -4%;
+  top: -5%;
+  max-width: 175px;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.5;
+  color: #7154dc;
+  animation-delay: -1.3s;
+}
+
+.premium-holo-speech::after {
+  content: "";
+  position: absolute;
+  bottom: -9px;
+  left: 24px;
+  width: 17px;
+  height: 17px;
+  background: rgba(247,243,255,.85);
+  border-right: 1px solid rgba(255,255,255,.8);
+  border-bottom: 1px solid rgba(255,255,255,.8);
+  transform: rotate(45deg);
+}
+
+/* Soft orbit lines */
+.premium-orbit {
+  position: absolute;
+  left: 10%;
+  right: 9%;
+  top: 25%;
+  height: 190px;
+  border: 2px solid rgba(255,255,255,.48);
+  border-radius: 50%;
+  transform: rotate(-17deg);
+  box-shadow:
+    0 0 20px rgba(194,151,255,.42),
+    inset 0 0 14px rgba(255,255,255,.35);
+  pointer-events: none;
+}
+
+.premium-orbit.orbit-two {
+  top: 32%;
+  left: 17%;
+  right: 4%;
+  height: 165px;
+  transform: rotate(23deg);
+  border-color: rgba(186,144,255,.34);
+}
+
+.premium-spark {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 0 15px 5px #d0b5ff;
+  pointer-events: none;
+}
+
+.premium-spark.s1 { left: 15%; top: 30%; }
+.premium-spark.s2 { right: 19%; top: 19%; }
+.premium-spark.s3 { right: 8%; bottom: 24%; }
+
+@keyframes premiumHoloFloat {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -9px; }
+}
+
+/* Keep status bubble compact and away from robot face */
+#aiBotSpace .context-bot-bubble {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: auto;
+  bottom: auto;
+  z-index: 9;
+  max-width: 160px;
+  font-size: 11px;
+}
+
+/* Responsive */
+@media (max-width: 1150px) {
+  .welcome-banner { padding: 32px 28px !important; }
+  .welcome-banner .ai-bot-space {
+    flex-basis: 40% !important;
+    width: 40% !important;
+  }
+  .premium-holo-reply { right: -2%; }
+}
+
+@media (max-width: 850px) {
+  .welcome-banner {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 28px 22px !important;
+  }
+  .welcome-banner .welcome-text,
+  .welcome-banner .welcome-content {
+    max-width: 100%;
+    width: 100%;
+  }
+  .premium-hero-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .welcome-banner .ai-bot-space {
+    flex: none !important;
+    width: 100% !important;
+    height: 350px !important;
+  }
+  .premium-holo-summary { left: 3%; }
+  .premium-holo-reply { right: 3%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .premium-holo { animation: none !important; }
+}
+
+/* ORIGINAL EMAIL STATISTICS INSIDE WELCOME HEADER */
+
+.header-email-statistics {
+  width: 100%;
+  margin-top: 26px;
+}
+
+.header-email-statistics .email-stats-grid,
+.header-email-statistics .statistics-grid,
+.header-email-statistics .stats-grid,
+.header-email-statistics .card-body {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.header-email-statistics .stat-card,
+.header-email-statistics .stat-item {
+  min-width: 0;
+  padding: 14px 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.8);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 25px rgba(110,90,180,0.07);
+}
+
+.header-email-statistics .stat-card h3,
+.header-email-statistics .stat-card strong {
+  font-size: 25px;
+}
+
+@media (max-width: 850px) {
+  .header-email-statistics .email-stats-grid,
+  .header-email-statistics .statistics-grid,
+  .header-email-statistics .stats-grid,
+  .header-email-statistics .card-body {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+
+/* ==========================================================
+   PREMIUM ANIMATED WELCOME BANNER
+   ========================================================== */
+
+#welcomeBanner {
+    position: relative !important;
+    isolation: isolate;
+    box-sizing: border-box;
+    width: 100%;
+    height: 490px !important;
+    min-height: 0 !important;
+    max-height: 490px !important;
+    overflow: hidden !important;
+    display: flex !important;
+    align-items: center;
+    border-radius: 28px;
+    border: 1px solid #e1d7ff;
+    background:
+        radial-gradient(
+            ellipse at 82% 80%,
+            rgba(167,125,255,.35),
+            transparent 54%
+        ),
+        linear-gradient(
+            115deg,
+            #fcfbff 5%,
+            #f5f1ff 49%,
+            #ded4ff 100%
+        );
+}
+
+#welcomeBanner::before {
+    content: "";
+    position: absolute;
+    width: 520px;
+    height: 520px;
+    right: -90px;
+    top: 0;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle,
+        rgba(181,143,255,.3),
+        transparent 68%
+    );
+    filter: blur(35px);
+    pointer-events: none;
+    animation: wbGlow 8s ease-in-out infinite alternate;
+}
+
+@keyframes wbGlow {
+    from {
+        transform: translate(-25px,10px);
+        opacity: .55;
+    }
+    to {
+        transform: translate(20px,-20px);
+        opacity: 1;
+    }
+}
+
+/* LEFT CONTENT */
+
+#welcomeBanner .welcome-text {
+    position: relative !important;
+    z-index: 5;
+    width: 58%;
+    max-width: none;
+    padding: 0 0 0 48px;
+    margin: 0 !important;
+    transform: none !important;
+}
+
+#welcomeBanner .welcome-text h1 {
+    font-size: clamp(28px,3vw,47px);
+    line-height: 1.14;
+    font-weight: 800;
+    letter-spacing: -1.6px;
+    color: #191d49;
+    margin: 0 0 12px;
+}
+
+#welcomeBanner .welcome-text > p {
+    font-size: 15px;
+    color: #777d9f;
+    margin: 0;
+}
+
+/* COMPACT GLASS STATISTICS */
+
+#welcomeBanner .stats-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4,minmax(0,1fr));
+    gap: 11px;
+    margin: 30px 0 0 !important;
+    padding: 0 !important;
+    width: 100%;
+}
+
+#welcomeBanner .stat-card {
+    position: relative;
+    display: flex !important;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    min-height: 92px;
+    padding: 13px 11px !important;
+    border: 1px solid rgba(255,255,255,.9);
+    border-radius: 16px;
+    background: rgba(255,255,255,.69) !important;
+    box-shadow: 0 9px 28px rgba(91,72,160,.09);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    animation: wbCardEnter .7s both;
+    transition: transform .3s,box-shadow .3s;
+}
+
+#welcomeBanner .stat-card:nth-child(2) {
+    animation-delay: .12s;
+}
+
+#welcomeBanner .stat-card:nth-child(3) {
+    animation-delay: .24s;
+}
+
+#welcomeBanner .stat-card:nth-child(4) {
+    animation-delay: .36s;
+}
+
+#welcomeBanner .stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 14px 30px rgba(91,72,160,.16);
+}
+
+@keyframes wbCardEnter {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+#welcomeBanner .stat-icon {
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 19px;
+}
+
+#welcomeBanner .stat-card.blue .stat-icon {
+    background: #ede5ff;
+    color: #865df3;
+}
+
+#welcomeBanner .stat-card.pink .stat-icon {
+    background: #e8edff;
+    color: #6284f4;
+}
+
+#welcomeBanner .stat-card.green .stat-icon {
+    background: #e5fbf3;
+    color: #21bb8b;
+}
+
+#welcomeBanner .stat-card.yellow .stat-icon {
+    background: #fff4d8;
+    color: #f2b72c;
+}
+
+#welcomeBanner .stat-details {
+    min-width: 0;
+}
+
+#welcomeBanner .stat-details h2 {
+    margin: 0;
+    font-size: 27px;
+    line-height: 1.1;
+    color: #1b204e;
+    font-weight: 800;
+}
+
+#welcomeBanner .stat-details p {
+    margin: 5px 0 0;
+    font-size: 11px;
+    line-height: 1.3;
+    color: #757b9c;
+}
+
+#welcomeBanner .stat-trend {
+    display: none !important;
+}
+
+/* ROBOT POSITION */
+
+#welcomeBanner #aiBotSpace {
+    position: absolute !important;
+    z-index: 3;
+    left: 59%;
+    right: 3%;
+    top: 4%;
+    bottom: 3%;
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    pointer-events: auto;
+}
+
+#welcomeBanner #aiBot3D {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 3;
+    cursor: pointer;
+}
+
+#welcomeBanner #aiBotCanvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+#welcomeBanner #aiBotCanvas canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* ANIMATED HOLOGRAMS */
+
+#welcomeBanner .wb-float {
+    position: absolute;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 12px 15px;
+    border-radius: 15px;
+    border: 1px solid rgba(255,255,255,.85);
+    background: rgba(255,255,255,.67);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 12px 28px rgba(105,75,180,.12);
+    pointer-events: none;
+    animation: wbFloat 4.5s ease-in-out infinite;
+}
+
+#welcomeBanner .wb-float i {
+    font-size: 21px;
+    color: #8564ef;
+}
+
+#welcomeBanner .wb-float strong {
+    font-size: 12px;
+    white-space: nowrap;
+    color: #29245e;
+}
+
+#welcomeBanner .wb-float small {
+    display: block;
+    width: 70px;
+    height: 5px;
+    margin-top: 7px;
+    border-radius: 10px;
+    background: linear-gradient(90deg,#c7b4ff,#f0eaff);
+}
+
+#welcomeBanner .wb-mail {
+    top: 14%;
+    right: 30%;
+    transform: rotate(-9deg);
+    animation-delay: -.7s;
+}
+
+#welcomeBanner .wb-summary {
+    bottom: 24%;
+    left: 58%;
+    animation-delay: -2s;
+}
+
+#welcomeBanner .wb-reply {
+    right: 3%;
+    bottom: 27%;
+    animation-delay: -3s;
+}
+
+@keyframes wbFloat {
+    0%,100% { translate: 0 0; }
+    50% { translate: 0 -13px; }
+}
+
+/* SPARKLE LIGHTS */
+
+#welcomeBanner .wb-spark {
+    position: absolute;
+    z-index: 2;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 14px 5px rgba(255,255,255,.8);
+    pointer-events: none;
+    animation: wbTwinkle 2.8s ease-in-out infinite;
+}
+
+#welcomeBanner .wb-spark.one {
+    top: 34%;
+    right: 24%;
+}
+
+#welcomeBanner .wb-spark.two {
+    bottom: 18%;
+    right: 11%;
+    animation-delay: -1s;
+}
+
+@keyframes wbTwinkle {
+    0%,100% {
+        opacity: .25;
+        scale: .6;
+    }
+    50% {
+        opacity: 1;
+        scale: 1.4;
+    }
+}
+
+/* RESPONSIVE */
+
+@media (max-width:1100px) {
+    #welcomeBanner .welcome-text {
+        width: 62%;
+        padding-left: 25px;
+    }
+
+    #welcomeBanner #aiBotSpace {
+        left: 62%;
+        right: 0;
+    }
+
+    #welcomeBanner .stats-grid {
+        grid-template-columns: repeat(2,minmax(0,1fr));
+        max-width: 390px;
+    }
+
+    #welcomeBanner .wb-summary {
+        left: 62%;
+    }
+}
+
+@media (max-width:650px) {
+    #welcomeBanner {
+        height: 420px !important;
+        max-height: 420px !important;
+    }
+
+    #welcomeBanner .welcome-text {
+        width: 66%;
+        padding-left: 15px;
+    }
+
+    #welcomeBanner .welcome-text h1 {
+        font-size: 24px;
+        letter-spacing: -.5px;
+    }
+
+    #welcomeBanner .welcome-text > p {
+        font-size: 12px;
+    }
+
+    #welcomeBanner .stats-grid {
+        gap: 6px;
+        margin-top: 18px !important;
+    }
+
+    #welcomeBanner .stat-card {
+        padding: 8px !important;
+        min-height: 65px;
+        gap: 5px;
+    }
+
+    #welcomeBanner .stat-icon {
+        flex-basis: 28px;
+        width: 28px;
+        height: 28px;
+        font-size: 13px;
+    }
+
+    #welcomeBanner .stat-details h2 {
+        font-size: 19px;
+    }
+
+    #welcomeBanner .stat-details p {
+        font-size: 9px;
+    }
+
+    #welcomeBanner #aiBotSpace {
+        left: 61%;
+        right: -12%;
+    }
+
+    #welcomeBanner .wb-float {
+        padding: 7px;
+    }
+
+    #welcomeBanner .wb-float strong {
+        font-size: 9px;
+    }
+
+    #welcomeBanner .wb-summary {
+        left: 60%;
+    }
+}
+
+@media (prefers-reduced-motion:reduce) {
+    #welcomeBanner *,
+    #welcomeBanner::before {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+
+/* ==========================================================
+   WELCOME BANNER — FINAL LAYOUT FIX
+   Compact cards on left, robot on right
+   ========================================================== */
+
+/* Keep original banner size */
+#welcomeBanner {
+    height: 490px !important;
+    max-height: 490px !important;
+    overflow: hidden !important;
+}
+
+/* Left side must not stretch across the banner */
+#welcomeBanner .welcome-text {
+    position: relative !important;
+    z-index: 5;
+    flex: 0 0 59% !important;
+    width: 59% !important;
+    max-width: 59% !important;
+    min-width: 0;
+    box-sizing: border-box;
+    padding-left: 48px !important;
+    padding-right: 12px !important;
+}
+
+/* Four compact cards only within the left area */
+#welcomeBanner .welcome-text > .stats-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 30px 0 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box;
+}
+
+/* Override old full-size statistic cards */
+#welcomeBanner .welcome-text .stats-grid > .stat-card {
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: 90px !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 11px 9px !important;
+    box-sizing: border-box;
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+/* Small icons */
+#welcomeBanner .stats-grid .stat-icon {
+    width: 36px !important;
+    height: 36px !important;
+    flex: 0 0 36px !important;
+    font-size: 16px !important;
+}
+
+/* Compact numbers and labels */
+#welcomeBanner .stats-grid .stat-details {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+#welcomeBanner .stats-grid .stat-details h2 {
+    font-size: 23px !important;
+    line-height: 1.1 !important;
+}
+
+#welcomeBanner .stats-grid .stat-details p {
+    font-size: 10px !important;
+    line-height: 1.3 !important;
+    overflow-wrap: anywhere;
+}
+
+/* Robot remains inside right side */
+#welcomeBanner #aiBotSpace {
+    left: 59% !important;
+    right: 3% !important;
+    top: 10% !important;
+    bottom: 3% !important;
+    width: auto !important;
+    height: auto !important;
+}
+
+/* Holograms stay around robot */
+#welcomeBanner .wb-mail {
+    top: 12%;
+    right: 28%;
+}
+
+#welcomeBanner .wb-summary {
+    left: 61%;
+    bottom: 23%;
+}
+
+#welcomeBanner .wb-reply {
+    right: 3%;
+    bottom: 26%;
+}
+
+/* Medium screens */
+@media (max-width: 1100px) {
+    #welcomeBanner .welcome-text {
+        flex-basis: 61% !important;
+        width: 61% !important;
+        max-width: 61% !important;
+        padding-left: 25px !important;
+    }
+
+    #welcomeBanner .welcome-text > .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    #welcomeBanner #aiBotSpace {
+        left: 62% !important;
+        right: 0 !important;
+    }
+}
+
+/* Mobile */
+@media (max-width: 650px) {
+    #welcomeBanner {
+        height: 420px !important;
+        max-height: 420px !important;
+    }
+
+    #welcomeBanner .welcome-text {
+        flex-basis: 64% !important;
+        width: 64% !important;
+        max-width: 64% !important;
+        padding-left: 14px !important;
+    }
+
+    #welcomeBanner .welcome-text > .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 6px !important;
+    }
+
+    #welcomeBanner .welcome-text .stats-grid > .stat-card {
+        min-height: 65px !important;
+        padding: 7px !important;
+    }
+
+    #welcomeBanner #aiBotSpace {
+        left: 62% !important;
+        right: -12% !important;
+    }
+}
+
+
+/* ===== COMPACT WELCOME BANNER ===== */
+
+#welcomeBanner {
+    height: 150px !important;
+    min-height: 150px !important;
+    max-height:150px !important;
+}
+
+/* Welcome title */
+#welcomeBanner .welcome-text {
+    padding-left: 42px !important;
+}
+
+#welcomeBanner .welcome-text h1 {
+    font-size: 36px !important;
+    margin-bottom: 9px !important;
+}
+
+#welcomeBanner .welcome-text > p {
+    font-size: 13px !important;
+}
+
+/* Four small statistics cards */
+#welcomeBanner .welcome-text > .stats-grid {
+    margin-top: 23px !important;
+    gap: 9px !important;
+}
+
+#welcomeBanner .welcome-text .stats-grid > .stat-card {
+    min-height: 73px !important;
+    padding: 9px !important;
+}
+
+#welcomeBanner .stats-grid .stat-details h2 {
+    font-size: 22px !important;
+}
+
+/* Robot fits inside shorter banner */
+#welcomeBanner #aiBotSpace {
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 59% !important;
+    right: 3% !important;
+}
+
+/* Reposition floating elements */
+#welcomeBanner .wb-mail {
+    top: 8%;
+    right: 27%;
+}
+
+#welcomeBanner .wb-summary {
+    bottom: 15%;
+    left: 60%;
+}
+
+#welcomeBanner .wb-reply {
+    bottom: 16%;
+    right: 2%;
+}
+
+/* Responsive */
+@media (max-width: 650px) {
+    #welcomeBanner {
+        height: 250px !important;
+        min-height: 250px !important;
+        max-height: 250px !important;
+    }
+
+    #welcomeBanner .welcome-text {
+        padding-left: 15px !important;
+    }
+
+    #welcomeBanner .welcome-text h1 {
+        font-size: 24px !important;
+    }
+}
+
+
+/* ===== PREMIUM TEAM WORKSPACE PLANNER ===== */
+
+#workspacePlanner {
+    --wp-purple: #7357f7;
+    --wp-border: #e8e5fc;
+    margin: 18px 0 24px;
+    padding: 20px;
+    border: 1px solid #e4ddff;
+    border-radius: 22px;
+    background: linear-gradient(135deg,#fcfbff 0%,#f7f5ff 100%);
+    color: #1e234e;
+    box-shadow: 0 8px 32px rgba(97,75,184,.045);
+}
+
+#workspacePlanner .wp-heading,
+#workspacePlanner .wp-heading-title,
+#workspacePlanner .wp-card-heading,
+#workspacePlanner .wp-monthbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+#workspacePlanner .wp-heading-title {
+    justify-content: flex-start;
+}
+
+#workspacePlanner .wp-heading-icon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    background: linear-gradient(135deg,#7958ff,#563be9);
+    color: white;
+    box-shadow: 0 6px 15px #785aff35;
+}
+
+#workspacePlanner .wp-heading h2 {
+    margin: 0;
+    font-size: 21px;
+    font-weight: 800;
+    letter-spacing: -.6px;
+}
+
+#workspacePlanner .wp-heading p {
+    margin: 6px 0 0 47px;
+    color: #8b8eab;
+    font-size: 12px;
+}
+
+#workspacePlanner .wp-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: #eee9ff;
+    color: #694af4;
+    font-size: 12px;
+    font-weight: 750;
+}
+
+/* SUMMARY */
+
+#workspacePlanner .wp-summary {
+    display: grid;
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: 12px;
+    margin: 17px 0 14px;
+}
+
+#workspacePlanner .wp-summary-card {
+    min-width: 0;
+    min-height: 91px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 15px;
+    border: 1px solid #e9e6f9;
+    background: rgba(255,255,255,.92);
+    box-shadow: 0 7px 22px #6d5bb20a;
+    transition: transform .25s,box-shadow .25s;
+}
+
+#workspacePlanner .wp-summary-card:hover,
+#workspacePlanner .wp-task:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 24px #7760cb1c;
+}
+
+#workspacePlanner .wp-summary-icon {
+    flex: 0 0 49px;
+    width: 49px;
+    height: 49px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    font-size: 22px;
+}
+
+#workspacePlanner .wp-summary-total .wp-summary-icon {
+    background: #eee8ff;
+    color: #7252f5;
+}
+
+#workspacePlanner .wp-summary-pending .wp-summary-icon {
+    background: #ffebf9;
+    color: #e63db9;
+}
+
+#workspacePlanner .wp-summary-completed .wp-summary-icon {
+    background: #e4f9ed;
+    color: #08ae64;
+}
+
+#workspacePlanner .wp-summary-info {
+    min-width: 70px;
+}
+
+#workspacePlanner .wp-summary-info > span {
+    display: block;
+    font-size: 12px;
+    color: #8288a8;
+}
+
+#workspacePlanner .wp-summary-info strong {
+    display: block;
+    margin-top: 5px;
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+#workspacePlanner .wp-summary-extra {
+    margin-left: auto;
+    min-width: 0;
+    width: 43%;
+    text-align: right;
+    font-size: 11px;
+    color: #8689a7;
+}
+
+#workspacePlanner .wp-progress-track {
+    height: 7px;
+    border-radius: 20px;
+    background: #eceafa;
+    overflow: hidden;
+    margin-bottom: 7px;
+}
+
+#workspacePlanner .wp-progress-fill {
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg,#7453ff,#b9a4ff);
+    transition: width .6s ease;
+}
+
+#workspacePlanner #wpProgressText {
+    color: #7053f4;
+    font-weight: 750;
+}
+
+#workspacePlanner .wp-summary-status {
+    width: auto;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 7px;
+}
+
+#workspacePlanner .wp-summary-pending .wp-summary-status i {
+    font-size: 8px;
+    color: #18c783;
+}
+
+#workspacePlanner .wp-complete-line {
+    flex: 0 0 65px;
+    height: 7px;
+    border-radius: 20px;
+    background: #09b86c;
+}
+
+/* MAIN LAYOUT */
+
+#workspacePlanner .wp-columns {
+    display: grid;
+    grid-template-columns: minmax(0,1.05fr) minmax(0,1.1fr);
+    gap: 12px;
+    align-items: stretch;
+}
+
+#workspacePlanner .wp-calendar-area {
+    display: grid;
+    grid-template-columns: minmax(0,1.35fr) minmax(0,1fr);
+    gap: 10px;
+    min-width: 0;
+}
+
+#workspacePlanner .wp-card {
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid #e9e7f7;
+    border-radius: 15px;
+    background: rgba(255,255,255,.93);
+    box-shadow: 0 5px 20px #6555a50a;
+}
+
+#workspacePlanner .wp-card-heading h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+#workspacePlanner .wp-card-heading h3 i {
+    color: #7253f5;
+    margin-right: 8px;
+    font-size: 17px;
+}
+
+#workspacePlanner .wp-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-shrink: 0;
+    border: 0;
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: linear-gradient(135deg,#8767ff,#6046f1);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 750;
+    cursor: pointer;
+    box-shadow: 0 5px 12px #7656ff25;
+    transition: transform .2s,filter .2s;
+}
+
+#workspacePlanner .wp-primary:hover {
+    filter: brightness(1.07);
+    transform: translateY(-2px);
+}
+
+/* TASK LIST */
+
+#workspacePlanner .wp-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin: 16px 0 12px;
+}
+
+#workspacePlanner .wp-filter {
+    padding: 8px 11px;
+    border: 0;
+    border-radius: 9px;
+    background: #f6f5fb;
+    color: #868ba9;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+#workspacePlanner .wp-filter.is-active {
+    background: #ede8ff;
+    color: #694bf3;
+    font-weight: 800;
+}
+
+#workspacePlanner .wp-task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    max-height: 330px;
+    overflow-y: auto;
+}
+
+#workspacePlanner .wp-task {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 12px;
+    border: 1px solid #eceaf8;
+    border-radius: 11px;
+    background: #fff;
+    transition: transform .25s,box-shadow .25s;
+}
+
+#workspacePlanner .wp-task input {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    accent-color: #7555f6;
+    cursor: pointer;
+}
+
+#workspacePlanner .wp-task-content {
+    flex: 1;
+    min-width: 0;
+}
+
+#workspacePlanner .wp-task-title {
+    font-size: 12px;
+    font-weight: 750;
+    overflow-wrap: anywhere;
+}
+
+#workspacePlanner .wp-task.is-done .wp-task-title {
+    text-decoration: line-through;
+    color: #979ab0;
+}
+
+#workspacePlanner .wp-task-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 7px;
+    font-size: 10px;
+    color: #9296ae;
+}
+
+#workspacePlanner .wp-priority {
+    padding: 3px 8px;
+    border-radius: 20px;
+    background: #f0eaff;
+    color: #7552ec;
+}
+
+#workspacePlanner .wp-priority.high {
+    background: #ffe8ec;
+    color: #e34562;
+}
+
+#workspacePlanner .wp-priority.low {
+    background: #e5f8ed;
+    color: #13a566;
+}
+
+#workspacePlanner .wp-delete {
+    border: 0;
+    background: transparent;
+    color: #a0a0b9;
+    cursor: pointer;
+}
+
+#workspacePlanner .wp-delete:hover {
+    color: #e4496b;
+}
+
+/* CALENDAR */
+
+#workspacePlanner .wp-monthbar {
+    margin: 20px 0 13px;
+}
+
+#workspacePlanner .wp-monthbar strong {
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+#workspacePlanner .wp-monthbar button {
+    border: 0;
+    border-radius: 9px;
+    background: #f1eeff;
+    color: #7554ef;
+    padding: 8px 10px;
+    cursor: pointer;
+}
+
+#workspacePlanner .wp-calendar {
+    display: grid;
+    grid-template-columns: repeat(7,minmax(0,1fr));
+    gap: 3px;
+}
+
+#workspacePlanner .wp-weekday {
+    text-align: center;
+    padding: 7px 0;
+    font-size: 10px;
+    color: #9a9db8;
+}
+
+#workspacePlanner .wp-day {
+    position: relative;
+    min-width: 0;
+    min-height: 33px;
+    border: 0;
+    border-radius: 8px;
+    background: #faf9ff;
+    color: #3e426d;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background .2s,transform .2s;
+}
+
+#workspacePlanner .wp-day:hover {
+    background: #ebe5ff;
+    transform: scale(1.05);
+}
+
+#workspacePlanner .wp-day.selected {
+    background: linear-gradient(135deg,#8869ff,#6146f2);
+    color: white;
+    box-shadow: 0 5px 12px #7659f541;
+}
+
+#workspacePlanner .wp-day.has-item::after {
+    content: "";
+    position: absolute;
+    bottom: 3px;
+    left: calc(50% - 2.5px);
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #f3aa40;
+}
+
+#workspacePlanner .wp-day.selected::after {
+    background: white;
+}
+
+#workspacePlanner .wp-blank {
+    min-height: 33px;
+}
+
+#workspacePlanner .wp-agenda {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid #f0edf9;
+}
+
+#workspacePlanner .wp-agenda h4 {
+    font-size: 11px;
+    margin: 0 0 9px;
+}
+
+#workspacePlanner .wp-agenda-item {
+    padding: 9px;
+    margin: 6px 0;
+    border-radius: 9px;
+    background: #f8f6ff;
+    font-size: 11px;
+}
+
+#workspacePlanner .wp-agenda-item span {
+    color: #9194aa;
+    font-size: 10px;
+}
+
+#workspacePlanner .wp-empty {
+    padding: 18px 8px;
+    text-align: center;
+    font-size: 11px;
+    color: #9b9eb4;
+}
+
+/* UPCOMING EVENTS */
+
+#workspacePlanner .wp-upcoming-list {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    margin-top: 18px;
+}
+
+#workspacePlanner .wp-upcoming-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 13px 9px;
+    border: 1px solid #efecfa;
+    border-radius: 10px;
+    background: #fff;
+}
+
+#workspacePlanner .wp-event-dot {
+    flex: 0 0 9px;
+    width: 9px;
+    height: 9px;
+    margin-top: 5px;
+    border-radius: 50%;
+    background: #8a60ff;
+}
+
+#workspacePlanner .wp-upcoming-item:nth-child(3n+2) .wp-event-dot {
+    background: #4381ff;
+}
+
+#workspacePlanner .wp-upcoming-item:nth-child(3n+3) .wp-event-dot {
+    background: #11bf78;
+}
+
+#workspacePlanner .wp-event-info {
+    flex: 1;
+    min-width: 0;
+}
+
+#workspacePlanner .wp-event-info strong {
+    display: block;
+    font-size: 11px;
+    overflow-wrap: anywhere;
+}
+
+#workspacePlanner .wp-event-info small {
+    display: block;
+    margin-top: 5px;
+    color: #9397b0;
+    font-size: 10px;
+}
+
+#workspacePlanner .wp-disclaimer {
+    margin: 13px 0 0;
+    font-size: 10px;
+    color: #999ab3;
+}
+
+/* EXISTING MODAL */
+
+.wp-modal-backdrop[hidden],
+#wpTaskFields[hidden] {
+    display: none !important;
+}
+
+.wp-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 15px;
+    background: #17173699;
+    backdrop-filter: blur(5px);
+}
+
+.wp-modal {
+    width: min(420px,100%);
+    padding: 24px;
+    border: 1px solid #eee9ff;
+    border-radius: 19px;
+    background: white;
+    box-shadow: 0 25px 70px #17173630;
+}
+
+.wp-modal-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.wp-modal-heading h3 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.wp-modal-heading button {
+    border: 0;
+    background: transparent;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.wp-modal label {
+    display: block;
+    margin: 13px 0 5px;
+    color: #656981;
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.wp-modal input,
+.wp-modal select {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px;
+    border: 1px solid #e2e0ee;
+    border-radius: 9px;
+    background: white;
+    color: #28294b;
+    font-size: 13px;
+}
+
+.wp-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 9px;
+    margin-top: 19px;
+}
+
+.wp-cancel {
+    padding: 9px 12px;
+    border: 1px solid #e6e3f4;
+    border-radius: 9px;
+    background: white;
+    cursor: pointer;
+}
+
+/* ANIMATION */
+
+#workspacePlanner .wp-summary-card,
+#workspacePlanner .wp-card {
+    animation: wpReveal .55s ease both;
+}
+
+#workspacePlanner .wp-summary-card:nth-child(2) {
+    animation-delay: .08s;
+}
+
+#workspacePlanner .wp-summary-card:nth-child(3) {
+    animation-delay: .16s;
+}
+
+@keyframes wpReveal {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* RESPONSIVE */
+
+@media (max-width:1250px) {
+    #workspacePlanner .wp-columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width:800px) {
+    #workspacePlanner .wp-summary {
+        grid-template-columns: 1fr;
+    }
+
+    #workspacePlanner .wp-calendar-area {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width:550px) {
+    #workspacePlanner {
+        padding: 13px;
+    }
+
+    #workspacePlanner .wp-heading h2 {
+        font-size: 16px;
+    }
+
+    #workspacePlanner .wp-heading p {
+        margin-left: 0;
+    }
+
+    #workspacePlanner .wp-label {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion:reduce) {
+    #workspacePlanner *,
+    #workspacePlanner *::before,
+    #workspacePlanner *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+
+/* =====================================================
+   PREMIUM AI ROBOT — COMPACT BANNER REFINEMENT
+   ===================================================== */
+
+/* Keep Welcome Banner compact */
+#welcomeBanner {
+    height: 330px !important;
+    min-height: 330px !important;
+    max-height: 330px !important;
+    overflow: hidden !important;
+    isolation: isolate;
+}
+
+/* Soft premium lighting */
+#welcomeBanner::before {
+    width: 380px;
+    height: 300px;
+    top: 12px;
+    right: 5%;
+    background: radial-gradient(
+        ellipse,
+        rgba(160, 113, 255, .24) 0%,
+        rgba(191, 168, 255, .10) 45%,
+        transparent 72%
+    );
+    filter: blur(28px);
+}
+
+/* Robot display area */
+#welcomeBanner #aiBotSpace {
+    position: absolute !important;
+    left: 61% !important;
+    right: 5% !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    z-index: 3;
+    overflow: visible;
+}
+
+/* GLB canvas remains interactive */
+#welcomeBanner #aiBot3D {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    cursor: pointer;
+}
+
+#welcomeBanner #aiBotCanvas,
+#welcomeBanner #aiBotCanvas canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Floating AI cards */
+#welcomeBanner .wb-float {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 13px;
+    border: 1px solid rgba(255,255,255,.92);
+    border-radius: 14px;
+    background: rgba(255,255,255,.76);
+    box-shadow:
+        0 8px 24px rgba(103,77,182,.12),
+        inset 0 1px 0 rgba(255,255,255,.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    pointer-events: none;
+    z-index: 5;
+    animation: premiumBubbleFloat 5s ease-in-out infinite;
+}
+
+#welcomeBanner .wb-float i {
+    font-size: 18px;
+    color: #7958f4;
+}
+
+#welcomeBanner .wb-float strong {
+    font-size: 11px;
+    font-weight: 800;
+    color: #292451;
+}
+
+#welcomeBanner .wb-float small {
+    width: 62px;
+    height: 4px;
+    margin-top: 6px;
+    background: linear-gradient(
+        90deg,
+        #bba7ff,
+        #e8dfff
+    );
+}
+
+/* New Email — top left of robot */
+#welcomeBanner .wb-mail {
+    top: 12% !important;
+    left: 65% !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: rotate(-7deg);
+    animation-delay: -.8s;
+}
+
+/* AI Summary — lower left */
+#welcomeBanner .wb-summary {
+    top: auto !important;
+    left: 59% !important;
+    right: auto !important;
+    bottom: 15% !important;
+    animation-delay: -2s;
+}
+
+/* Smart Reply — lower right */
+#welcomeBanner .wb-reply {
+    top: auto !important;
+    left: auto !important;
+    right: 2% !important;
+    bottom: 20% !important;
+    animation-delay: -3.2s;
+}
+
+@keyframes premiumBubbleFloat {
+    0%, 100% {
+        translate: 0 0;
+    }
+    50% {
+        translate: 0 -9px;
+    }
+}
+
+/* Subtle light particles */
+#welcomeBanner .wb-spark {
+    width: 5px;
+    height: 5px;
+    box-shadow: 0 0 12px 4px rgba(255,255,255,.7);
+}
+
+/* Tablet */
+@media (max-width: 1100px) {
+    #welcomeBanner #aiBotSpace {
+        left: 62% !important;
+        right: 1% !important;
+    }
+
+    #welcomeBanner .wb-mail {
+        left: 64% !important;
+    }
+
+    #welcomeBanner .wb-summary {
+        left: 61% !important;
+    }
+}
+
+/* Mobile */
+@media (max-width: 650px) {
+    #welcomeBanner {
+        height: 350px !important;
+        min-height: 350px !important;
+        max-height: 350px !important;
+    }
+
+    #welcomeBanner #aiBotSpace {
+        left: 63% !important;
+        right: -8% !important;
+    }
+
+    #welcomeBanner .wb-float {
+        padding: 7px 9px;
+        gap: 5px;
+    }
+
+    #welcomeBanner .wb-float i {
+        font-size: 13px;
+    }
+
+    #welcomeBanner .wb-float strong {
+        font-size: 9px;
+    }
+
+    #welcomeBanner .wb-float small {
+        width: 40px;
+    }
+
+    #welcomeBanner .wb-mail {
+        left: 65% !important;
+        top: 12% !important;
+    }
+
+    #welcomeBanner .wb-summary {
+        left: 59% !important;
+        bottom: 13% !important;
+    }
+
+    #welcomeBanner .wb-reply {
+        right: 1% !important;
+        bottom: 24% !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #welcomeBanner .wb-float {
+        animation: none !important;
+    }
+}
+
+/* ===== REFERENCE DASHBOARD DESIGN ===== */
+
+#welcomeBanner.welcome-banner {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  height: 340px !important;
+  min-height: 340px !important;
+  margin: 0 0 18px !important;
+  padding: 38px !important;
+  border: 1px solid #dcd7ff !important;
+  border-radius: 28px !important;
+  background: radial-gradient(
+    ellipse at 78% 55%,
+    #b7adff 0%,
+    #ded9ff 35%,
+    #f5f1ff 70%,
+    #fff 100%
+  ) !important;
+  display: flex !important;
+  align-items: center !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+#welcomeBanner .welcome-text {
+  flex: 0 0 57% !important;
+  max-width: 57% !important;
+  min-width: 0 !important;
+  position: relative !important;
+  z-index: 5 !important;
+}
+
+#welcomeBanner h1 {
+  font-size: clamp(30px, 3.1vw, 49px) !important;
+  line-height: 1.12 !important;
+  letter-spacing: -1.8px !important;
+  color: #0c1030 !important;
+  margin: 0 0 12px !important;
+}
+
+#welcomeBanner .welcome-text > p {
+  font-size: 16px !important;
+  color: #7c83a7 !important;
+  margin: 0 0 22px !important;
+}
+
+/* FOUR STAT CARDS */
+
+#welcomeBanner .stats-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+#welcomeBanner .stat-card {
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  height: 118px !important;
+  min-height: 118px !important;
+  padding: 15px 12px !important;
+  background: rgba(255,255,255,.94) !important;
+  border: 1px solid #e7e6ff !important;
+  border-radius: 15px !important;
+  box-shadow: 0 10px 22px rgba(90,80,160,.10) !important;
+  display: grid !important;
+  grid-template-columns: 50px minmax(0,1fr) !important;
+  grid-template-rows: 1fr 20px !important;
+  gap: 3px 8px !important;
+  align-items: center !important;
+  transform: none !important;
+  transition: box-shadow .25s ease !important;
+}
+
+#welcomeBanner .stat-card:hover {
+  box-shadow: 0 14px 28px rgba(90,80,160,.16) !important;
+}
+
+#welcomeBanner .stat-icon {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 16px !important;
+  display: grid !important;
+  place-items: center !important;
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  background: #f0eaff !important;
+  color: #7655f9 !important;
+  font-size: 24px !important;
+}
+
+#welcomeBanner .stat-card.blue .stat-icon {
+  background: #e9f1ff !important;
+  color: #287bff !important;
+}
+
+#welcomeBanner .stat-card.teal .stat-icon,
+#welcomeBanner .stat-card.green .stat-icon {
+  background: #e4faf7 !important;
+  color: #23cbbd !important;
+}
+
+#welcomeBanner .stat-card.yellow .stat-icon {
+  background: #fff4df !important;
+  color: #f6a500 !important;
+}
+
+#welcomeBanner .stat-details {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  min-width: 0 !important;
+}
+
+#welcomeBanner .stat-details h2 {
+  font-size: 25px !important;
+  line-height: 1.1 !important;
+  color: #101334 !important;
+  margin: 0 !important;
+}
+
+#welcomeBanner .stat-details p {
+  font-size: 10px !important;
+  line-height: 1.25 !important;
+  color: #8189a8 !important;
+  margin: 5px 0 0 !important;
+}
+
+#welcomeBanner .stat-trend {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  justify-self: end !important;
+  align-self: end !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+}
+
+/* 3D ROBOT */
+
+#welcomeBanner .ai-bot-space {
+  position: absolute !important;
+  left: auto !important;
+  right: 11% !important;
+  top: 3% !important;
+  width: 310px !important;
+  height: 320px !important;
+  min-width: 0 !important;
+  flex: none !important;
+  z-index: 3 !important;
+  transform: none !important;
+}
+
+#welcomeBanner .wb-float {
+  z-index: 4 !important;
+}
+
+#welcomeBanner .wb-mail {
+  left: auto !important;
+  right: 31% !important;
+  top: 10% !important;
+}
+
+#welcomeBanner .wb-summary {
+  left: auto !important;
+  right: 27% !important;
+  bottom: 12% !important;
+}
+
+#welcomeBanner .wb-reply {
+  left: auto !important;
+  right: 2% !important;
+  bottom: 14% !important;
+}
+
+/* TEAM WORKSPACE */
+
+#dashboardRoot {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+#workspacePlanner.workspace-planner {
+  margin: 18px 0 24px !important;
+  padding: 20px !important;
+  border: 1px solid #e1dfff !important;
+  border-radius: 19px !important;
+  background: linear-gradient(125deg,#fbfaff,#f8f9ff) !important;
+  box-shadow: 0 7px 24px rgba(96,90,193,.05) !important;
+}
+
+#workspacePlanner .wp-heading {
+  margin-bottom: 12px !important;
+}
+
+#workspacePlanner .wp-heading h2 {
+  font-size: 20px !important;
+  color: #121633 !important;
+}
+
+#workspacePlanner .wp-summary {
+  display: grid !important;
+  grid-template-columns: repeat(3,minmax(0,1fr)) !important;
+  gap: 12px !important;
+  margin: 12px 0 !important;
+}
+
+#workspacePlanner .wp-summary-card {
+  min-width: 0 !important;
+  min-height: 88px !important;
+  background: #fff !important;
+  border: 1px solid #ecebfa !important;
+  border-radius: 13px !important;
+  box-shadow: 0 5px 12px rgba(123,122,171,.04) !important;
+}
+
+/* TO-DO | CALENDAR | EVENTS */
+
+#workspacePlanner .wp-columns {
+  display: grid !important;
+  grid-template-columns: 1.65fr 1.75fr !important;
+  gap: 12px !important;
+  align-items: stretch !important;
+}
+
+#workspacePlanner .wp-calendar-area {
+  display: grid !important;
+  grid-template-columns: 1.15fr .9fr !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+  align-items: stretch !important;
+}
+
+#workspacePlanner .wp-card {
+  min-width: 0 !important;
+  background: #fff !important;
+  border: 1px solid #eaeafa !important;
+  border-radius: 14px !important;
+  padding: 15px !important;
+}
+
+#workspacePlanner .wp-card-heading h3 {
+  font-size: 14px !important;
+  white-space: nowrap !important;
+}
+
+#workspacePlanner .wp-monthbar {
+  gap: 6px !important;
+  margin: 13px 0 10px !important;
+}
+
+#workspacePlanner .wp-monthbar strong {
+  font-size: 12px !important;
+  white-space: nowrap !important;
+}
+
+#workspacePlanner .wp-monthbar button {
+  padding: 6px 8px !important;
+}
+
+#workspacePlanner .wp-calendar {
+  gap: 3px !important;
+}
+
+#workspacePlanner .wp-day,
+#workspacePlanner .wp-blank {
+  min-height: 32px !important;
+}
+
+#workspacePlanner .wp-task {
+  border: 1px solid #f0effb !important;
+  border-radius: 11px !important;
+  margin-bottom: 7px !important;
+  padding: 11px !important;
+  box-shadow: 0 3px 10px rgba(85,81,160,.04) !important;
+}
+
+#workspacePlanner .wp-agenda {
+  max-height: 125px;
+  overflow: auto;
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 1250px) {
+  #welcomeBanner .welcome-text {
+    flex-basis: 65% !important;
+    max-width: 65% !important;
+  }
+
+  #welcomeBanner .ai-bot-space {
+    right: 3% !important;
+    width: 260px !important;
+    height: 290px !important;
+  }
+
+  #workspacePlanner .wp-columns {
+    grid-template-columns: 1fr !important;
+  }
+
+  #workspacePlanner .wp-calendar-area {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 800px) {
+  #welcomeBanner.welcome-banner {
+    height: auto !important;
+    min-height: 430px !important;
+    padding: 28px 20px !important;
+    align-items: flex-start !important;
+  }
+
+  #welcomeBanner .welcome-text {
+    flex-basis: 100% !important;
+    max-width: 100% !important;
+  }
+
+  #welcomeBanner .ai-bot-space {
+    opacity: .4 !important;
+    right: 0 !important;
+    top: 10px !important;
+  }
+
+  #welcomeBanner .stats-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+  }
+
+  #welcomeBanner .wb-float {
+    display: none !important;
+  }
+
+  #workspacePlanner .wp-calendar-area {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* ===== WELCOME BANNER FINAL VISUAL FIX ===== */
+
+/* Four-point stars */
+#welcomeBanner::before {
+  content: "✦     ✧          ✦       ✧";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 65px 75px 0 0;
+  color: rgba(255,255,255,.95);
+  font-size: 27px;
+  letter-spacing: 45px;
+  text-shadow:
+    0 0 8px #fff,
+    0 0 18px #fff,
+    0 0 28px #c8b7ff;
+  animation: sparkleTwinkle 2.8s ease-in-out infinite alternate;
+}
+
+/* Softer light orbit */
+#welcomeBanner::after {
+  content: "";
+  position: absolute;
+  right: 3%;
+  bottom: 10%;
+  width: 43%;
+  height: 43%;
+  border: 2px solid rgba(255,255,255,.75);
+  border-radius: 50%;
+  transform: rotate(-13deg);
+  box-shadow:
+    0 0 12px rgba(255,255,255,.9),
+    0 0 30px rgba(190,155,255,.55);
+  z-index: 1;
+  pointer-events: none;
+  animation: orbitGlow 4s ease-in-out infinite alternate;
+}
+
+@keyframes sparkleTwinkle {
+  from {
+    opacity: .25;
+    filter: blur(1px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes orbitGlow {
+  from { opacity: .3; }
+  to { opacity: .85; }
+}
+
+/* Robot position and size */
+#welcomeBanner .ai-bot-space {
+  top: -3% !important;
+  right: 10% !important;
+  width: 330px !important;
+  height: 300px !important;
+  overflow: visible !important;
+}
+
+#welcomeBanner .ai-bot-3d {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Floating cards */
+#welcomeBanner .wb-mail {
+  top: 9% !important;
+  right: 30% !important;
+  transform: rotate(-10deg);
+}
+
+#welcomeBanner .wb-summary {
+  bottom: 14% !important;
+  right: 26% !important;
+  transform: rotate(9deg);
+}
+
+#welcomeBanner .wb-reply {
+  bottom: 18% !important;
+  right: 2% !important;
+  transform: rotate(-9deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #welcomeBanner::before,
+  #welcomeBanner::after {
+    animation: none !important;
+  }
+}
+
+
+/* Shorter Welcome Banner */
+#welcomeBanner.welcome-banner {
+  height: 250px !important;
+  min-height: 250px !important;
+  padding: 25px 38px !important;
+}
+
+/* Keep Robot inside banner */
+#welcomeBanner .ai-bot-space {
+  top: 0 !important;
+  right: 10% !important;
+  height: 280px !important;
+  width: 300px !important;
+}
+
+/* Keep statistics cards compact */
+#welcomeBanner .stat-card {
+  height: 105px !important;
+  min-height: 105px !important;
+}
+
+
+/* ===== BIGGER ROBOT + MOVE UP ===== */
+
+#welcomeBanner .ai-bot-space {
+  position: absolute !important;
+  top: -25px !important;
+  right: 9% !important;
+  width: 360px !important;
+  height: 340px !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+  z-index: 3 !important;
+}
+
+#welcomeBanner .ai-bot-3d {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Keep floating cards above background effects */
+#welcomeBanner .wb-float {
+  z-index: 4 !important;
+}
+
+/* ===== ROBOT VISUAL POLISH ===== */
+
+#welcomeBanner .ai-bot-space {
+  position: absolute !important;
+  top: -28px !important;
+  right: 8% !important;
+  width: 360px !important;
+  height: 340px !important;
+  z-index: 3 !important;
+  overflow: visible !important;
+}
+
+#welcomeBanner .ai-bot-3d {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#welcomeBanner .wb-mail {
+  animation: mascotCardFloat 4s ease-in-out infinite;
+}
+
+#welcomeBanner .wb-summary {
+  animation: mascotCardFloat 4.8s ease-in-out infinite -1.2s;
+}
+
+#welcomeBanner .wb-reply {
+  animation: mascotCardFloat 4.4s ease-in-out infinite -2s;
+}
+
+@keyframes mascotCardFloat {
+  0%, 100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #welcomeBanner .wb-float {
+    animation: none !important;
+  }
+}
+
+/* ===== TEAM WORKSPACE: NO ANIMATION ===== */
+
+#workspacePlanner,
+#workspacePlanner *,
+#workspacePlanner *::before,
+#workspacePlanner *::after {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+}
+
+/* Keep Workspace stationary */
+#workspacePlanner {
+  filter: none !important;
+}

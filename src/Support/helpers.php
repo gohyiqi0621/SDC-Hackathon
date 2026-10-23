@@ -314,7 +314,12 @@ function brand_logo(): string
 }
 
 /**
- * The company that issues our invoices (src/company.php).
+ * The company that issues the signed-in user's invoices and receipts.
+ *
+ * Every account is its own business, so the details come from that user's
+ * Company Profile (company_profiles: name, registration no., address, phone,
+ * email, bank). src/company.php only fills what the profile leaves empty
+ * (and the logo used by the invoice template).
  *
  * @return array<string, string>
  */
@@ -322,9 +327,49 @@ function company(): array
 {
     static $company = null;
 
-    if ($company === null) {
-        $file    = SRC_ROOT . '/company.php';
-        $company = is_file($file) ? (array) require $file : [];
+    if ($company !== null) {
+        return $company;
+    }
+
+    $file    = SRC_ROOT . '/company.php';
+    $company = is_file($file) ? (array) require $file : [];
+
+    $user = current_user();
+    if ($user === null) {
+        return $company;
+    }
+
+    try {
+        $profile = (new \Src\Models\CompanyProfile())->find((int) $user['id']) ?? [];
+    } catch (\Throwable $e) {
+        $profile = [];
+    }
+
+    foreach ([
+        'name'                 => 'company_name',
+        'reg_no'               => 'registration_no',
+        'address'              => 'company_address',
+        'tel'                  => 'company_phone',
+        'email'                => 'company_email',
+        'payment_bank'         => 'payment_bank',
+        'payment_account_no'   => 'payment_account_no',
+        'payment_account_name' => 'payment_account_name',
+    ] as $key => $column) {
+        $value = trim((string) ($profile[$column] ?? ''));
+        if ($value !== '') {
+            $company[$key] = $value;
+        }
+    }
+
+    // The user's own logo (Company Profile), as a file path for the PDFs. Never
+    // the app's logo: a business's invoice shows only that business.
+    $company['logo_path'] = null;
+    $logo = (string) ($profile['company_logo_url'] ?? '');
+    if ($logo !== '' && !str_contains($logo, '..') && !preg_match('#^https?://#i', $logo)) {
+        $path = PUBLIC_ROOT . '/' . ltrim($logo, '/');
+        if (is_file($path)) {
+            $company['logo_path'] = $path;
+        }
     }
 
     return $company;
