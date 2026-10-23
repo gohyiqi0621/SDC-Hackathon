@@ -828,14 +828,50 @@
             if (firstTab) { firstTab.click(); }
         }
 
+        /** While the AI writes: what it is doing, and the seconds so far. */
+        function showProgress() {
+            var started = Date.now();
+            aiResult.innerHTML = '';
+            var head = document.createElement('p');
+            head.className = 'sop-ai-result-head';
+            head.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> ';
+            var label = document.createTextNode('Writing 3 SOPs from your Company Information…');
+            head.appendChild(label);
+            aiResult.appendChild(head);
+            var list = document.createElement('ul');
+            ['Customer service: complaints, refunds and questions',
+             'Your main order or booking process',
+             'Sales: recommending and closing'].forEach(function (text) {
+                var item = document.createElement('li');
+                item.textContent = text;
+                list.appendChild(item);
+            });
+            aiResult.appendChild(list);
+            var hint = document.createElement('p');
+            hint.className = 'field-hint';
+            aiResult.appendChild(hint);
+            aiResult.hidden = false;
+            function tick() {
+                var s = Math.round((Date.now() - started) / 1000);
+                hint.textContent = s + 's - usually ready in 5 to 20 seconds. You can keep editing other fields.';
+            }
+            tick();
+            var timer = setInterval(tick, 1000);
+            return function stop() { clearInterval(timer); };
+        }
+
         function generateSops() {
             setBusy(generateBtn, true, 'Generating…');
+            var stopProgress = showProgress();
             Api.assistant.generateSops().then(function (data) {
+                stopProgress();
                 if (!data || !data.sops || !data.sops.length) { throw new Error('No instructions came back. Please try again.'); }
                 applySops(data.sops);
                 showAiResult(data);
                 toast('Instructions generated. Review them, then click Save.', 'success');
             }).catch(function (error) {
+                stopProgress();
+                aiResult.hidden = true;
                 var message = error && error.kind === 'unavailable'
                     ? 'AI generation is not available right now (the server endpoint could not be reached).'
                     : (error && error.message) || 'Could not generate the SOPs.';

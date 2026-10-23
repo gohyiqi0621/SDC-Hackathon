@@ -63,6 +63,7 @@ use Src\Models\GmailConnection;
 use Src\Models\StaffAiAssistantSetting;
 use Src\Services\BookingService;
 use Src\Services\GmailService;
+use Src\Services\OrderInvoiceService;
 use Src\Services\OrderService;
 use Src\Services\StaffAssistantService;
 use Src\Support\Database;
@@ -244,6 +245,11 @@ final class ToolController
             FlowLog::write('tool.buy_product_error', ['error' => $e->getMessage()]);
             $this->json(500, ['success' => false, 'error' => 'The order could not be saved. Run the database migrations (009) and try again.']);
         }
+
+        // Financial > Invoice: the order's invoice (Unpaid); cancelled orders lose theirs.
+        $invoiceService = new OrderInvoiceService();
+        $invoice        = $invoiceService->createFor($userId, $order);
+        $invoiceService->removeFor($userId, $replaced);
 
         $company      = (new CompanyProfile())->find($userId) ?? [];
         $instructions = CompanyProfile::paymentText($company);

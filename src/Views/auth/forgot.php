@@ -38,6 +38,9 @@ view('layouts/header', ['title' => 'Forgot password', 'bare' => true]);
         </button>
     </form>
 
-    <p class="auth-switch"><a href="<?= e(url('auth', ['action' => 'login'])) ?>">Back to sign in</a></p>
+    <p class="auth-switch">
+        No account yet? <a href="<?= e(url('auth', ['action' => 'register'])) ?>">Create an account</a>
+        &middot; <a href="<?= e(url('auth', ['action' => 'login'])) ?>">Back to sign in</a>
+    </p>
 </section>
 <?php view('layouts/footer', ['bare' => true]); ?>

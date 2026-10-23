@@ -197,6 +197,9 @@ final class OrderService
             'status' => 'paid', 'reviewed_at' => date('c'), 'review_note' => null,
         ]) ?? $order;
 
+        // The order's invoice (Financial > Invoice) becomes Paid.
+        $invoice = (new OrderInvoiceService())->markPaid($userId, $order);
+
         $total = format_money($order['total'], $order['currency']);
         $text  = "✅ Payment verified!\nWe have received {$total} for order {$order['order_no']}. Thank you for your order.\n"
             . 'Your official receipt (' . OfficialReceiptPdf::receiptNo($order) . ') is attached below.';
@@ -209,7 +212,8 @@ final class OrderService
 
         FlowLog::write('order.approved', ['order_no' => $order['order_no'], 'customer_notified' => $sent, 'official_receipt_sent' => $receiptSent]);
 
-        return ['order' => $order, 'notified' => $sent, 'receipt_sent' => $receiptSent];
+        return ['order' => $order, 'notified' => $sent, 'receipt_sent' => $receiptSent,
+                'invoice_paid' => $invoice !== null && ($invoice['status'] ?? '') === 'paid'];
     }
 
     /**
@@ -349,6 +353,7 @@ final class OrderService
         }
 
         $order = (new Order())->update($userId, (int) $order['id'], ['status' => 'cancelled', 'reviewed_at' => date('c')]) ?? $order;
+        (new OrderInvoiceService())->removeFor($userId, [(string) $order['order_no']]);
         $text  = "Order {$order['order_no']} has been cancelled. Reply here if you have any questions.";
         $sent  = $this->notifyCustomer($userId, $order, $text);
         $this->remember($userId, $order, 'assistant', $text);

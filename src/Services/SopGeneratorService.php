@@ -11,11 +11,11 @@
  *            no appointments gets e.g. "Order & Delivery SOP" instead)
  *   sales    how to recommend, upsell and close
  *
- * Agnes AI uses the OpenAI-style API:
- *   POST {AGNES_API_URL}/chat/completions   Authorization: Bearer <key>
- *
- * Key: AGNES_API_KEY in .env, or the business's own saved key when its
- * assistant runs on an Agnes model. The key is never logged or returned.
+ * Which AI writes them (fastest first):
+ *   1. Claude Haiku 4.5, with the business's own saved Claude key (or
+ *      ANTHROPIC_API_KEY in .env) - usually 5-10 seconds.
+ *   2. Agnes (OpenAI-style API, AGNES_API_KEY or a saved Agnes key) - slower.
+ * Keys are never logged or returned.
  */
 declare(strict_types=1);
 
@@ -47,6 +47,11 @@ final class SopGeneratorService
      */
     public function generate(array $company, array $products, ?array $assistant): array
     {
+        $claudeKey = $this->claudeKey($assistant);
+        if ($claudeKey !== null) {
+            return $this->generateWithClaude($claudeKey, $company, $products);
+        }
+
         $apiKey = $this->apiKey($assistant);
         $model  = (string) (env('AGNES_SOP_MODEL', '') ?: 'agnes-2.5-flash');
         $url    = rtrim((string) (env('AGNES_API_URL', '') ?: 'https://apihub.agnes-ai.com/v1'), '/') . '/chat/completions';
@@ -121,6 +126,75 @@ final class SopGeneratorService
     }
 
     /* ---------------------------------------------------------- private ---- */
+
+    /** Claude (fast): POST https://api.anthropic.com/v1/messages */
+    private function generateWithClaude(string $key, array $company, array $products): array
+    {
+        $model   = (string) (env('SOP_CLAUDE_MODEL', '') ?: 'claude-haiku-4-5');
+        $payload = [
+            'model'       => $model,
+            'max_tokens'  => 1500,
+            'temperature' => 0.4,
+            'system'      => $this->instructions(),
+            'messages'    => [['role' => 'user', 'content' => $this->companyBrief($company, $products)]],
+        ];
+
+        try {
+            $response = Http::request('POST', 'https://api.anthropic.com/v1/messages', [
+                'x-api-key'         => $key,
+                'anthropic-version' => '2023-06-01',
+                'Content-Type'      => 'application/json',
+            ], json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 45);
+        } catch (RuntimeException $e) {
+            error_log('[sop] claude: ' . $e->getMessage());
+            throw new RuntimeException('Could not reach the AI service. Check the internet connection and try again.');
+        }
+
+        if ($response['status'] === 401 || $response['status'] === 403) {
+            throw new RuntimeException('The saved Claude key was rejected. Check the secret key in AI Assistant Settings.');
+        }
+        if ($response['status'] === 429 || $response['status'] === 529) {
+            throw new RuntimeException('The AI service is busy or the usage limit was reached. Try again in a minute.');
+        }
+        if ($response['status'] < 200 || $response['status'] >= 300) {
+            $detail = is_array($response['json']) ? (string) ($response['json']['error']['message'] ?? '') : '';
+            error_log('[sop] claude HTTP ' . $response['status'] . ($detail !== '' ? ': ' . $detail : ''));
+            throw new RuntimeException('The instructions could not be generated (HTTP ' . $response['status'] . ').' . (APP_DEBUG && $detail !== '' ? ' ' . $detail : ''));
+        }
+
+        $json = is_array($response['json']) ? $response['json'] : [];
+        $text = $this->contentText($json['content'] ?? '');
+
+        try {
+            $sops = $this->parse($text);
+        } catch (RuntimeException $e) {
+            error_log('[sop] could not read Claude answer (stop_reason=' . (string) ($json['stop_reason'] ?? '?') . '): ' . mb_substr($text, 0, 3000));
+            if (($json['stop_reason'] ?? '') === 'max_tokens') {
+                throw new RuntimeException('The AI stopped before finishing the instructions. Please try again.');
+            }
+            throw $e;
+        }
+
+        return ['model' => $model, 'sops' => $sops];
+    }
+
+    /** The business's saved Claude key (its assistant runs on Claude), else ANTHROPIC_API_KEY, else null. */
+    private function claudeKey(?array $assistant): ?string
+    {
+        $model = AiSettingsController::resolveModel($assistant['ai_model'] ?? null);
+        if (!empty($assistant['api_key_encrypted']) && (AiSettingsController::AI_MODELS[$model][1] ?? '') === 'Anthropic') {
+            try {
+                $key = trim(Crypto::decrypt((string) $assistant['api_key_encrypted']));
+                if ($key !== '') {
+                    return $key;
+                }
+            } catch (RuntimeException $e) {
+                // fall back to .env / Agnes
+            }
+        }
+        $env = trim((string) env('ANTHROPIC_API_KEY', ''));
+        return $env !== '' ? $env : null;
+    }
 
     private function apiKey(?array $assistant): string
     {
