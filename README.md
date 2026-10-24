@@ -1,25 +1,25 @@
-# Project Name
+# Project Name - SME Smart
 
-> A one-sentence description of what your project does and who it is for.
+> SME Smart is an AI-powered business automation platform that helps Malaysian SMEs streamline customer service, order processing, invoicing, appointment scheduling, and daily operations through personalized AI assistants.
 
 ---
 
 ## Team Information
 
-| Field                 | Details                                          |
-| --------------------- | ------------------------------------------------ |
-| **Team Name**         | CTRL + Future                                    |
-| **Team Domain**       | Domain 2                                         |
-| **SDG Track (1–17)**  | e.g. SDG 11 — Sustainable Cities and Communities |
-| **Team Leader**       | Teh Sze Yu Jocelyn                               |
-| **University**        | Universiti Technologi Malaysia                   |
-| **Number of Members** | 5                                                |
+| Field                  | Details                                     |
+| ---------------------- | ------------------------------------------- |
+| **Team Name**          | Ctrl + Future                               |
+| **Team Domain**        | Domain 2                                    |
+| **SDG Track (1–17)**   | SDG 8 — Decent Work and Economic Growth     |
+| **Team Leader**        | Teh Sze Yu Jocelyn                          |
+| **University**         | University Technology Malaysia (UTM)        |
+| **Number of Members**  | 5                                           |
 
 ## Links
 
 | Resource          | Link                                           |
 | ----------------- | ---------------------------------------------- |
-| GitHub Repository | https://github.com/gohyiqi0621/SDC-Hackathon   |
+| GitHub Repository | https://github.com/your-username/your-project  |
 | Replit Project    | https://replit.com/@your-username/your-project |
 | Live Demo         | https://your-project.replit.app                |
 | RunPod Endpoint   | https://api.runpod.ai/v2/your-endpoint-id      |
@@ -32,27 +32,30 @@
 
 ### Problem
 
-Describe the real-world problem you are solving in 2–4 sentences. Who is affected, and why does it matter?
+Many Malaysian micro and small businesses rely on manual processes and disconnected applications to manage customer enquiries, orders, invoices, appointments, and daily operations. These repetitive tasks often lead to delayed responses, human errors, and inconsistent workflows. SMEs need an affordable, easy-to-learn automation solution that improves productivity while keeping employees in control.
 
 ### Solution
 
-Explain how your project uses AI to solve the problem and what makes it valuable.
+SME Smart is an AI-powered business automation platform that allows businesses from different industries to quickly configure personalized AI assistants. It automates customer enquiries, order processing, invoice generation, appointment scheduling, and business data management through connected workflows.
+
+By combining AI automation with human verification, SME Smart reduces repetitive tasks, improves accuracy, and helps businesses operate more efficiently. Its reusable and customizable modules are designed for potential integration with the Orbyte ecosystem, supporting SME digital transformation and SDG 8.
 
 ### Key Features
 
-- **Feature 1** — Short description.
-- **Feature 2** — Short description.
-- **Feature 3** — Short description.
+- **Personalized AI Assistants** — Enables SMEs across different industries to quickly configure AI assistants based on their business needs.
+- **AI Customer Service & Automation** — Handles customer enquiries, processes orders, generates invoices, and assists with appointment scheduling.
+- **AI-Powered Business Management** — Automates product data imports, email management, and internal business information retrieval.
+- **Human Verification & Control** — Allows staff to verify payments, manage approvals, and oversee important business operations.
 
 ### Tech Stack
 
-| Layer         | Technology                    |
-| ------------- | ----------------------------- |
-| Frontend      | HTML, CSS, JS                 |
-| Backend       | PHP 8.2 (portal), Python (RunPod) |
-| Database      | PostgreSQL                    |
-| AI / Compute  | RunPod (GPU)                  |
-| Hosting / Dev | XAMPP, Replit                 |
+| Layer         | Technology                   |
+| ------------- | ---------------------------- |
+| Frontend      | HTML, CSS, JavaScript        |
+| Backend       | Python, Php                  |
+| Database      | PostgreSQL                   |
+| AI / Compute  | RunPod (GPU)                 |
+| Hosting / Dev | Replit                       |
 
 ---
 
@@ -128,6 +131,7 @@ Explain how your project uses AI to solve the problem and what makes it valuable
 ├── .htaccess                    # blocks src/, .env etc. from the web
 ├── .replit                      # Replit run + deployment configuration
 ├── LICENSE
+├── requirements.txt         # Python dependencies
 └── README.md
 ```
 
@@ -136,173 +140,42 @@ Explain how your project uses AI to solve the problem and what makes it valuable
 > app does not use them; everything current is in `src/` and `public/`.
 
 ### Architecture
+             
+                 Customers / SME Staff
+                           |
+                           v
+                 SME Smart Web Platform
+                  (Frontend + Backend)
+                           |
+          +----------------+----------------+
+          |                |                |
+          v                v                v
+      AI Services       Database       External APIs
+       (Flowise)       PostgreSQL      Gmail / Calendar
+          |                            Telegram / Claude
+          |                            Agnes
+          |
+          +----> RunPod GPU
+          |      (vLLM + Qwen2.5-7B-Instruct)
+          |      System Prompt Generation Only
+          |
+          v
+              Business Automation
+           - Customer AI Chatbot
+           - Order & Invoice Management
+           - Appointment Scheduling
+           - Internal AI Assistant
+           - Email Processing
+                           |
+                           v
+                 Human Verification
+                     & Approval
+                           |
+                           v
+                  Updated Business
+                   Records & Status
 
-```
-User ──► Replit (App / API) ──► RunPod Endpoint (GPU model)
-                │
-                └──► Response returned to user
-```
-
----
-
-## Authentication & Profile Portal
-
-The project now includes a **user-only** web portal (PHP 8.2 + PostgreSQL).
-It has registration, login, logout, forgot password, reset password and profile management.
-There is **no admin portal and no admin authentication** anywhere in it.
-
-### What is included
-
-- Sign in redirects straight to the dashboard; visiting the login page while
-  signed in redirects to the dashboard too.
-- Passwords are hashed with `password_hash`; every query is a prepared
-  statement against PostgreSQL.
-- Sessions use HTTP-only, `SameSite=Lax` cookies with ID regeneration and
-  idle/absolute timeouts.
-- Every POST is protected by CSRF; logout is POST-only.
-- Password reset uses a 32-byte random token, stored as a SHA-256 hash,
-  expiring after 60 minutes and consumed exactly once inside a transaction.
-- The profile page lets the signed-in user update their name and password.
-- Anyone can create an account at `/auth/register`; after registering they are
-  signed in and sent to the dashboard.
-- The **dashboard is the Smart SME AI email dashboard** (inbox, AI summary,
-  AI reply draft, smart notifications), and every page — sign in, Financial,
-  AI Chatbot, Profile — uses the same design.
-- Brevo sends password-reset email (bodies in `src/Views/emails/`). The
-  dashboard shows whether Brevo is connected and can send a test email.
-- Sidebar: **Dashboard · Financial (Invoice, Claims, Settlement, Upload
-  Invoice) · AI Chatbot (Customer, Staff) · Profile · Logout**.
-
-Full details: [`docs/AUTH.md`](docs/AUTH.md).
-
-## Dashboard email: Gmail, AI summary and follow-ups
-
-The dashboard is the Smart SME AI email dashboard:
-
-- **Gmail inbox (read-only).** Click **Connect Gmail** on the dashboard and
-  sign in with Google. The latest inbox and spam emails then load into the
-  inbox, with categories (Finance, Meeting, Orders, …) picked from keywords.
-  **Sync** reloads, **Disconnect** forgets and revokes the access. Without a
-  connection the dashboard shows demo emails.
-- **AI summary and reply draft** for the selected email (generated in the
-  browser for now).
-- **Suggested follow-up** with **Approve** (creates a follow-up task) and
-  **Dismiss**, plus a **History** popup listing created tasks and the
-  activity log. These are kept in the browser, separately per user.
-
-Gmail is implemented with plain HTTPS calls (`src/Services/GmailService.php`),
-so no Composer package is needed. Tokens are stored per user in the
-`gmail_connections` table (migration `003`).
-
-### Set up Gmail
-
-1. In `.env`, set `GMAIL_CLIENT_ID` and `GMAIL_CLIENT_SECRET` from Google
-   Cloud Console → APIs & Services → Credentials → your OAuth client (Web).
-2. In the same OAuth client, add this to **Authorized redirect URIs**:
-   `http://localhost/SDC-Hackathon/public/gmail/callback`
-   (it must match `GMAIL_REDIRECT_URI` in `.env` exactly).
-3. Make sure the **Gmail API** is enabled for the project, and while the
-   app is in "Testing", add your Google account under **Test users**.
-4. Run `C:\xampp\php\php.exe bin\migrate.php` to create `gmail_connections`.
-
-## AI replies: Telegram → Website → Flowise
-
-Customer messages to a business's Telegram bot are answered by its AI
-assistant: the website loads the company profile and AI settings from
-PostgreSQL, fills `src/Prompts/system_message.md`, asks Flowise and sends the
-reply back to the chat. The Customer **Chat Interface** page runs the same
-pipeline for testing. Setup, the exact Flowise request and the custom tool
-code are in [`docs/FLOWISE.md`](docs/FLOWISE.md).
-
-New `.env` settings: `PUBLIC_APP_URL`, `FLOWISE_API_URL`, `FLOWISE_CHATFLOW_ID`,
-`FLOWISE_API_KEY` (see `.env.example`). New table migration: `007`.
-
-## Product & Service (AI Chatbot → Customer)
-
-Each signed-in user manages their own products and services at
-`/products` (categories at `/categories`):
-
-- List with image, name, SKU, category, price, promo price and status;
-  search by name/SKU, filter by category and status, sort by name, price or
-  date, 10 per page.
-- Add / edit with name, SKU, category, description, free-text
-  characteristics, image (JPG/PNG/WebP/GIF, 2 MB), price, promotional price,
-  currency (default MYR) and Active/Inactive status.
-- Remove with a confirmation dialog. Categories can be added, edited and
-  deleted, but a category that still has products cannot be deleted.
-- Every query is scoped to the signed-in user; the database also enforces
-  that a product's category belongs to the same user.
-
-Sidebar: **AI Chatbot → Customer** (Setting & Integration, Product & Service,
-Chat Interface) and **Staff** (Setting & Integration, Chat Interface).
-
-### Apply the database migrations
-
-```bat
-cd C:\xampp\htdocs\SDC-Hackathon
-C:\xampp\php\php.exe bin\migrate.php
-```
-
-or with `psql` (adjust the PostgreSQL version folder):
-
-```bat
-"C:\Program Files\PostgreSQL\16\bin\psql.exe" -h 127.0.0.1 -U yiqi -d sme_assistant -f database\migrations\001_create_product_categories.sql
-"C:\Program Files\PostgreSQL\16\bin\psql.exe" -h 127.0.0.1 -U yiqi -d sme_assistant -f database\migrations\002_create_products.sql
-```
-
-Both files are safe to run again and never touch the `users` table.
-
-### Local setup (XAMPP + PostgreSQL)
-
-1. Start **Apache** and **PostgreSQL** in the XAMPP Control Panel.
-2. Copy `.env.example` to `.env` and set the `DB_*` values (the included `.env`
-   already points at `sme_assistant` on `127.0.0.1:5432`).
-3. Create the tables (idempotent — it never drops data):
-
-   ```bash
-   C:\xampp\php\php.exe bin\migrate.php
-   ```
-
-   Or import the schema with psql:
-
-   ```bash
-   psql -U yiqi -h 127.0.0.1 -d sme_assistant -f database/schema.sql
-   ```
-
-4. Create an account (there is no public registration):
-
-   ```bash
-   C:\xampp\php\php.exe bin\create-user.php "Your Name" you@example.com
-   ```
-
-   The generated password is printed once.
-
-5. Open <http://localhost/SDC-Hackathon/public/>.
-
-6. For password-reset email, add the Brevo credentials to `.env`:
-
-   ```dotenv
-   BREVO_API_KEY=xkeysib-...
-   BREVO_SENDER_EMAIL=verified-sender@example.com
-   BREVO_SENDER_NAME="Smart SME"
-   ```
-
-   `BREVO_SENDER_EMAIL` must be a verified sender in Brevo. The dashboard
-   shows the connection status and can send a test message.
-
-### Health checks
-
-```bash
-C:\xampp\php\php.exe bin\check.php     # database connection + tables
-C:\xampp\php\php.exe -l src\Controllers\AuthController.php
-```
-
----
-
-## Run the Python / RunPod Scaffold
-
-The original Python entry point (`src/main.py`), `src/utils.py`, tests and the
-RunPod handler are preserved.
+## How to Run
 
 ### Option 1 — Run on Replit (Recommended)
 
@@ -323,8 +196,8 @@ cd your-project
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 
-# 3. Install the RunPod handler dependency only if you are setting up its separate endpoint
-pip install -r runpod/requirements.txt
+# 3. Install dependencies
+pip install -r requirements.txt
 
 # 4. Configure environment variables
 cp .env.example .env            # then fill in your values
@@ -341,23 +214,31 @@ python -m unittest discover tests
 
 ---
 
-## How We Use Replit _(Required)_
+## How We Use Replit *(Required)*
 
 Describe how your team used Replit. For example:
 
-- **Development:** Collaborative coding in a shared Repl using Multiplayer.
-- **Hosting:** The app is deployed with Replit Deployments at the Live Demo link above.
-- **Secrets:** API keys are stored in Replit Secrets, never in the code.
+- **Development:** Replit was used to develop, integrate, and test the SME Smart web application.
+
+- **Hosting:** SME Smart is hosted on Replit, allowing users to access the platform through a live web application.
+
+- **Integration:** Replit connects the frontend, backend, database, AI services, and external APIs.
+
+- **Environment Variables:** API credentials and sensitive configuration values are managed through environment variables.
 
 📄 Proof of use: [`submission/REPLIT PROOF OF USE.pdf`](submission/REPLIT%20PROOF%20OF%20USE.pdf)
 
-## How We Use RunPod _(Required)_
+## How We Use RunPod *(Required)*
 
 Describe how your team used RunPod. For example:
 
-- **Workload:** Model inference (e.g. text generation, image processing) runs on a RunPod GPU.
-- **Setup:** `runpod/handler.py` and `runpod/requirements.txt` are deployed as a **RunPod Serverless Endpoint**. Its Python dependencies are kept separate from the PHP portal so the Replit portal build does not try to install them.
-- **Integration:** The Replit app sends requests to the endpoint using `RUNPOD_API_KEY` and `RUNPOD_ENDPOINT_ID`.
+- **Workload:** Generate customized SOP prompts based on each company's business requirements.
+
+- **AI Model:** Qwen2.5-7B-Instruct, deployed using vLLM on RunPod GPU.
+
+- **Integration:**The generated prompts are integrated into Flowise to configure personalized AI assistants.
+
+- **Purpose:** Simplify AI setup and automate business workflows across different industries.
 
 Example request:
 
@@ -374,34 +255,40 @@ curl -X POST https://api.runpod.ai/v2/$RUNPOD_ENDPOINT_ID/runsync \
 
 ## Challenges & Learnings
 
-- What challenges did you face, and how did you overcome them?
-- What did your team learn?
+- **AI Behavior Customization:** Refining customized SOP prompts to ensure consistent and accurate AI responses across different business scenarios.
+- **API Authentication:** Managing OAuth authentication and permissions for Gmail and Google Calendar integrations.
+- **Time Constraints:** Developing and testing multiple interconnected features within a limited hackathon timeframe.
+- Throughout this hackathon, our team learned the importance of teamwork, effective communication, and task delegation based on each member's strengths. We stepped beyond our existing knowledge and comfort zones to explore new technologies, develop innovative and creative solutions, and overcome technical challenges. This experience strengthened our problem-solving skills, adaptability, and ability to work together towards a common goal.
 
 ## Future Improvements
 
-- [ ] Improvement 1
-- [ ] Improvement 2
+- [ ] Expand AI integrations to more customer communication platforms.
+- [ ] Introduce advanced business analytics and reporting.
+- [ ] Enhance system scalability and security.
+- [ ] Expand Team Workspace with employee attendance tracking, clock-in/out, leave applications, and leave balance management.
 
 ## Team
 
-| Name        | Role                | GitHub                                   |
-| ----------- | ------------------- | ---------------------------------------- |
-| Member Name | Team Lead / Backend | [@username](https://github.com/username) |
-| Member Name | Frontend            | [@username](https://github.com/username) |
-| Member Name | AI / RunPod         | [@username](https://github.com/username) |
+| Name                         | Role                | GitHub                                          |
+| -------------------------    | ------------------- | ----------------------------------------------- | 
+| Teh Sze Yu Jocelyn           | Team Lead / AI      |[@Jocelynsuppp](https://github.com/Jocelynsuppp) |
+| Wong Xin Yu                  | AI/Backend          | [@Xinyuuuu0521](https://github.com/Xinyuuuu0521)|
+| Goh Yi Qi                    | Backend / RunPod    | [@gohyiqi0621](https://github.com/gohyiqi0621/) |
+| Muhammad Naqib Bin Md Salleh | Frontend            | [@Naqib57](https://github.com/Naqib57/)         |
+| Aliff Najmi Bin Nor Zamree   | AI / Backend        | [@aliffjammy](https://github.com/aliffjammy)    |
 
 ---
 
 ## Submission Checklist
 
-- [ ] Team name, domain (Domain 1 / Domain 2) and SDG track filled in
+- [/ ] Team name, domain (Domain 1 / Domain 2) and SDG track filled in
 - [ ] Slide deck link added
 - [ ] Demo video link added
 - [ ] Replit used, with proof of use in `submission/`
 - [ ] RunPod used, with proof of use in `submission/`
 - [ ] Submission template completed in `submission/`
-- [ ] "How to Run" steps verified
-- [ ] No API keys or secrets committed to the repository
+- [ /] "How to Run" steps verified
+- [ /] No API keys or secrets committed to the repository
 
 ## License
 
