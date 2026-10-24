@@ -221,7 +221,7 @@ final class OrderController
         $ids    = array_slice((array) ($_POST['ids'] ?? []), 0, 200);
 
         try {
-            // Unpaid invoices of these orders are removed; paid ones are kept (accounting).
+            // Unpaid invoices of these orders are voided; paid ones are kept (accounting).
             $orders = new Order();
             $nos    = [];
             foreach ($ids as $id) {
@@ -230,7 +230,7 @@ final class OrderController
                     $nos[] = (string) $order['order_no'];
                 }
             }
-            (new \Src\Services\OrderInvoiceService())->removeFor($userId, $nos);
+            (new \Src\Services\OrderInvoiceService())->cancelForOrders($userId, $nos);
 
             $deleted = $orders->deleteMany($userId, $ids);
             $files   = new PrivateFiles('receipts');

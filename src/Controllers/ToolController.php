@@ -184,9 +184,9 @@ final class ToolController
         $phone = mb_substr(trim((string) ($input['phone'] ?? $input['customer_phone'] ?? '')), 0, 30);
         $note  = mb_substr(trim((string) ($input['note'] ?? $input['delivery_note'] ?? '')), 0, 500);
 
-        // An add-on after a finished order: the AI sometimes repeats the items
-        // of the order that was already paid. Those items are taken out, so the
-        // new order holds only what was added.
+        // An add-on is always a NEW order with its own payment; the earlier order
+        // is never changed. The AI sometimes repeats the earlier order's items:
+        // those are taken out, so the new order holds only what was added.
         $addOnOf = null;
         try {
             $locked = (new Order())->latestLocked($userId, $auth['channel'], $auth['chat_id']);
@@ -195,16 +195,28 @@ final class ToolController
         }
         if ($locked !== null) {
             [$remaining, $contained, $sameItems] = $this->subtractItems($items, $locked['items']);
-            $lockedLabel = $locked['order_no'] . (in_array($locked['status'], ['paid', 'shipped'], true) ? ' (already paid)' : ' (receipt sent, being checked)');
+            $lockedLabel = $locked['order_no'] . match ($locked['status']) {
+                'paid', 'shipped'   => ' (already paid)',
+                'payment_submitted' => ' (bank reference sent, being checked)',
+                default             => ' (waiting for payment)',
+            };
 
-            if ($sameItems && strtotime((string) $locked['created_at']) > time() - 600) {
+            // Exactly the same items as an order still waiting for payment: that is
+            // the same order (handled as a repeat below), not a new one.
+            if ($sameItems && $locked['status'] !== 'pending_payment' && strtotime((string) $locked['created_at']) > time() - 600) {
                 $this->fail('The order was NOT created: these are exactly the items of order ' . $lockedLabel . '. '
                     . 'Do not order them again. If the customer really wants the same items again, ask them to confirm first, '
                     . 'then call buy_product with only the items they want now.');
             }
-            if ($contained && $remaining !== []) {
+            // Take the earlier items out only when a DIFFERENT product was added
+            // ("old items + new one"). More of the same product = a new order as asked.
+            $earlierIds = array_map(static fn (array $i): int => (int) ($i['product_id'] ?? 0), $locked['items']);
+            $newProduct = array_diff(array_map(static fn (array $i): int => (int) $i['product_id'], $items), $earlierIds) !== [];
+            if ($contained && $remaining !== [] && $newProduct) {
                 $addOnOf = $lockedLabel;
                 $items    = $remaining;
+            } elseif ($remaining !== [] || !$sameItems) {
+                $addOnOf = $lockedLabel;   // still a separate new order: say so to the customer
             }
         }
 
@@ -235,9 +247,7 @@ final class ToolController
                 'currency'          => $currency ?? 'MYR',
             ], $items);
 
-                // The new order replaces this customer's other unpaid orders.
-                $replaced = $orders->cancelOtherUnpaid($userId, $auth['channel'], $auth['chat_id'], (int) $order['id'],
-                    'Replaced by ' . $order['order_no']);
+                // Earlier orders stay as they are: an add-on is paid separately.
             }
 
             $db->commit();
@@ -295,9 +305,10 @@ final class ToolController
         }
         if ($addOnOf !== null) {
             $result['add_on_of'] = $addOnOf;
-            $result['note'] = 'Order ' . $addOnOf . ' is finished, so its items were NOT added again. '
-                            . 'This is a separate new order with ONLY the add-on items listed here. '
-                            . 'Tell the customer it is a new order for the add-on and they pay only this total.';
+            $result['note'] = 'Earlier order ' . $addOnOf . ' was NOT changed and its items were NOT added again. '
+                            . 'This is a separate NEW order with ONLY the add-on items listed here, with its own total and payment. '
+                            . 'Tell the customer: this add-on is a new order; pay this total separately'
+                            . (str_contains($addOnOf, 'waiting for payment') ? ', and the earlier order still needs its own payment.' : '.');
         }
         if ($replaced !== []) {
             $result['replaced_orders'] = $replaced;
@@ -1299,7 +1310,7 @@ final class ToolController
         if ($start === null) {
             $this->fail('Give the date as YYYY-MM-DD and the time in 12-hour format with AM/PM, e.g. date "'
                 . (new \DateTimeImmutable('tomorrow', $s['zone']))->format('Y-m-d') . '", time "7:30 PM". '
-                . 'Today is ' . (new \DateTimeImmutable('now', $s['zone']))->format('l, Y-m-d g:i A') . ' (' . $s['zone']->getName() . ').');
+                . 'Today is ' . (new \DateTimeImmutable('now', $s['zone']))->format('j M Y (Y-m-d), g:i A') . ' (' . $s['zone']->getName() . ').');
         }
 
         $pax = (int) ($input['pax'] ?? $input['people'] ?? $input['guests'] ?? 1);

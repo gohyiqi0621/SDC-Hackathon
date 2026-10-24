@@ -246,7 +246,7 @@ final class BookingService
         }
         $start = new DateTimeImmutable((string) $row['starts_at']);
         $zone  = new DateTimeZone((string) (($this->model->find($userId) ?? [])['timezone'] ?? 'Asia/Kuala_Lumpur'));
-        $text  = "Your booking {$row['booking_no']} on " . $start->setTimezone($zone)->format('l, j F Y, g:i A')
+        $text  = "Your booking {$row['booking_no']} on " . $start->setTimezone($zone)->format('j F Y, g:i A')
                . ' has been cancelled by our staff. Reply here if you would like another time.';
         $sent  = $this->notifyCustomer($userId, $row, $text);
         $this->remember($userId, $row, 'assistant', $text);
@@ -270,7 +270,7 @@ final class BookingService
     /** "Thursday, 22 October 2026, 9:00 PM - 10:00 PM" */
     public static function label(DateTimeImmutable $start, DateTimeImmutable $end): string
     {
-        return $start->format('l, j F Y, g:i A') . ' - ' . $end->format('g:i A');
+        return $start->format('j F Y, g:i A') . ' - ' . $end->format('g:i A');
     }
 
     /** Opening hours as text for the AI, e.g. "Mon-Sun 09:00-18:00, 60-minute slots, up to 10 bookings per slot". */
@@ -297,7 +297,7 @@ final class BookingService
             return 'Bookings can only be made up to ' . self::MAX_DAYS_AHEAD . ' days ahead.';
         }
         if (!in_array((int) $start->format('N'), $s['open_days'], true)) {
-            return 'The business is closed on ' . $start->format('l') . 's.';
+            return 'The business is closed on ' . $start->format('j M Y') . '. Ask the customer for another date.';
         }
         [$oh, $om] = array_map('intval', explode(':', $s['open_time']));
         [$ch, $cm] = array_map('intval', explode(':', $s['close_time']));
@@ -381,7 +381,7 @@ final class BookingService
                 }
                 [$ok] = $this->fits($s, $events, $slot, $end, $pax);
                 if ($ok) {
-                    $out[] = $slot->format('l j M, g:i A');
+                    $out[] = $slot->format('j M Y, g:i A');
                 }
             }
         }
@@ -429,7 +429,7 @@ final class BookingService
                 return $da <=> $db ?: $a <=> $b;
             });
             foreach (array_slice($free, 0, 3 - count($out)) as $slot) {
-                $out[] = $slot->format('l j M, g:i A');
+                $out[] = $slot->format('j M Y, g:i A');
             }
         }
         return $out;

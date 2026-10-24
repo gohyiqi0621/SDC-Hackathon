@@ -175,8 +175,9 @@ final class Order
     }
 
     /**
-     * This customer's latest order that is already paid or has its receipt
-     * sent (it can no longer change), placed in the last $hours.
+     * This customer's latest earlier order (waiting for payment, receipt sent,
+     * paid or shipped), placed in the last $hours. An add-on never changes it:
+     * the add-on becomes its own order.
      *
      * @return array|null orders row with an extra 'items' list
      */
@@ -185,7 +186,7 @@ final class Order
         $stmt = Database::connection()->prepare(
             "SELECT * FROM orders
               WHERE user_id = ? AND channel = ? AND customer_chat_id = ?
-                AND status IN ('payment_submitted', 'paid', 'shipped')
+                AND status IN ('pending_payment', 'payment_submitted', 'paid', 'shipped')
                 AND created_at > CURRENT_TIMESTAMP - (? * INTERVAL '1 hour')
               ORDER BY created_at DESC, id DESC LIMIT 1"
         );
