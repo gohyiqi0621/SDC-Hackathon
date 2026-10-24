@@ -96,21 +96,27 @@ final class OrderService
         $this->remember($userId, $order, 'customer', '📎 [Bank reference sent for ' . $order['order_no'] . ']');
         $this->remember($userId, $order, 'assistant', $thanks);
 
-        // Staff alert with the approve link: never into the customer's own chat
-        // (when you test with the same Telegram account that is linked as staff).
+        // Staff alert: "verify this payment". When the staff Telegram is the same
+        // account as the customer (testing with one phone), it still goes out,
+        // clearly marked as a staff alert.
         $staff = (string) ($integration['staff_telegram_chat_id'] ?? '');
-        if ($staff === '' || $staff === $chatId) {
+        if ($staff === '') {
             FlowLog::write('staff.alert_skipped', ['order_no' => $order['order_no'],
-                'reason' => $staff === '' ? 'no staff chat linked' : 'staff chat is the same Telegram account as the customer']);
+                'reason' => 'no staff Telegram linked (Staff Assistant > Connections > Telegram staff alerts)']);
         } else {
-            $caption = "🧾 Bank reference to review\n"
+            $caption = "👩‍💼 STAFF ALERT · Payment to verify\n"
                 . "Order: {$order['order_no']}\n"
                 . 'Customer: ' . $this->customerLabel($order) . "\n"
                 . "Total: {$total}\n"
-                . $this->itemSummary((int) $order['id']);
-            if (!$telegram->copyMessage($token, $staff, $chatId, (int) $message['message_id'], $caption)) {
-                $telegram->sendText($token, $staff, $caption);
+                . $this->itemSummary((int) $order['id']) . "\n"
+                . 'Approve or reject: ' . PUBLIC_APP_URL . '/?page=orders&status=payment_submitted';
+            $sent = $staff !== $chatId
+                && $telegram->copyMessage($token, $staff, $chatId, (int) $message['message_id'], $caption);
+            if (!$sent) {
+                $sent = $telegram->sendText($token, $staff, $caption);
             }
+            FlowLog::write('staff.payment_alert', ['order_no' => $order['order_no'], 'sent' => $sent,
+                'same_chat_as_customer' => $staff === $chatId]);
         }
 
         return true;
