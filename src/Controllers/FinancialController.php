@@ -44,7 +44,7 @@ final class FinancialController
         }
 
         $items = (new InvoiceItem())->forInvoice((int) $invoice['id']);
-        $pdf   = (new InvoicePdfService())->render($invoice, $items);
+        $pdf   = (new InvoicePdfService())->render($invoice, $items, (int) $user['id']);
 
         header('Content-Type: application/pdf');
         header('Content-Disposition: inline; filename="' . rawurlencode('Invoice-' . $invoice['invoice_number'] . '.pdf') . '"');

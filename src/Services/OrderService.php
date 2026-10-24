@@ -335,7 +335,7 @@ final class OrderService
         }
 
         $items = (new \Src\Models\InvoiceItem())->forInvoice((int) $invoice['id']);
-        $pdf   = (new InvoicePdfService())->render($invoice, $items);
+        $pdf   = (new InvoicePdfService())->render($invoice, $items, $userId);
         $tmp   = tempnam(sys_get_temp_dir(), 'inv');
         if ($tmp === false || file_put_contents($tmp, $pdf) === false) {
             throw new RuntimeException('The invoice PDF could not be prepared. Please try again.');
