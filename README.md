@@ -292,14 +292,14 @@ curl -X POST https://api.runpod.ai/v2/$RUNPOD_ENDPOINT_ID/runsync \
 
 ## Submission Checklist
 
-- [/ ] Team name, domain (Domain 1 / Domain 2) and SDG track filled in
+- [/] Team name, domain (Domain 1 / Domain 2) and SDG track filled in
 - [ ] Slide deck link added
 - [ ] Demo video link added
-- [/ ] Replit used, with proof of use in `submission/`
-- [/ ] RunPod used, with proof of use in `submission/`
+- [/] Replit used, with proof of use in `submission/`
+- [/] RunPod used, with proof of use in `submission/`
 - [ ] Submission template completed in `submission/`
-- [ /] "How to Run" steps verified
-- [ /] No API keys or secrets committed to the repository
+- [/] "How to Run" steps verified
+- [/] No API keys or secrets committed to the repository
 
 ## License
 
