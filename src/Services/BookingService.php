@@ -246,7 +246,7 @@ final class BookingService
         }
         $start = new DateTimeImmutable((string) $row['starts_at']);
         $zone  = new DateTimeZone((string) (($this->model->find($userId) ?? [])['timezone'] ?? 'Asia/Kuala_Lumpur'));
-        $text  = "Your booking {$row['booking_no']} on " . $start->setTimezone($zone)->format('j F Y, g:i A')
+        $text  = "📅 Your booking {$row['booking_no']} on " . $start->setTimezone($zone)->format('j F Y, g:i A')
                . ' has been cancelled by our staff. Reply here if you would like another time.';
         $sent  = $this->notifyCustomer($userId, $row, $text);
         $this->remember($userId, $row, 'assistant', $text);

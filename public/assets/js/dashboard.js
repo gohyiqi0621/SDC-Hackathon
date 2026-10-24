@@ -68,6 +68,121 @@ document.addEventListener("DOMContentLoaded", () => {
             "'": "&#39;"
         })[char]);
 
+    /* --------------------------------------------------------
+       Email text -> tidy, safe HTML.
+       Gmail's plain-text bodies (calendar invites, newsletters)
+       carry long raw links and hard line wraps. Here:
+         - "Label" followed by a link on the next line becomes a
+           button ("Join with Google Meet", "Add to calendar");
+         - any other link is clickable with a short label;
+         - wrapped lines are joined, extra blank lines dropped;
+         - the footer (unsubscribe / notification text) is muted.
+       Everything is escaped; only http(s) links are made.
+    -------------------------------------------------------- */
+    const EMAIL_URL_ONLY = /^<?(https?:\/\/[^\s<>"]+)>?$/i;
+    const EMAIL_URL_ANY = /<?(https?:\/\/[^\s<>"]+)>?/gi;
+    const EMAIL_HAS_URL = /https?:\/\//i;
+    const EMAIL_FOOTER = /^(~~\/\/~~|--\s*|_{5,}|-{5,}|You are receiving this|You received this|To unsubscribe|Unsubscribe|This email was sent to|Invitation from Google Calendar)/i;
+
+    function shortEmailUrl(url) {
+        try {
+            const u = new URL(url);
+            const path = u.pathname === "/" ? "" : u.pathname;
+            const text = u.hostname.replace(/^www\./, "") + path;
+            return text.length > 42 ? text.slice(0, 40) + "…" : text;
+        } catch (error) {
+            return url.length > 42 ? url.slice(0, 40) + "…" : url;
+        }
+    }
+
+    function emailLink(url, label, cls) {
+        return `<a class="${cls}" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" title="${escapeHTML(url)}">${escapeHTML(label)}</a>`;
+    }
+
+    function emailInline(line) {
+        let html = "";
+        let last = 0;
+        line.replace(EMAIL_URL_ANY, (match, url, offset) => {
+            html += escapeHTML(line.slice(last, offset));
+            const clean = url.replace(/[).,;:!?]+$/, "");
+            html += emailLink(clean, shortEmailUrl(clean), "mail-link") + escapeHTML(url.slice(clean.length));
+            last = offset + match.length;
+            return match;
+        });
+        return html + escapeHTML(line.slice(last));
+    }
+
+    function formatEmailBody(raw) {
+        const source = String(raw ?? "").replace(/\r\n?/g, "\n").split("\n");
+
+        // Join hard-wrapped lines ("... want to  \nautomatically add ...").
+        const lines = [];
+        source.forEach(line => {
+            const prev = lines.length ? lines[lines.length - 1] : null;
+            if (prev !== null && /\S\s{2,}$/.test(prev) && line.trim() !== ""
+                && !EMAIL_URL_ONLY.test(line.trim()) && !EMAIL_URL_ONLY.test(prev.trim())) {
+                lines[lines.length - 1] = prev.trimEnd() + " " + line.trimStart();
+            } else {
+                lines.push(line);
+            }
+        });
+
+        const main = [];
+        const footer = [];
+        let target = main;
+        let blank = 0;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].replace(/\s+$/, "").replace(/[ \t]{2,}/g, " ");
+            const text = line.trim();
+
+            if (target === main && main.length && EMAIL_FOOTER.test(text)) {
+                target = footer;
+                blank = 0;
+                if (/^(~~\/\/~~|--|_{5,}|-{5,})$/.test(text)) continue;
+            }
+
+            if (text === "") {
+                blank++;
+                if (blank === 1 && target.length) target.push("");
+                continue;
+            }
+            blank = 0;
+
+            const next = (lines[i + 1] || "").trim();
+            const onlyUrl = text.match(EMAIL_URL_ONLY);
+            const nextUrl = next.match(EMAIL_URL_ONLY);
+
+            if (!onlyUrl && nextUrl && text.length <= 90 && !EMAIL_HAS_URL.test(text)) {
+                // "Join with Google Meet" + link  ->  a button.
+                target.push(emailLink(nextUrl[1], text, "mail-action"));
+                i++;
+            } else if (onlyUrl) {
+                target.push(emailLink(onlyUrl[1], shortEmailUrl(onlyUrl[1]), "mail-link"));
+            } else {
+                // "Learn more https://..."  ->  "Learn more" as the link.
+                const tail = text.match(/^(.{2,60}?)\s+<?(https?:\/\/[^\s<>"]+)>?$/i);
+                target.push(tail && !EMAIL_HAS_URL.test(tail[1])
+                    ? escapeHTML(tail[1]) + " " + emailLink(tail[2], "↗", "mail-link")
+                    : emailInline(text));
+            }
+        }
+
+        while (main.length && main[main.length - 1] === "") main.pop();
+        while (footer.length && footer[footer.length - 1] === "") footer.pop();
+
+        let html = main.join("<br>");
+        if (footer.length) {
+            html += `<span class="mail-footer"><br><br>${footer.join("<br>")}</span>`;
+        }
+        return html || escapeHTML(String(raw ?? ""));
+    }
+
+    function setEmailBody(raw) {
+        if (!emailBody) return;
+        emailBody.innerHTML = formatEmailBody(raw);
+    }
+
     const initials = name =>
         String(name || "?")
             .trim()
@@ -701,7 +816,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             if (emailBody) {
-                emailBody.textContent = email.body;
+                setEmailBody(email.body);
             }
 
             if (email.summaryLoaded) {
@@ -919,7 +1034,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                     padding:4px 0;
                                     min-height:0;
                                     height:auto;
-                                ">${escapeHTML(message.body || "")}</div>
+                                ">${formatEmailBody(message.body || "")}</div>
 
                             ${
                                 message.sent
@@ -1062,8 +1177,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 loadGmailThread(email, version);
             } else {
-                emailBody.textContent =
-                    email.body || "";
+                setEmailBody(email.body || "");
             }
         }
 

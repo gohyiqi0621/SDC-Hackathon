@@ -228,6 +228,126 @@ final class ChatbotController
     }
 
     /** Everything the live Chat Interface shows, as plain arrays (also embedded in the first page load). */
+    /** Messages written by the system (order / payment / booking notices), not by the AI. */
+    private const SYSTEM_MARKS = '/^(📎|🖼|🧾|✅|⚠️|📦|📅|📄|🛒|❌)/u';
+
+    /** "📄 [Official receipt OR-1 sent as PDF]" -> "📄 Official receipt OR-1" for the chat list. */
+    private static function previewText(string $text): string
+    {
+        return (string) preg_replace(['/\[(Payment QR code)\]/u', '/\[(.+?) sent as PDF\]/u', '/\[(Bank reference) sent for (.+?)\]/u'],
+            ['$1 ·', '$1', '$1 · $2'], $text);
+    }
+
+    /**
+     * The orders / invoices / payment QR that the chat's file messages point to,
+     * fetched once for the whole list.
+     *
+     * @return array{orders: array<string, array>, invoices: array<string, int>, qr: ?string}
+     */
+    private function chatFiles(int $userId, array $list): array
+    {
+        $orderNos = [];
+        $invoiceNos = [];
+        $needQr = false;
+        foreach ($list as $m) {
+            $c = (string) $m['content'];
+            if (preg_match('/^📄 \[Official receipt OR-(\S+) sent as PDF\]/u', $c, $x)) {
+                $orderNos[] = 'ORD-' . $x[1];
+            } elseif (preg_match('/^📎 \[Bank reference sent for (\S+?)\]/u', $c, $x)) {
+                $orderNos[] = $x[1];
+            } elseif (preg_match('/^📄 \[Invoice (\S+) sent as PDF\]/u', $c, $x)) {
+                $invoiceNos[] = $x[1];
+            } elseif (str_starts_with($c, '🖼 [Payment QR code]')) {
+                $needQr = true;
+            }
+        }
+
+        $out = ['orders' => [], 'invoices' => [], 'qr' => null];
+        try {
+            $db = \Src\Support\Database::connection();
+            if ($orderNos !== []) {
+                $orderNos = array_values(array_unique($orderNos));
+                $stmt = $db->prepare('SELECT id, order_no, status, receipt_path, receipt_mime, receipt_name FROM orders
+                                       WHERE user_id = ? AND order_no IN (' . implode(',', array_fill(0, count($orderNos), '?')) . ')');
+                $stmt->execute(array_merge([$userId], $orderNos));
+                foreach ($stmt->fetchAll() as $o) {
+                    $out['orders'][(string) $o['order_no']] = $o;
+                }
+            }
+            if ($invoiceNos !== []) {
+                $invoiceNos = array_values(array_unique($invoiceNos));
+                $stmt = $db->prepare('SELECT id, invoice_number FROM invoices
+                                       WHERE user_id = ? AND invoice_number IN (' . implode(',', array_fill(0, count($invoiceNos), '?')) . ')');
+                $stmt->execute(array_merge([$userId], $invoiceNos));
+                foreach ($stmt->fetchAll() as $i) {
+                    $out['invoices'][(string) $i['invoice_number']] = (int) $i['id'];
+                }
+            }
+            if ($needQr) {
+                $qr = (string) ((new \Src\Models\CompanyProfile())->find($userId)['payment_qr_url'] ?? '');
+                $out['qr'] = $qr !== '' ? asset($qr) : null;
+            }
+        } catch (Throwable $e) {
+            // a table not created yet: the messages show as text
+        }
+        return $out;
+    }
+
+    /**
+     * Who sent a chat line, its text and its file, so the chat can show a
+     * photo or a PDF card instead of "[Official receipt ... sent as PDF]".
+     *
+     * @return array{0: string, 1: string, 2: ?array}
+     */
+    private function chatPart(array $m, array $files): array
+    {
+        $c = (string) $m['content'];
+        if ($m['role'] === 'customer') {
+            if (preg_match('/^📎 \[Bank reference sent for (\S+?)\]/u', $c, $x)) {
+                $o = $files['orders'][$x[1]] ?? null;
+                if ($o !== null && !empty($o['receipt_path'])) {
+                    $isImage = str_starts_with((string) $o['receipt_mime'], 'image/');
+                    return ['customer', '', [
+                        'type'  => $isImage ? 'image' : 'file',
+                        'url'   => url('orders', ['action' => 'receipt', 'id' => (int) $o['id']]),
+                        'name'  => (string) ($o['receipt_name'] ?: 'Bank reference'),
+                        'label' => 'Bank reference · ' . $x[1],
+                    ]];
+                }
+                return ['customer', '📎 Bank reference for ' . $x[1], null];
+            }
+            return ['customer', $c, null];
+        }
+
+        if (preg_match('/^📄 \[Official receipt (OR-(\S+)) sent as PDF\]/u', $c, $x)) {
+            $o = $files['orders']['ORD-' . $x[2]] ?? null;
+            return ['system', '', [
+                'type'  => 'file',
+                'url'   => $o !== null ? url('orders', ['action' => 'official_receipt', 'id' => (int) $o['id']]) : null,
+                'name'  => 'Official-Receipt-' . $x[1] . '.pdf',
+                'label' => 'Official receipt · PDF',
+            ]];
+        }
+        if (preg_match('/^📄 \[Invoice (\S+) sent as PDF\]/u', $c, $x)) {
+            $id = $files['invoices'][$x[1]] ?? null;
+            return ['system', '', [
+                'type'  => 'file',
+                'url'   => $id !== null ? url('financial', ['action' => 'print', 'id' => $id]) : null,
+                'name'  => 'Invoice-' . $x[1] . '.pdf',
+                'label' => 'Invoice · PDF',
+            ]];
+        }
+        if (preg_match('/^🖼 \[Payment QR code\]\s*(.*)$/su', $c, $x)) {
+            return ['system', trim($x[1]), $files['qr'] !== null ? [
+                'type'  => 'image',
+                'url'   => $files['qr'],
+                'name'  => 'Payment QR code',
+                'label' => 'Payment QR code',
+            ] : null];
+        }
+        return [preg_match(self::SYSTEM_MARKS, $c) === 1 ? 'system' : 'ai', $c, null];
+    }
+
     private function feed(int $userId, string $selected, int $after): array
     {
         $model = new ChatMessage();
@@ -255,7 +375,7 @@ final class ChatbotController
                 'chat_id'      => (string) $c['chat_id'],
                 'label'        => $label($c),
                 'username'     => $c['customer_username'] ?? null,
-                'last_message' => mb_strimwidth(preg_replace('/\s+/u', ' ', (string) $c['last_message']) ?? '', 0, 90, '…'),
+                'last_message' => mb_strimwidth(preg_replace('/\s+/u', ' ', self::previewText((string) $c['last_message'])) ?? '', 0, 90, '…'),
                 'last_role'    => $c['last_role'],
                 'last_at'      => date(DATE_ATOM, strtotime((string) $c['last_at'])),
                 'messages'     => (int) $c['messages'],
@@ -275,14 +395,18 @@ final class ChatbotController
             $list = $after > 0
                 ? $model->after($userId, $current['channel'], $current['chat_id'], $after)
                 : $model->recent($userId, $current['channel'], $current['chat_id'], 200);
+            $files = $this->chatFiles($userId, $list);
             foreach ($list as $m) {
+                [$sender, $text, $attachment] = $this->chatPart($m, $files);
                 $messages[] = [
-                    'id'      => (int) $m['id'],
-                    'role'    => $m['role'],
-                    'content' => (string) $m['content'],
-                    'status'  => $m['status'],
-                    'at'      => date(DATE_ATOM, strtotime((string) $m['created_at'])),
-                    'event'   => preg_match('/^(📎|🖼|🧾|✅|⚠️|📦|📅)/u', (string) $m['content']) === 1,
+                    'id'         => (int) $m['id'],
+                    'role'       => $m['role'],
+                    'sender'     => $sender,        // customer | ai | system
+                    'content'    => $text,
+                    'attachment' => $attachment,    // null or {type: image|file, url, name, label}
+                    'status'     => $m['status'],
+                    'at'         => date(DATE_ATOM, strtotime((string) $m['created_at'])),
+                    'event'      => false,
                     // Why the AI did not answer, and how to fix it (staff only).
                     'problem' => $m['role'] === 'assistant' && $m['status'] !== 'ok'
                         ? AssistantErrorAdvice::explain((string) ($m['error_reason'] ?? ''), (string) $m['status']) : null,

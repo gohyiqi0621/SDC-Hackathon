@@ -146,6 +146,38 @@
 .msgr-bubble__who { font-weight: 800; letter-spacing: .04em; }
 .msgr-bubble__flag { padding: 0 6px; border-radius: 999px; background: rgba(0, 0, 0, .12); }
 
+/* System notices (payment, receipt, booking): a real message, marked "System". */
+.msgr-msg--system .msgr-bubble { background: #f4f5fb; color: var(--text); border: 1px solid #dfe2f0; border-bottom-right-radius: 6px; }
+.msgr-msg--system .msgr-bubble__who { color: var(--primary); }
+.msgr-msg--system .msgr-bubble__meta { opacity: .85; }
+
+/* Photos and files inside a bubble. */
+.msgr-bubble--att { padding: 6px 6px 5px; }
+.msgr-bubble--att .msgr-bubble__text { padding: 6px 6px 0; }
+.msgr-bubble--att .msgr-bubble__meta { padding: 0 6px; }
+.msgr-att { display: block; color: inherit; text-decoration: none; }
+.msgr-att--image { display: inline-block; vertical-align: top; width: 220px; max-width: 100%; border-radius: 13px; overflow: hidden; background: rgba(0, 0, 0, .04); }
+.msgr-att--image img { display: block; width: 100%; max-height: 300px; object-fit: cover; }
+.msgr-att__caption { display: block; padding: 5px 8px; font-size: 11.5px; font-weight: 600; opacity: .8; }
+.msgr-att--file {
+    display: flex; align-items: center; gap: 10px;
+    min-width: 230px; padding: 10px 12px;
+    border-radius: 13px; background: #fff; color: var(--text);
+    border: 1px solid var(--border);
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+a.msgr-att--file:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(98, 85, 245, .15); }
+.msgr-att__icon {
+    flex: none; display: grid; place-items: center;
+    width: 38px; height: 38px; border-radius: 10px;
+    background: #fdecec; color: #d93025; font-size: 18px;
+}
+.msgr-att__info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.msgr-att__info strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msgr-att__info small { font-size: 11px; color: var(--muted); }
+.msgr-att__open { flex: none; color: var(--muted); font-size: 13px; }
+a.msgr-att--file:hover .msgr-att__open { color: var(--primary); }
+
 .msgr-event {
     align-self: center; max-width: 80%;
     display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 8px; align-items: baseline;

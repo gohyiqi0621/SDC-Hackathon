@@ -4538,3 +4538,39 @@ body.dashboard-is-dragging * {
     color: #e34562;
     font-weight: 750;
 }
+
+/* Email body: clickable links, action buttons, muted footer (formatEmailBody). */
+#emailBody .mail-link {
+    color: #6255f5;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(98, 85, 245, .3);
+    overflow-wrap: anywhere;
+}
+
+#emailBody .mail-link:hover {
+    border-bottom-color: #6255f5;
+}
+
+#emailBody .mail-action {
+    display: inline-block;
+    margin: 3px 0;
+    padding: 2px 12px;
+    border: 1px solid rgba(98, 85, 245, .35);
+    border-radius: 999px;
+    background: #f3f2ff;
+    color: #6255f5;
+    font-weight: 600;
+    line-height: 1.8;
+    text-decoration: none;
+}
+
+#emailBody .mail-action:hover {
+    background: #6255f5;
+    color: #fff;
+}
+
+#emailBody .mail-footer {
+    color: #9aa0b8;
+    font-size: 11px;
+    line-height: 1.6;
+}

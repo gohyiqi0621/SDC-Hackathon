@@ -152,6 +152,49 @@
         return card;
     }
 
+    /**
+     * A photo (QR code, bank slip) or a file card (PDF) inside a bubble.
+     * Opens in a new tab; a file whose link is missing shows as a plain card.
+     */
+    function attachment(a) {
+        var link = node(a.url ? 'a' : 'div', a.type === 'image' ? 'msgr-att msgr-att--image' : 'msgr-att msgr-att--file');
+        if (a.url) {
+            link.href = a.url; link.target = '_blank'; link.rel = 'noopener';
+            link.title = 'Open ' + (a.name || 'file');
+        }
+        if (a.type === 'image') {
+            var img = node('img');
+            img.src = a.url; img.alt = a.label || a.name || 'Image'; img.loading = 'lazy';
+            img.addEventListener('error', function () {
+                // Not an image after all (e.g. a PDF slip): show it as a file card.
+                link.className = 'msgr-att msgr-att--file';
+                link.textContent = '';
+                fileCard(link, a);
+            });
+            link.appendChild(img);
+            if (a.label) { link.appendChild(node('span', 'msgr-att__caption', a.label)); }
+        } else {
+            fileCard(link, a);
+        }
+        return link;
+    }
+
+    function fileCard(target, a) {
+        var pdf = /\.pdf$/i.test(a.name || '');
+        var icon = node('span', 'msgr-att__icon');
+        icon.appendChild(node('i', pdf ? 'fa-solid fa-file-pdf' : 'fa-solid fa-file-lines'));
+        var info = node('span', 'msgr-att__info');
+        info.appendChild(node('strong', null, a.name || 'File'));
+        info.appendChild(node('small', null, (a.label || (pdf ? 'PDF' : 'File')) + (a.url ? '' : ' · not available')));
+        target.appendChild(icon);
+        target.appendChild(info);
+        if (a.url) {
+            var open = node('span', 'msgr-att__open');
+            open.appendChild(node('i', 'fa-solid fa-arrow-up-right-from-square'));
+            target.appendChild(open);
+        }
+    }
+
     function appendMessages(messages) {
         var stick = nearBottom() || state.lastId === 0;
         messages.forEach(function (m) {
@@ -175,11 +218,21 @@
             }
 
             var mine = m.role !== 'customer';
-            var wrap = node('div', 'msgr-msg ' + (mine ? 'msgr-msg--ai' : 'msgr-msg--customer') + (m.status !== 'ok' ? ' msgr-msg--muted' : ''));
-            var bubble = node('div', 'msgr-bubble');
-            bubble.appendChild(node('div', 'msgr-bubble__text', m.content));
+            var sender = m.sender || (mine ? 'ai' : 'customer');
+            var wrap = node('div', 'msgr-msg ' + (mine ? 'msgr-msg--ai' : 'msgr-msg--customer')
+                + (sender === 'system' ? ' msgr-msg--system' : '') + (m.status !== 'ok' ? ' msgr-msg--muted' : ''));
+            var bubble = node('div', 'msgr-bubble' + (m.attachment ? ' msgr-bubble--att' : ''));
+            if (m.attachment) { bubble.appendChild(attachment(m.attachment)); }
+            if (m.content) { bubble.appendChild(node('div', 'msgr-bubble__text', m.content)); }
             var meta = node('div', 'msgr-bubble__meta');
-            if (mine) { meta.appendChild(node('span', 'msgr-bubble__who', 'AI')); }
+            if (sender === 'system') {
+                var sys = node('span', 'msgr-bubble__who');
+                sys.appendChild(node('i', 'fa-solid fa-gear'));
+                sys.appendChild(document.createTextNode(' System'));
+                meta.appendChild(sys);
+            } else if (mine) {
+                meta.appendChild(node('span', 'msgr-bubble__who', 'AI'));
+            }
             meta.appendChild(node('time', null, clock(m.at)));
             if (m.status === 'error') { meta.appendChild(node('span', 'msgr-bubble__flag', 'fallback reply')); }
             if (m.status === 'skipped') { meta.appendChild(node('span', 'msgr-bubble__flag', 'not sent')); }
