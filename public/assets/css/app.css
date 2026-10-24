@@ -2450,6 +2450,10 @@ code {
         transform: translateX(-100%);
         transition: transform 0.2s ease;
         box-shadow: 0 0 40px rgba(23, 27, 69, 0.15);
+        /* It slides over the page here, so it must be solid (not see-through). */
+        background: #fff;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
     }
 
     .app.nav-open .sidebar {
