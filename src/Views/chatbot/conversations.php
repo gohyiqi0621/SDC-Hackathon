@@ -64,7 +64,7 @@ view('layouts/header', ['title' => $title, 'styles' => ['assets/css/conversation
                 </summary>
                 <div class="msgr-orders__panel">
                     <div class="msgr-orders__cols" aria-hidden="true">
-                        <span>Order</span><span>Items</span><span>Status</span><span class="num">Total</span><span></span>
+                        <span>Order</span><span>Items</span><span>Status</span><span class="num">Total</span><span class="num">Documents</span>
                     </div>
                     <ul data-orders-list role="list"></ul>
                 </div>

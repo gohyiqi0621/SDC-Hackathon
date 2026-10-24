@@ -4574,3 +4574,52 @@ body.dashboard-is-dragging * {
     font-size: 11px;
     line-height: 1.6;
 }
+
+/* Phones / small tablets: the planner's three counters stack, so "Total tasks",
+   "Pending" and "Completed" are not cut off (the !important 3-column rule above
+   otherwise wins over the earlier 800px rule). */
+@media (max-width: 800px) {
+    #workspacePlanner .wp-summary {
+        grid-template-columns: 1fr !important;
+    }
+
+    #workspacePlanner .wp-calendar-area {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* Phones and small tablets: the welcome banner grows with its content, the
+   greeting uses the full width and the four email counters sit 2 x 2, so
+   nothing is cut off by the fixed 250px desktop height. */
+@media (max-width: 800px) {
+    #welcomeBanner.welcome-banner {
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        padding: 24px 18px !important;
+    }
+
+    #welcomeBanner .welcome-text {
+        position: relative;
+        z-index: 1;
+        flex-basis: 100% !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 0 !important;
+    }
+
+    #welcomeBanner .ai-bot-space {
+        opacity: .25 !important;
+        pointer-events: none;
+    }
+
+    #welcomeBanner .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 10px !important;
+        margin-top: 18px !important;
+    }
+
+    #welcomeBanner .stat-card {
+        min-height: 74px;
+    }
+}

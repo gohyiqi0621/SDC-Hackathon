@@ -777,6 +777,25 @@
                 var dot = $('[data-sop-filled="' + s.key + '"]', form);
                 if (dot) { dot.hidden = editors[s.key].value.trim() === ''; }
             });
+            updateGenerateLabel();
+        }
+
+        /** Any instructions written yet? (then the AI button says "Regenerate") */
+        function hasInstructions() {
+            return SOP.some(function (s) { return editors[s.key].value.trim() !== ''; });
+        }
+
+        /** "Generate instruction with AI" the first time, "Regenerate instruction with AI" once there is text. */
+        function updateGenerateLabel() {
+            var btn = $('[data-sop-generate]', form);
+            if (!btn || btn.dataset.busy === '1') { return; }
+            var again = hasInstructions();
+            btn.innerHTML = '';
+            var icon = document.createElement('i');
+            icon.className = again ? 'fa-solid fa-rotate' : 'fa-solid fa-wand-magic-sparkles';
+            icon.setAttribute('aria-hidden', 'true');
+            btn.appendChild(icon);
+            btn.appendChild(document.createTextNode(again ? ' Regenerate instruction with AI' : ' Generate instruction with AI'));
         }
 
         function fillEditors(text) {
@@ -861,7 +880,7 @@
         }
 
         function generateSops() {
-            setBusy(generateBtn, true, 'Generating…');
+            setBusy(generateBtn, true, hasInstructions() ? 'Regenerating…' : 'Generating…');
             var stopProgress = showProgress();
             Api.assistant.generateSops().then(function (data) {
                 stopProgress();
@@ -878,17 +897,17 @@
                 toast(message, 'error');
             }).then(function () {
                 setBusy(generateBtn, false);
+                updateGenerateLabel();
             });
         }
 
         if (generateBtn) {
             generateBtn.addEventListener('click', function () {
-                var hasText = SOP.some(function (s) { return editors[s.key].value.trim() !== ''; });
-                if (!hasText) { generateSops(); return; }
+                if (!hasInstructions()) { generateSops(); return; }
                 confirmAction({
                     title: 'Replace your instructions?',
                     message: 'AI will write new instructions and replace the text in all three sections. You can still reset before saving.',
-                    confirmLabel: 'Generate'
+                    confirmLabel: 'Regenerate'
                 }).then(function (ok) { if (ok) { generateSops(); } });
             });
         }

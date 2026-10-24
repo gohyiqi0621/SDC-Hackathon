@@ -278,15 +278,20 @@
 
             var total = node('strong', 'msgr-order__total', o.total);
 
-            var receipt = node('div', 'msgr-order__receipt');
-            if (o.receipt) {
-                var r = node('a', null);
-                r.href = o.receipt; r.target = '_blank'; r.rel = 'noopener';
-                r.title = 'View payment receipt';
-                r.setAttribute('aria-label', 'View payment receipt for ' + o.order_no);
-                r.appendChild(node('i', 'fa-regular fa-file-image'));
-                receipt.appendChild(r);
-            }
+            // Documents: the customer's bank slip, the invoice and the official receipt (PDF).
+            var receipt = node('div', 'msgr-order__docs');
+            var icons = { slip: 'fa-regular fa-file-image', invoice: 'fa-solid fa-file-invoice', receipt: 'fa-solid fa-receipt' };
+            var files = o.files || (o.receipt ? [{ kind: 'slip', label: 'Slip', title: 'Bank reference', url: o.receipt }] : []);
+            files.forEach(function (f) {
+                var a = node('a', 'msgr-doc msgr-doc--' + f.kind);
+                a.href = f.url; a.target = '_blank'; a.rel = 'noopener';
+                a.title = f.title || f.label;
+                a.setAttribute('aria-label', (f.title || f.label) + ' for ' + o.order_no);
+                a.appendChild(node('i', icons[f.kind] || 'fa-regular fa-file'));
+                a.appendChild(node('span', null, f.label));
+                receipt.appendChild(a);
+            });
+            if (!files.length) { receipt.appendChild(node('span', 'msgr-doc__none', '—')); }
 
             [id, items, status, total, receipt].forEach(function (n) { li.appendChild(n); });
             el.ordersList.appendChild(li);

@@ -105,6 +105,12 @@ code {
 
 .sr-only {
     position: absolute;
+    /* pinned to its box, so a hidden label in a wide table never widens the page */
+    top: 0;
+    left: 0;
+    margin: -1px;
+    padding: 0;
+    border: 0;
     width: 1px;
     height: 1px;
     overflow: hidden;
@@ -1040,6 +1046,7 @@ code {
 /* ---------- Tables ---------- */
 
 .table-wrap {
+    position: relative;
     overflow-x: auto;
 }
 
@@ -3758,5 +3765,25 @@ a.badge:hover {
 
     .header-chatbot-panel {
         width: min(340px, calc(100vw - 24px));
+    }
+}
+
+/* Phones and tablets: wide tables (invoices, claims, settings) keep readable columns and
+   scroll sideways inside their box, instead of squeezing every column into a
+   few letters per line. Tables that turn into cards on phones are left out. */
+@media (max-width: 900px) {
+    .table-wrap > .data-table:not(.product-table):not(.category-table):not(.order-table) {
+        min-width: 640px;
+    }
+
+    .table-wrap > .data-table:not(.product-table):not(.category-table):not(.order-table) th,
+    .table-wrap > .data-table:not(.product-table):not(.category-table):not(.order-table) td {
+        white-space: nowrap;
+    }
+
+    /* Long notes still wrap, in a readable width. */
+    .table-wrap > .data-table:not(.product-table):not(.category-table):not(.order-table) td.muted {
+        min-width: 220px;
+        white-space: normal;
     }
 }

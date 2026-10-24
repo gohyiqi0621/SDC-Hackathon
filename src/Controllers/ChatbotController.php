@@ -228,6 +228,34 @@ final class ChatbotController
     }
 
     /** Everything the live Chat Interface shows, as plain arrays (also embedded in the first page load). */
+    /**
+     * The printable invoice of each order (not drafts), keyed by order id.
+     *
+     * @param list<int> $orderIds
+     * @return array<int, array{id: int, invoice_number: string}>
+     */
+    private function invoicesForOrders(int $userId, array $orderIds): array
+    {
+        if ($orderIds === []) {
+            return [];
+        }
+        try {
+            $stmt = \Src\Support\Database::connection()->prepare(
+                "SELECT id, invoice_number, order_id FROM invoices
+                  WHERE user_id = ? AND status <> 'draft' AND order_id IN (" . implode(',', array_fill(0, count($orderIds), '?')) . ')
+                  ORDER BY id'
+            );
+            $stmt->execute(array_merge([$userId], $orderIds));
+        } catch (Throwable $e) {
+            return []; // invoices table / order_id column not there yet
+        }
+        $out = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $out[(int) $row['order_id']] = ['id' => (int) $row['id'], 'invoice_number' => (string) $row['invoice_number']];
+        }
+        return $out;
+    }
+
     /** Messages written by the system (order / payment / booking notices), not by the AI. */
     private const SYSTEM_MARKS = '/^(📎|🖼|🧾|✅|⚠️|📦|📅|📄|🛒|❌)/u';
 
@@ -414,8 +442,25 @@ final class ChatbotController
             }
 
             try {
-                foreach ((new Order())->todayForChat($userId, $current['channel'], $current['chat_id']) as $o) {
+                $today    = (new Order())->todayForChat($userId, $current['channel'], $current['chat_id']);
+                $invoices = $this->invoicesForOrders($userId, array_map(static fn (array $o): int => (int) $o['id'], $today));
+                foreach ($today as $o) {
+                    $files = [];
+                    if (!empty($o['receipt_path'])) {
+                        $files[] = ['kind' => 'slip', 'label' => 'Slip', 'title' => 'Bank reference the customer sent',
+                                    'url' => url('orders', ['action' => 'receipt', 'id' => (int) $o['id']])];
+                    }
+                    if (isset($invoices[(int) $o['id']])) {
+                        $inv = $invoices[(int) $o['id']];
+                        $files[] = ['kind' => 'invoice', 'label' => 'Invoice', 'title' => 'Invoice ' . $inv['invoice_number'] . ' (PDF)',
+                                    'url' => url('financial', ['action' => 'print', 'id' => (int) $inv['id']])];
+                    }
+                    if (in_array($o['status'], \Src\Services\OfficialReceiptPdf::STATUSES, true)) {
+                        $files[] = ['kind' => 'receipt', 'label' => 'Receipt', 'title' => 'Official receipt ' . \Src\Services\OfficialReceiptPdf::receiptNo($o) . ' (PDF)',
+                                    'url' => url('orders', ['action' => 'official_receipt', 'id' => (int) $o['id']])];
+                    }
                     $orders[] = [
+                        'files'    => $files,
                         'order_no' => $o['order_no'],
                         'status'   => $o['status'],
                         'label'    => Order::STATUSES[$o['status']] ?? $o['status'],

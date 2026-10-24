@@ -246,7 +246,7 @@ a.ocard:hover { border-color: #d5d0ff; transform: translateY(-1px); text-decorat
 @media (max-width: 1100px) {
     .ocards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (max-width: 720px) {
+@media (max-width: 900px) {
     .ocards { gap: 10px; }
     .ocard { padding: 12px 14px; }
     .ocard { gap: 10px; }
@@ -257,8 +257,9 @@ a.ocard:hover { border-color: #d5d0ff; transform: translateY(-1px); text-decorat
     /* Table -> cards */
     .otable thead { display: none; }
     .otable, .otable tbody, .otable tr, .otable td { display: block; width: 100%; }
-    .orow { display: grid !important; grid-template-columns: 1fr auto; gap: 6px 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
-    .otable td { padding: 0; border: 0; }
+    .orow { display: grid !important; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+    /* grid cells size to their content (width: 100% above would push the status / total off the card) */
+    .otable td { padding: 0; border: 0; width: auto; min-width: 0; }
     .otable td[data-label="Order"] { grid-column: 1; }
     .otable td[data-label="Status"] { grid-column: 2; grid-row: 1; text-align: right; }
     .otable td[data-label="Customer"] { grid-column: 1; }
