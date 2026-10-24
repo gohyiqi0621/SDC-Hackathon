@@ -155,22 +155,40 @@ final class DocumentExtractService
         }
         $content[] = ['type' => 'text', 'text' => $prompt];
 
+        $outputConfig = ['format' => ['type' => 'json_schema', 'schema' => $schema]];
+        // Reading a document is routine work: low effort keeps it fast and cheap.
+        // Only newer models accept "effort"; Claude Haiku 4.5 (and other 4.x
+        // models) reject the whole request with HTTP 400 when it is sent.
+        if (!preg_match('/^claude-(haiku|sonnet|opus)-4/', (string) $ai['model'])) {
+            $outputConfig['effort'] = 'low';
+        }
+
         $payload = [
             'model'         => $ai['model'],
             'max_tokens'    => 4000, // a hard cap on the reply; a normal invoice needs well under 1,000
-            // Reading a document is routine work: low effort keeps it fast and cheap.
-            'output_config' => [
-                'effort' => 'low',
-                'format' => ['type' => 'json_schema', 'schema' => $schema],
-            ],
+            'output_config' => $outputConfig,
             'messages'      => [['role' => 'user', 'content' => $content]],
         ];
-
-        $response = $this->post('https://api.anthropic.com/v1/messages', [
+        $headers = [
             'x-api-key'         => $ai['key'],
             'anthropic-version' => '2023-06-01',
             'Content-Type'      => 'application/json',
-        ], $payload, $ai['label']);
+        ];
+
+        try {
+            $response = $this->post('https://api.anthropic.com/v1/messages', $headers, $payload, $ai['label']);
+        } catch (RuntimeException $e) {
+            // HTTP 400 = this model refused one of the options. Ask once more in
+            // the plainest form (no effort, no schema; JSON asked for in the text).
+            if (!str_contains($e->getMessage(), '(HTTP 400)')) {
+                throw $e;
+            }
+            unset($payload['output_config']);
+            $last = count($content) - 1;
+            $content[$last]['text'] .= "\n\nReply with the JSON object only, no other text.";
+            $payload['messages'] = [['role' => 'user', 'content' => $content]];
+            $response = $this->post('https://api.anthropic.com/v1/messages', $headers, $payload, $ai['label']);
+        }
 
         $json = $response['json'];
         if (($json['stop_reason'] ?? '') === 'refusal') {
@@ -239,6 +257,7 @@ final class DocumentExtractService
         if ($status < 200 || $status >= 300 || !is_array($response['json'])) {
             $detail = is_array($response['json']) ? (string) ($response['json']['error']['message'] ?? '') : '';
             error_log('[extract] ' . $label . ' HTTP ' . $status . ($detail !== '' ? ': ' . $detail : ''));
+            \Src\Support\FlowLog::write('extract.error', ['model' => $label, 'status' => $status, 'detail' => mb_substr($detail, 0, 300)]);
             throw new RuntimeException($label . ' could not read the file (HTTP ' . $status . ').' . (APP_DEBUG && $detail !== '' ? ' ' . $detail : ''));
         }
 
