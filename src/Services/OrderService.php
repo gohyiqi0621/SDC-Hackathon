@@ -92,6 +92,21 @@ final class OrderService
         $total = format_money($order['total'], $order['currency']);
         $thanks = "🧾 Thank you! We received your bank reference for order {$order['order_no']} ({$total}).\n"
             . 'Our team will verify it and let you know here shortly.';
+        // Several orders waiting for payment: say which one this slip was matched to.
+        try {
+            $others = array_values(array_filter(
+                $orders->recentForChat($userId, 'telegram', $chatId, 10),
+                static fn (array $o): bool => (int) $o['id'] !== (int) $order['id']
+                    && in_array($o['status'], ['pending_payment', 'payment_rejected'], true)
+            ));
+        } catch (\Throwable $e) {
+            $others = [];
+        }
+        if ($others !== []) {
+            $thanks .= "\nStill waiting for payment: "
+                . implode(', ', array_map(static fn (array $o): string => $o['order_no'] . ' (' . format_money($o['total'], $o['currency']) . ')', $others))
+                . ". If this slip was for one of those, tell us the order number.";
+        }
         $telegram->sendText($token, $chatId, $thanks);
         $this->remember($userId, $order, 'customer', '📎 [Bank reference sent for ' . $order['order_no'] . ']');
         $this->remember($userId, $order, 'assistant', $thanks);

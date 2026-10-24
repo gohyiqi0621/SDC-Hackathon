@@ -26,7 +26,7 @@ final class SystemMessageBuilder
     /** How an order's status is described to the AI. */
     private const ORDER_STATUS = [
         'pending_payment'   => 'UNPAID, waiting for the customer to pay and send the receipt',
-        'payment_submitted' => 'receipt received, staff are checking the payment',
+        'payment_submitted' => 'BANK REFERENCE RECEIVED, staff are verifying it (not unpaid: never ask the customer to pay it again)',
         'paid'              => 'PAID (payment successful), being prepared for shipping',
         'shipped'           => 'PAID and SHIPPED',
         'payment_rejected'  => 'payment rejected by staff, waiting for a new receipt',
@@ -48,9 +48,9 @@ final class SystemMessageBuilder
         }
 
         return "## This customer's orders (newest first)\n" . implode("\n", $lines) . "\n\n"
-            . "- PAID, cancelled and receipt-received orders are finished: never put their items into a new order.\n"
-            . "- \"One more X\" or \"add X\" after a finished order means a NEW order with ONLY X (quantity as asked, 1 if not said).\n"
-            . "- If the newest order is UNPAID and the customer wants to change or add items, call buy_product once with the complete new list: the new order replaces the unpaid one.\n"
+            . "- Every order above stays as it is. \"One more X\", \"add X\" or any change means a NEW, separate order with ONLY X (quantity as asked, 1 if not said), with its own payment. Never repeat earlier items, never say \"updated order\", never add totals of different orders together.\n"
+            . "- When telling the customer what is still to pay, list ONLY the orders marked UNPAID or payment rejected. Orders with a bank reference received are being verified, not unpaid.\n"
+            . "- Only mention order numbers listed above or returned by buy_product in this chat. Never invent an order number: if buy_product did not return success, the order was not created.\n"
             . "- When unsure what the customer wants in the new order, ask before calling buy_product.\n\n";
     }
 
