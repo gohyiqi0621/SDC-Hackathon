@@ -19,7 +19,7 @@
 
 | Resource          | Link                                           |
 | ----------------- | ---------------------------------------------- |
-| GitHub Repository | https://github.com/gohyiqi0621/SDC-Hackathon/= |
+| GitHub Repository | https://github.com/gohyiqi0621/SDC-Hackathon/ |
 | Replit Project    | https://replit.com/@gohyiqi1/SME-Smart         |
 | Live Demo         | https://sme-smart.replit.app/                  |
 | RunPod Endpoint   | https://api.runpod.ai/v2/your-endpoint-id      |
