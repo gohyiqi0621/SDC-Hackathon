@@ -55,6 +55,13 @@ private static bool $loaded = false;
         return $user;
     }
 
+    /** Chrome/Edge preload (prefetch / prerender) of a page, not a real visit. */
+    private static function isPrefetch(): bool
+    {
+        $purpose = strtolower((string) ($_SERVER['HTTP_SEC_PURPOSE'] ?? $_SERVER['HTTP_PURPOSE'] ?? $_SERVER['HTTP_X_MOZ'] ?? ''));
+        return str_contains($purpose, 'prefetch') || str_contains($purpose, 'prerender');
+    }
+
     public static function check(): bool
     {
         return self::user() !== null;
@@ -69,7 +76,16 @@ private static bool $loaded = false;
         $user = self::user();
 
         if ($user === null) {
-            flash('error', 'Please sign in to continue.', 'Sign in to continue');
+            // A background request (fetch from an open tab) answers in JSON; it must
+            // not leave a "sign in" message waiting for the next login page.
+            if (wants_json()) {
+                json_response(false, ['redirect' => url('auth', ['action' => 'login'])], 'Please sign in again.', 401);
+            }
+            // The browser preloading a page while the address is typed is not a
+            // visit by the person: no message for that either.
+            if (!self::isPrefetch()) {
+                flash('info', 'Please sign in to open that page.', 'Sign in to continue');
+            }
             redirect(url('auth', ['action' => 'login']));
         }
 
