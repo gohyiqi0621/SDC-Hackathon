@@ -23,8 +23,8 @@
 | Replit Project    | https://replit.com/@gohyiqi1/SME-Smart        |
 | Live Demo         | https://sme-smart.replit.app/                 |
 | RunPod Endpoint   | https://api.runpod.ai/v2/your-endpoint-id     |
-| Slide Deck        | https://example.com/slides                    |
-| Demo Video        | https://example.com/demo-video                |
+| Slide Deck        | https://canva.link/o7vqbu97ji960r8                   |
+| Demo Video        | https://youtu.be/5k7ap7hJpZ8                |
 
 ---
 
