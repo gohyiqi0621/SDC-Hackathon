@@ -38,9 +38,9 @@ button shows the exact system message and Flowise request (secrets masked).
 | Call Flowise | `src/Services/FlowiseService.php` (`payload()` and `parseReply()`) |
 | One message → one reply | `src/Services/AssistantReplyService.php` |
 | Tools for Flowise | `src/Controllers/ToolController.php` (check_product, buy_product, check_availability, make_booking), token: `src/Support/ToolToken.php` |
-| Bookings (Google Calendar) | `src/Services/BookingService.php`, `src/Controllers/BookingController.php`, `database/migrations/013_create_bookings.sql` |
-| Orders, receipts, approval | `src/Services/OrderService.php`, `src/Controllers/OrderController.php`, `database/migrations/009_create_orders.sql` |
-| Tables | `database/migrations/007_create_telegram_messaging.sql` |
+| Bookings (Google Calendar) | `src/Services/BookingService.php`, `src/Controllers/BookingController.php`, `database/schema.sql` (bookings) |
+| Orders, receipts, approval | `src/Services/OrderService.php`, `src/Controllers/OrderController.php`, `database/schema.sql` (orders) |
+| Tables | `database/schema.sql` (telegram_updates, chat_messages) |
 
 ## Where each template value comes from
 

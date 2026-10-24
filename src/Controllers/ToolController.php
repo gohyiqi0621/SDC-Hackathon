@@ -201,13 +201,11 @@ final class ToolController
                 default             => ' (waiting for payment)',
             };
 
-            // Exactly the same items as an order still waiting for payment: that is
-            // the same order (handled as a repeat below), not a new one.
-            if ($sameItems && $locked['status'] !== 'pending_payment' && strtotime((string) $locked['created_at']) > time() - 600) {
-                $this->fail('The order was NOT created: these are exactly the items of order ' . $lockedLabel . '. '
-                    . 'Do not order them again. If the customer really wants the same items again, ask them to confirm first, '
-                    . 'then call buy_product with only the items they want now.');
-            }
+            // The same items again after the slip was sent / the order was paid
+            // ("one more roti telur") is a NEW order: the customer already
+            // confirmed it with the AI, so it is not refused (refusing made the AI
+            // ask "are you sure?" again and again). A repeat of an order still
+            // waiting for payment is caught by findSamePending below.
             // Take the earlier items out only when a DIFFERENT product was added
             // ("old items + new one"). More of the same product = a new order as asked.
             $earlierIds = array_map(static fn (array $i): int => (int) ($i['product_id'] ?? 0), $locked['items']);

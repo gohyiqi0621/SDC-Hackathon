@@ -66,9 +66,7 @@ By combining AI automation with human verification, SME Smart reduces repetitive
 ├── bin/                         # CLI tools: migrate, create-user, generate-key, telegram-webhook,
 │                                #   flow-log, check, plus the local / production server launchers
 ├── database/
-│   ├── schema.sql               # base PostgreSQL schema (users + password resets)
-│   ├── all_migrations.sql       # every migration in one file (paste into a fresh database)
-│   └── migrations/              # numbered migrations 001_ ... 024_, run by bin/migrate.php
+│   └── schema.sql               # the whole PostgreSQL database in one file, run by bin/migrate.php
 ├── deployment/                  # Nginx + PHP-FPM configuration for the Replit deployment
 ├── docs/
 │   ├── AUTH.md                  # sign-in, sessions and profile

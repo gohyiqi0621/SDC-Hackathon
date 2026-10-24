@@ -1,0 +1,3 @@
+# Python dependencies (RunPod handler and tests).
+# The web app itself is PHP 8.2 and needs no Composer packages.
+runpod

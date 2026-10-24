@@ -148,14 +148,12 @@ final class OrderInvoiceService
             return;
         }
 
+        // database/schema.sql holds the whole database and is safe to run again.
         $applied = [];
-        foreach (['005_create_invoices.sql', '016_add_invoice_details_and_items.sql',
-                  '018_reconcile_invoice_items_print_columns.sql', '022_invoice_create_flow_and_receipts.sql'] as $file) {
-            $path = APP_ROOT . '/database/migrations/' . $file;
-            if (is_file($path)) {
-                $db->exec((string) file_get_contents($path));
-                $applied[] = $file;
-            }
+        $path    = APP_ROOT . '/database/schema.sql';
+        if (is_file($path)) {
+            $db->exec((string) file_get_contents($path));
+            $applied[] = 'schema.sql';
         }
         FlowLog::write('invoice.schema_created', ['migrations' => $applied]);
     }
