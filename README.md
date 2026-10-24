@@ -17,14 +17,14 @@
 
 ## Links
 
-| Resource          | Link                                           |
-| ----------------- | ---------------------------------------------- |
+| Resource          | Link                                          |
+| ----------------- | --------------------------------------------- |
 | GitHub Repository | https://github.com/gohyiqi0621/SDC-Hackathon/ |
-| Replit Project    | https://replit.com/@gohyiqi1/SME-Smart         |
-| Live Demo         | https://sme-smart.replit.app/                  |
-| RunPod Endpoint   | https://api.runpod.ai/v2/your-endpoint-id      |
-| Slide Deck        | https://example.com/slides                     |
-| Demo Video        | https://example.com/demo-video                 |
+| Replit Project    | https://replit.com/@gohyiqi1/SME-Smart        |
+| Live Demo         | https://sme-smart.replit.app/                 |
+| RunPod Endpoint   | https://api.runpod.ai/v2/your-endpoint-id     |
+| Slide Deck        | https://example.com/slides                    |
+| Demo Video        | https://example.com/demo-video                |
 
 ---
 
