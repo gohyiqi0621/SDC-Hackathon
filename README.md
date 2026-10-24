@@ -136,10 +136,14 @@ By combining AI automation with human verification, SME Smart reduces repetitive
 │   ├── cache/                   #   short-lived cache
 │   └── uploads/                 #   private uploads: bank slips, invoices, claim receipts
 ├── submission/                  # required submission documents (PDF)
+│   ├── SDC2026_Ctrl+Future_Preliminary.pdf
+│   ├── SDC2026_CtrlFuture_TechDeclaration.pdf
 │   ├── SDC2026_CtrlFuture_Replit_POU.pdf
 │   └── SDC2026_CtrlFuture_Runpod_POU.pdf
 ├── tests/
 │   └── test_utils.py            # unit tests
+├── .agents/
+│   └── memory/                  # Replit Agent notes (e.g. the PHP-FPM runtime setup on Replit)
 ├── .env.example                 # every setting the app reads, with placeholders
 ├── .gitignore
 ├── .htaccess                    # blocks src/, .env etc. from the web (XAMPP)
